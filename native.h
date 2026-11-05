@@ -20,6 +20,8 @@
 
 #include <windows.h>
 
+#include <chrono>
+#include <cstdio>
 #include <ctime>
 #include <filesystem>
 #include <fstream>
@@ -463,12 +465,20 @@ private:
     }
     std::string stamp()
     {
-        std::time_t t = std::time(nullptr);
+        // Millisecond resolution: two saves inside one second would otherwise
+        // produce the same file name and silently overwrite the older snapshot,
+        // losing an undo point.
+        const auto now = std::chrono::system_clock::now();
+        const std::time_t t = std::chrono::system_clock::to_time_t(now);
+        const int ms = static_cast<int>(
+            std::chrono::duration_cast<std::chrono::milliseconds>(now.time_since_epoch()).count() % 1000);
         std::tm tmbuf {};
         gmtime_s(&tmbuf, &t);
-        char buf[32];
-        std::strftime(buf, sizeof buf, "%Y%m%dT%H%M%SZ", &tmbuf);
-        return std::string(buf);
+        char buf[40];
+        std::strftime(buf, sizeof buf, "%Y%m%dT%H%M%S", &tmbuf);
+        char msBuf[8];
+        std::snprintf(msBuf, sizeof msBuf, ".%03dZ", ms);
+        return std::string(buf) + msBuf;
     }
 
     std::string m_dir;
