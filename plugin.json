@@ -1,0 +1,104 @@
+{
+  "$schema": "https://raw.githubusercontent.com/LingCore/WinShun-plugins/main/schema/plugin.schema.json",
+  "manifest": 1,
+  "id": "ra9fael.envhosts",
+  "name": {
+    "zh": "环境变量 / hosts 编辑",
+    "en": "Env & hosts editor"
+  },
+  "version": "0.1.0",
+  "description": {
+    "zh": "查看、过滤、改写用户环境变量和 hosts 条目；改写前自动备份，系统级目标未提权时明确降级",
+    "en": "Browse, filter and edit user env vars and hosts entries; auto-backup before writes; honest degradation for admin-only targets"
+  },
+  "author": "ra9fael",
+  "license": "MIT",
+  "runtime": {
+    "mode": "resident",
+    "program": "envhosts.exe",
+    "sandbox": "normal",
+    "start": "lazy",
+    "timeoutMs": 1500,
+    "memoryMB": 64,
+    "idleExitSec": 600,
+    "encoding": "utf-8"
+  },
+  "permissions": [
+    {
+      "files:read": ["%SystemRoot%\\System32\\drivers\\etc\\hosts"]
+    },
+    {
+      "files:write": ["%SystemRoot%\\System32\\drivers\\etc\\hosts"]
+    }
+  ],
+  "ai": {
+    "expose": true
+  },
+  "commands": [
+    {
+      "id": "env",
+      "keyword": ["env", "环境变量"],
+      "title": {
+        "zh": "环境变量",
+        "en": "Environment variables"
+      },
+      "hint": {
+        "zh": "如 env path；回车进入行内编辑",
+        "en": "e.g. env path; Enter edits inline"
+      },
+      "icon": "color:#185FA5",
+      "actions": [
+        { "id": "edit", "title": { "zh": "编辑", "en": "Edit" }, "key": "Enter" },
+        { "id": "copyValue", "title": { "zh": "复制值", "en": "Copy value" }, "key": "Ctrl+Enter" },
+        { "id": "copyExpanded", "title": { "zh": "复制展开值", "en": "Copy expanded" }, "key": "Shift+Enter" },
+        { "id": "delete", "title": { "zh": "删除", "en": "Delete" }, "key": "" }
+      ]
+    },
+    {
+      "id": "hosts",
+      "keyword": ["hosts"],
+      "title": {
+        "zh": "hosts 文件",
+        "en": "hosts file"
+      },
+      "hint": {
+        "zh": "如 hosts docker；回车注释 / 启用",
+        "en": "e.g. hosts docker; Enter toggles"
+      },
+      "icon": "color:#107C10",
+      "actions": [
+        { "id": "toggle", "title": { "zh": "注释 / 启用", "en": "Toggle" }, "key": "Enter" },
+        { "id": "copyLine", "title": { "zh": "复制整行", "en": "Copy line" }, "key": "Ctrl+Enter" },
+        { "id": "openFile", "title": { "zh": "打开 hosts 文件", "en": "Open hosts file" }, "key": "Shift+Enter" },
+        { "id": "delete", "title": { "zh": "删除该行", "en": "Delete line" }, "key": "" }
+      ]
+    }
+  ],
+  "settings": [
+    {
+      "key": "hostsPath",
+      "type": "text",
+      "title": { "zh": "hosts 路径", "en": "hosts path" },
+      "hint": { "zh": "支持 %VAR% 展开", "en": "%VAR% expanded" },
+      "default": "%SystemRoot%\\System32\\drivers\\etc\\hosts"
+    },
+    {
+      "key": "backupCount",
+      "type": "number",
+      "title": { "zh": "备份数", "en": "Backups kept" },
+      "default": 10
+    },
+    {
+      "key": "maxResults",
+      "type": "number",
+      "title": { "zh": "最大行数", "en": "Max rows" },
+      "default": 50
+    },
+    {
+      "key": "showSystemVars",
+      "type": "bool",
+      "title": { "zh": "显示系统变量", "en": "Show system vars" },
+      "default": true
+    }
+  ]
+}

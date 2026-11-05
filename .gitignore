@@ -1,0 +1,14 @@
+# Build output is never committed or packaged into .wsplugin.
+build/
+dist/
+CMakeFiles/
+*.obj
+*.pdb
+*.ilk
+__pycache__/
+*.pyc
+
+# envhosts.exe is a build artifact (CMake writes it to the source dir, because
+# plugin.json names it as runtime.program). It ships as a GitHub release asset
+# (.wsplugin), not through git. A fresh clone rebuilds it with CMake.
+envhosts.exe

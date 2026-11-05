@@ -1,0 +1,40 @@
+# Build and unit-test every push and pull request, and keep the package as a
+# workflow artifact so a change can be tried before it is released.
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Configure
+        run: cmake -S . -B build -A x64
+
+      - name: Build
+        run: cmake --build build --config Release
+
+      - name: Unit tests
+        run: ctest --test-dir build -C Release --output-on-failure
+
+      - name: Package
+        run: python tools/package.py
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: wsplugin
+          path: dist/
+          if-no-files-found: error

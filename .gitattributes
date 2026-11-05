@@ -1,0 +1,3 @@
+# The hosts fixture is compared byte for byte (UTF-8 BOM, CRLF). Never let git
+# normalise its line endings, on commit or on checkout.
+tests/fixtures/** -text
