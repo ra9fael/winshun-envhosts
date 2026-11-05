@@ -66,14 +66,20 @@ upstream as a separate commit.
 
 1. Fork, create a branch from `main`.
 2. Keep a pull request to one topic. Follow the existing style: C++17, no
-   third-party libraries, no runtime DLLs, all code, comments and docs in
-   English (user-facing strings in plugin.json stay bilingual zh/en).
+   third-party libraries, no runtime DLLs, all code and comments in English.
+   Documentation is bilingual: `README.md` is the Chinese default and
+   `README.en.md` its English counterpart (see "Documentation languages").
+   User-facing strings in plugin.json stay bilingual zh/en.
 3. Add or update unit tests for logic changes. CI must pass.
 4. Before opening the PR, run `env` and `hosts` in Win顺 and check one edit and one restore.
-5. If behaviour, settings or permissions change, update `README.md` and add a
-   line under `## [Unreleased]` in `CHANGELOG.md`.
-6. Commit messages use [Conventional Commits](https://www.conventionalcommits.org/):
-   `feat(scope): ...`, `fix(scope): ...`, `docs: ...`, `test: ...`, `chore: ...`.
+5. If behaviour, settings or permissions change, update **both**
+   `README.md` and `README.en.md`, and add a line under `## [Unreleased]` in
+   `CHANGELOG.md`.
+6. Commit messages use the Angular convention
+   ([Conventional Commits](https://www.conventionalcommits.org/)):
+   `type(scope): imperative summary`, a blank line, then the body. Allowed
+   types: `feat`, `fix`, `docs`, `style`, `refactor`, `perf`, `test`, `build`,
+   `ci`, `chore`, `revert`. Lowercase summary, no trailing period.
 
 Do not commit `envhosts.exe`, `build/` or `dist/`; `.gitignore` already excludes them.
 
@@ -89,6 +95,27 @@ Never commit a real hosts file, real environment values, user names, machine
 names or private IP addresses. `tests/fixtures/hosts.sample` keeps the
 structure of a real file (UTF-8 BOM, CRLF, a Docker section, a duplicate host)
 with RFC 5737 documentation addresses. Extend it the same way.
+
+## Documentation languages
+
+Win顺 is Chinese-first but also ships an English UI (`winshun_en.ts`), so the
+user-facing documentation follows the same split:
+
+| File | Language | Role |
+|---|---|---|
+| `README.md` | 简体中文 | Default. GitHub renders it on the repository home page. |
+| `README.en.md` | English | Full counterpart for English-UI users. |
+
+Both files start with a language switch and end with a link back, so readers can
+jump in either direction. **Keep both in sync**: any change to structure,
+settings, permissions or install steps must be applied to both in the same PR.
+Code identifiers, settings keys, command syntax, JSON and paths stay in English
+in both files. The English README uses Win顺's real English UI labels
+(`Settings → Plugins → Installed → Add plugin → Archive (.zip / .wsplugin)`),
+while the Chinese one uses the Chinese labels.
+
+`CONTRIBUTING.md`, `CHANGELOG.md`, `TESTPLAN.md` and `ROADMAP.md` stay in
+English.
 
 ## Releasing (maintainers)
 

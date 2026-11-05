@@ -7,6 +7,11 @@ single source of truth; release tags are `v<version>`.
 
 ## [Unreleased]
 
+### Changed
+- `README.md` is now the Chinese (default) documentation; `README.en.md` holds
+  the full English text. Both link to each other. The English install steps now
+  use Win顺's real English UI labels. No runtime change.
+
 ## [0.1.0] - 2026-11-05
 
 First public release.
