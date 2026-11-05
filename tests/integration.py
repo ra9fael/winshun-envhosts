@@ -260,6 +260,63 @@ def main():
     else:
         check(False, "env:restore listed a backup")
 
+    print("== P1/P2 interactive editor pinned row is always first ==")
+    pe = parse(d.query("env", "", "env"))
+    pe_items = pe["result"]["items"]
+    check(pe_items and pe_items[0]["id"] == "env:editor", "env query first row is env:editor")
+    check(pe_items and pe_items[0]["data"]["kind"] == "openEditor", "env:editor row kind is openEditor")
+    ph = parse(d.query("hosts", "", "hosts"))
+    ph_items = ph["result"]["items"]
+    check(ph_items and ph_items[0]["id"] == "hosts:editor", "hosts query first row is hosts:editor")
+    check(ph_items and ph_items[0]["data"]["kind"] == "openEditor", "hosts:editor row kind is openEditor")
+
+    print("== P3 openEditor action is wired and degrades gracefully ==")
+    oe = parse(d.action("env", "open", pe_items[0]))
+    oe_eff = oe["result"]["effects"]
+    has_notify = any(e.get("type") == "notify" for e in oe_eff)
+    check(has_notify, "openEditor returns a notify effect")
+    # On a headless/CI box CreateWindowExW fails; the action must NOT crash and the
+    # process must stay responsive (a follow-up query still answers).
+    pe2 = parse(d.query("env", "", "env"))
+    check(pe2 and pe2["result"]["items"][0]["id"] == "env:editor", "plugin still answers after openEditor")
+    p3_hide = any(e.get("type") == "hide" for e in oe_eff)
+    p3_keep = any(e.get("type") == "keep" for e in oe_eff)
+    check(p3_hide or p3_keep, "openEditor returns hide (opened) or keep (failed) effect",
+          str([e.get("type") for e in oe_eff]))
+    # P6: external-change path must not crash when a launcher write happens while an
+    # editor may or may not be open (onExternalChange posts to a possibly-null HWND).
+    e_save = parse(d.query("env", ":set WS_EDITOR_PING=ok", "env:set WS_EDITOR_PING=ok"))
+    edit_row = d.find_item(e_save["result"]["items"], kind="envEdit")
+    if edit_row:
+        d.action("env", "save", edit_row)
+        time.sleep(0.2)
+        ping = reg_list(SUBKEY).get("WS_EDITOR_PING", (None, None))[0]
+        check(ping == "ok", "env save still works after openEditor (external-change path)",
+              f"WS_EDITOR_PING={ping}")
+        d.action("env", "delete", d.find_item(parse(d.query("env", "WS_EDITOR_PING", "env WS_EDITOR_PING"))["result"]["items"],
+                                              kind="env", name="WS_EDITOR_PING"))
+        time.sleep(0.2)
+
+    print("== P4 manifest declares v0.2.0 + ui + clipboard:write + idleExitSec 0 ==")
+    import json as _json
+    plugin_path = os.path.join(HERE, "..", "plugin.json")
+    with open(plugin_path, "r", encoding="utf-8") as _f:
+        manifest = _json.load(_f)
+    check(manifest.get("version") == "0.2.0", "plugin.json version is 0.2.0", manifest.get("version"))
+    perms = manifest.get("permissions", [])
+    check("ui" in perms, "permissions include ui")
+    check("clipboard:write" in perms, "permissions include clipboard:write")
+    check(manifest.get("runtime", {}).get("idleExitSec") == 0, "idleExitSec is 0 (window must stay alive)")
+
+    print("== P5 editor draft path uses per-kind files under WS_DATA_DIR ==")
+    editor_src = open(os.path.join(HERE, "..", "editor_win.h"), "r", encoding="utf-8").read()
+    # Must check the actual path expression, not a comment: drafts are written
+    # to <dataDir>/drafts/<kind>.json (env.json / hosts.json).
+    check('m_args.dataDir + "/drafts/" + m_kind + ".json"' in editor_src,
+          "editor_win.h writes drafts to <dataDir>/drafts/<kind>.json")
+    check("fromDraft" in editor_src and "readDraft" in editor_src,
+          "editor_win.h auto-loads a leftover draft on open")
+
     print("== T2.3 hosts write denied as normal user (real System32 hosts) ==")
     # Second instance without the temp-hosts override: the plugin reads the
     # real hosts file, which a normal user cannot write.

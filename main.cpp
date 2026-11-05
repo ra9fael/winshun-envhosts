@@ -23,6 +23,7 @@
 
 #ifdef _WIN32
 #include "native.h"
+#include "editor_win.h"
 #endif
 
 static_assert(sizeof(void*) == 8, "ra9fael.envhosts must be built as x64; a 32-bit build edits the wrong System32\\drivers\\etc\\hosts via the Wow64 redirector");
@@ -243,11 +244,49 @@ winshun::Item confirmRow(const std::string& id, const std::string& kind, const s
     return item;
 }
 
+// ---- pinned "open interactive editor" row (always the first result) -----------
+
+winshun::Item editorEntryRow(const std::string& kind, const std::string& filter, bool zh)
+{
+    const bool isEnv = kind == "env";
+    winshun::Item item(kind + ":editor", tr(zh, "进入交互式编辑界面", "Open interactive editor"),
+                      (isEnv ? tr(zh, "可视化编辑全部环境变量", "Visually edit all environment variables")
+                             : tr(zh, "可视化编辑 hosts 文件", "Visually edit the hosts file"))
+                          + tr(zh, " · Enter 打开独立窗口", " · Enter opens a standalone window"));
+    item.withIcon(isEnv ? "color:#185FA5" : "color:#107C10")
+        .withScore(1000)
+        .withPreview(isEnv
+                         ? tr(zh, "打开独立窗口：纯键盘操作、撤销/重做、冲突检测、草稿自动保存",
+                              "Standalone window: full keyboard control, undo/redo, conflict detection, auto-saved drafts")
+                         : tr(zh, "打开独立窗口：注释/启用、增删行、备份与冲突检测",
+                              "Standalone window: toggle/enable, add/remove lines, backups, conflict detection"))
+        .withData(rowData({{"kind", "openEditor"},
+                          {"target", kind},
+                          {"filter", filter},
+                          {"select", ""},
+                          {"primary", tr(zh, "进入交互式编辑界面", "Open interactive editor")},
+                          {"detail", ""},
+                          {"chain", ""},
+                          {"expand", false}}))
+        .withActions(std::vector<winshun::Action> {{"open", tr(zh, "打开", "Open"), "Enter"}});
+    return item;
+}
+
 #ifdef _WIN32
 // ---- resident plugin -----------------------------------------------------------
 
 struct EnvHosts : winshun::Plugin {
     std::string name() const override { return "ra9fael.envhosts"; }
+
+    // On shutdown (serve() returns) close any open editor windows and join their
+    // GUI threads so unsaved edits are written as drafts and no std::thread is left
+    // joinable (which would terminate the process).
+    ~EnvHosts() override
+    {
+#ifdef _WIN32
+        editorwin::closeAllEditors(1500);
+#endif
+    }
 
     // Test-only escape: when these env vars are set the plugin targets a scratch
     // key / file instead of the real Environment / hosts, so integration tests
@@ -347,6 +386,7 @@ struct EnvHosts : winshun::Plugin {
 
         // EnvList
         winshun::Items items;
+        items.push_back(editorEntryRow("env", pq.filter, zh));
         if (pq.filter.empty()) {
             int userN = 0, sysN = 0;
             for (const auto& v : r.snap.vars)
@@ -425,6 +465,7 @@ struct EnvHosts : winshun::Plugin {
         const envh::HostsParsed parsed = envh::parseHosts(r.content);
         const std::vector<envh::HostsEntry> entries = envh::hostsEntries(parsed);
         winshun::Items items;
+        items.push_back(editorEntryRow("hosts", pq.filter, zh));
         if (pq.filter.empty()) {
             winshun::Item h("hosts:hint", tr(zh, "hosts 文件", "hosts file"),
                             tr(zh, "共 ", "entries: ") + std::to_string(entries.size())
@@ -461,6 +502,34 @@ struct EnvHosts : winshun::Plugin {
         const winshun::Json data = a.item["data"];
         const std::string kind = data["kind"].toString();
         const auto notify = [&](const std::string& t) { return winshun::effect::notify(t); };
+
+        // ---- open the interactive editor window ----
+        if (kind == "openEditor") {
+            const std::string target = data["target"].toString(); // "env" | "hosts"
+            editorwin::OpenArgs oa;
+            oa.kind = target;
+            oa.userSubkey = testUserSubkey();
+            oa.hostsPath = winshun::wide(testHostsPath(st));
+            oa.dataDir = dataDir();
+            oa.backupCount = st.backupCount;
+            oa.showSystem = st.showSystem;
+            oa.filter = data["filter"].toString();
+            oa.select = data["select"].toString();
+            oa.zh = chinese();
+            oa.dark = (theme() == "dark");
+            if (target == "hosts") {
+                envh::native::HostsStore hs(winshun::wide(testHostsPath(st)));
+                std::string werr;
+                oa.writable = hs.isWritable(werr);
+            } else {
+                oa.writable = true;
+            }
+            std::string err;
+            const bool ok = editorwin::openEditor(oa, err);
+            if (ok)
+                return {winshun::effect::notify(tr(zh, "已打开编辑窗口", "Editor window opened")), winshun::effect::hide()};
+            return {winshun::effect::notify(tr(zh, "无法打开编辑窗口：", "Cannot open editor: ") + err), winshun::effect::keep()};
+        }
 
         // ---- env read-only actions ----
         if (kind == "env") {
@@ -513,6 +582,7 @@ struct EnvHosts : winshun::Plugin {
                     return {notify(tr(zh, "写入失败（注册表拒绝）", "Write failed (registry denied)")), winshun::effect::keep()};
                 }
                 store.broadcastSettingsChange();
+                editorwin::onExternalChange("env");
                 return {notify(tr(zh, "已保存 ", "Saved ") + name), winshun::effect::setQuery("env " + name), winshun::effect::hide()};
             }
             return {notify(tr(zh, "未支持的动作", "Unsupported action")), winshun::effect::hide()};
@@ -536,6 +606,7 @@ struct EnvHosts : winshun::Plugin {
                 return {notify(tr(zh, "删除失败", "Delete failed")), winshun::effect::keep()};
             }
             store.broadcastSettingsChange();
+            editorwin::onExternalChange("env");
             return {notify(tr(zh, "已删除 ", "Deleted ") + name), winshun::effect::setQuery("env"), winshun::effect::hide()};
         }
 
@@ -575,6 +646,7 @@ struct EnvHosts : winshun::Plugin {
                     winshun::debug("ra9fael.envhosts: hosts write failed: " + werr);
                     return {notify(tr(zh, "写入失败：", "Write failed: ") + werr), winshun::effect::keep()};
                 }
+                editorwin::onExternalChange("hosts");
                 return {notify(tr(zh, "已切换注释状态", "Toggled comment")), winshun::effect::setQuery("hosts " + hostname), winshun::effect::hide()};
             }
             if (a.action == "delete") {
@@ -617,6 +689,7 @@ struct EnvHosts : winshun::Plugin {
             std::string werr;
             if (!store.write(envh::serializeHosts(out.value), werr))
                 return {notify(tr(zh, "写入失败：", "Write failed: ") + werr), winshun::effect::keep()};
+            editorwin::onExternalChange("hosts");
             return {notify(tr(zh, "已删除该行", "Deleted line")), winshun::effect::setQuery("hosts"), winshun::effect::hide()};
         }
 
@@ -655,6 +728,7 @@ struct EnvHosts : winshun::Plugin {
             std::string werr;
             if (!store.write(envh::serializeHosts(add.value), werr))
                 return {notify(tr(zh, "写入失败：", "Write failed: ") + werr), winshun::effect::keep()};
+            editorwin::onExternalChange("hosts");
             return {notify(tr(zh, "已添加 ", "Added ") + target), winshun::effect::setQuery("hosts " + host), winshun::effect::hide()};
         }
 
@@ -665,8 +739,10 @@ struct EnvHosts : winshun::Plugin {
             envh::native::EnvStore store(testUserSubkey());
             envh::native::BackupStore backups(dataDir(), st.backupCount);
             backups.saveEnv(store.read(false).snap); // keep an undo point
-            if (backups.restoreEnv(data["backupId"].toString(), store))
+            if (backups.restoreEnv(data["backupId"].toString(), store)) {
+                editorwin::onExternalChange("env");
                 return {notify(tr(zh, "已恢复备份", "Restored backup")), winshun::effect::setQuery("env"), winshun::effect::hide()};
+            }
             return {notify(tr(zh, "恢复失败", "Restore failed")), winshun::effect::keep()};
         }
         if (kind == "hostsRestore") {
@@ -677,8 +753,10 @@ struct EnvHosts : winshun::Plugin {
             if (!store.isWritable(writableErr))
                 return {notify(tr(zh, "hosts 只读，无法恢复", "hosts read-only, cannot restore")), winshun::effect::keep()};
             envh::native::BackupStore backups(dataDir(), st.backupCount);
-            if (backups.restoreHosts(data["backupId"].toString(), store))
+            if (backups.restoreHosts(data["backupId"].toString(), store)) {
+                editorwin::onExternalChange("hosts");
                 return {notify(tr(zh, "已恢复备份", "Restored backup")), winshun::effect::setQuery("hosts"), winshun::effect::hide()};
+            }
             return {notify(tr(zh, "恢复失败", "Restore failed")), winshun::effect::keep()};
         }
 

@@ -6,7 +6,7 @@
     "zh": "环境变量 / hosts 编辑",
     "en": "Env & hosts editor"
   },
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": {
     "zh": "查看、过滤、改写用户环境变量和 hosts 条目；改写前自动备份，系统级目标未提权时明确降级",
     "en": "Browse, filter and edit user env vars and hosts entries; auto-backup before writes; honest degradation for admin-only targets"
@@ -20,10 +20,12 @@
     "start": "lazy",
     "timeoutMs": 1500,
     "memoryMB": 64,
-    "idleExitSec": 600,
+    "idleExitSec": 0,
     "encoding": "utf-8"
   },
   "permissions": [
+    "ui",
+    "clipboard:write",
     {
       "files:read": ["%SystemRoot%\\System32\\drivers\\etc\\hosts"]
     },

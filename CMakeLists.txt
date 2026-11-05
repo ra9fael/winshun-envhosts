@@ -15,8 +15,9 @@ endif()
 # because plugin.json names it as runtime.program. Keep that convention.
 add_executable(envhosts main.cpp)
 target_compile_definitions(envhosts PRIVATE UNICODE _UNICODE NOMINMAX WIN32_LEAN_AND_MEAN)
-# Registry (advapi32) for environment writes, user32 for the optional window.
-target_link_libraries(envhosts PRIVATE advapi32 user32)
+# Registry (advapi32) for environment writes, user32 for the launcher window glue,
+# gdi32 for the interactive editor window's GDI double-buffered painting.
+target_link_libraries(envhosts PRIVATE advapi32 user32 gdi32)
 
 if(MSVC)
     target_compile_options(envhosts PRIVATE /utf-8 /W4 /permissive-)
@@ -46,5 +47,20 @@ foreach(config DEBUG RELEASE RELWITHDEBINFO MINSIZEREL)
     set_target_properties(envhosts_tests PROPERTIES RUNTIME_OUTPUT_DIRECTORY_${config} "${CMAKE_BINARY_DIR}/tests")
 endforeach()
 
+# Editor model tests: pure data model behind editor_win.h (dirty tracking, undo/redo,
+# validation, PATH split/join, hosts multi-hostname rows, byte-exact save, drafts).
+add_executable(editor_model_tests tests/test_editor_model.cpp)
+target_include_directories(editor_model_tests PRIVATE "${CMAKE_SOURCE_DIR}")
+if(MSVC)
+    target_compile_options(editor_model_tests PRIVATE /utf-8 /W4 /permissive-)
+else()
+    target_compile_options(editor_model_tests PRIVATE -finput-charset=UTF-8 -fexec-charset=UTF-8 -Wall -Wextra -O2)
+endif()
+set_target_properties(editor_model_tests PROPERTIES RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/tests")
+foreach(config DEBUG RELEASE RELWITHDEBINFO MINSIZEREL)
+    set_target_properties(editor_model_tests PROPERTIES RUNTIME_OUTPUT_DIRECTORY_${config} "${CMAKE_BINARY_DIR}/tests")
+endforeach()
+
 enable_testing()
 add_test(NAME envhosts_logic COMMAND envhosts_tests)
+add_test(NAME editor_model COMMAND editor_model_tests)

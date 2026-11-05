@@ -157,10 +157,27 @@ All data stays local under `WS_DATA_DIR`:
 - The editor writes nothing until you press **Ctrl+S**: it re-reads the target,
   compares a content fingerprint, and aborts with a conflict note if the underlying
   env/hosts changed since the window opened. The pre-write backup is the recovery
-  path. Unsaved edits are flushed to `drafts/editor.json` every 30 s and on close.
+  path. Unsaved edits are flushed to `drafts/env.json` / `drafts/hosts.json`
+  every 30 s and on close.
 - The window runs on its own GUI thread; launcher writes to the same target
   `PostMessage` a reload (so an open window reflects external edits). They are
   serialised by `native::g_writeLock`.
+
+### Inside the window
+
+- **Scrolling**: mouse wheel, the vertical scrollbar, arrow keys, PgUp/PgDn and
+  Home/End. The status bar reports `rows a-b / N` and each tab shows its count.
+  The window is resizable and column widths scale with it.
+- **Per-row commands**: `Ins` adds a row (and clears an incompatible filter so
+  the new row is visible), `Del` marks a row deleted (press again to restore;
+  an unsaved new row is removed outright), `Enter`/`F2` enters the detail pane,
+  `Esc` returns focus to the table, `Ctrl+Z`/`Ctrl+Y` undo/redo. Four buttons on
+  the right of the detail pane (`+ Add`, `- Del`, `Undo`, `Redo`) call the same
+  commands as the keyboard.
+- **Status bar**: two rows. Row 1 shows edit state, visible range, filter and
+  writability; transient messages expire after 4 s. Row 2 is a strip of
+  clickable shortcut chips, greyed out when unavailable.
+- `Ctrl+S` lists the individual changes (add / modify / delete) before writing.
 
 ## Settings
 

@@ -104,7 +104,8 @@ struct HostsEntry {
     bool commented = false; // leading '#' present
     bool section = false; // comment-only divider (no ip/host spec)
     std::string ip;
-    std::string hostname;
+    std::string hostname; // first host name (kept for v0.1 id compatibility)
+    std::vector<std::string> hostnames; // ALL host names on the line (multi-host aware)
     std::string comment; // trailing comment after the host spec
     std::string raw; // the raw line text (text + terminator already stripped)
 };
@@ -245,10 +246,25 @@ inline HostsEntry parseHostLine(const std::string& raw, int lineIndex)
         tok.push_back(body.substr(i, j - i));
         i = j;
     }
-    // A trailing comment begins with '#'.
-    if (!tok.empty() && tok.back().size() > 1 && tok.back()[0] == '#') {
-        e.comment = tok.back().substr(1);
-        tok.pop_back();
+    // A trailing comment starts at the first token (after the ip) whose first
+    // character is '#'. Everything from there to the end of the line is the
+    // comment, so multi-word comments ("# my comment") are kept intact.
+    for (std::size_t ci = 1; ci < tok.size(); ++ci) {
+        if (!tok[ci].empty() && tok[ci][0] == '#') {
+            std::string cmt;
+            for (std::size_t k = ci; k < tok.size(); ++k) {
+                if (!cmt.empty())
+                    cmt += ' ';
+                cmt += tok[k];
+            }
+            if (!cmt.empty() && cmt[0] == '#')
+                cmt = cmt.substr(1);
+            if (!cmt.empty() && cmt[0] == ' ')
+                cmt = cmt.substr(1);
+            e.comment = cmt;
+            tok.resize(ci);
+            break;
+        }
     }
     bool hostSpec = false;
     if (!tok.empty()) {
@@ -261,8 +277,10 @@ inline HostsEntry parseHostLine(const std::string& raw, int lineIndex)
     e.section = e.commented && !hostSpec;
     if (!e.section && !tok.empty()) {
         e.ip = tok[0];
-        if (tok.size() > 1)
-            e.hostname = tok[1];
+        for (std::size_t k = 1; k < tok.size(); ++k)
+            e.hostnames.push_back(tok[k]);
+        if (!e.hostnames.empty())
+            e.hostname = e.hostnames.front();
     }
     return e;
 }

@@ -110,9 +110,9 @@ python tools/package.py                    # dist/ra9fael.envhosts-<version>.wsp
   （保留数量由 `backupCount` 控制，默认 10）。
 - `backups/hosts/<timestamp>.hosts` —— 每次 hosts 写入前的逐字节原文（保留数量同样
   由 `backupCount` 控制）。
-- `drafts/editor.json` —— 交互式编辑窗口里未保存的编辑，每 30 s 及关闭 / 退出时
-  自动写入。重新打开编辑器时会询问是否从草稿恢复。只有编辑器写草稿，
-  这里不发生任何注册表 / hosts 写入。
+- `drafts/env.json` / `drafts/hosts.json` —— 交互式编辑窗口里未保存的编辑，
+  每 30 s 及关闭 / 退出时自动写入。重新打开编辑器时会自动载入草稿（作为未保存的
+  修改，不会写回目标）。只有编辑器写草稿，这里不发生任何注册表 / hosts 写入。
 - 不上传任何内容；无遥测；密钥和设置从不写日志。
 
 ## 失败处理
@@ -131,16 +131,29 @@ python tools/package.py                    # dist/ra9fael.envhosts-<version>.wsp
 
 ### 交互式编辑窗口
 
-- 打开窗口会调用 `CreateWindowExW`；若失败（无头 / CI 会话，或前台切换被拒），
-  动作返回 `notify` + `keep`，你仍留在启动器里，不会崩溃。
+- 窗口已在真实桌面上打开并逐项核对过渲染（分栏表格、表头、详情编辑框、
+  状态栏、过滤与 Tab 切换均正常）。`CreateWindowExW` 失败时（例如无桌面会话或
+  前台切换被拒），动作返回 `notify` + `keep`，你仍留在启动器里，不会崩溃。
 - 窗口打开后，Windows 可能把它放到后台：启动器只承诺在
   menu / picture / showSettings / hotkey 时切到前台，不保证 `action` 也切；
   被挡住时用 Alt+Tab 找回来。
 - 在按下 **Ctrl+S** 之前，编辑器不写任何东西：它会重新读取目标、比较内容指纹，
   若窗口打开期间底层 env / hosts 被改过，则中止并给出冲突提示。写前备份是恢复路径。
-  未保存的编辑每 30 s 及关闭时刷入 `drafts/editor.json`。
+  未保存的编辑每 30 s 及关闭时刷入 `drafts/env.json` / `drafts/hosts.json`。
 - 窗口运行在自己的 GUI 线程上；启动器对同一目标的写入会 `PostMessage` 通知重载
   （让打开的窗口反映外部改动）。两者由 `native::g_writeLock` 串行化。
+
+#### 窗口内操作
+
+- **列表滚动**：鼠标滚轮、右侧滚动条、`↑ ↓`、`PgUp / PgDn`、`Home / End`；
+  状态栏显示「第 a–b / 共 N 行」，Tab 上带行数。窗口可拖动调整大小，列宽按比例自适应。
+- **单项增删改**：`Ins` 新增一行（自动滚动到新行并清空冲突的过滤词）、
+  `Del` 标记删除（再按一次恢复，未提交的新行则直接移除）、`Enter / F2` 进入详情编辑、
+  `Esc` 从输入框回到表格、`Ctrl+Z / Ctrl+Y` 撤销 / 重做。详情面板右侧另有
+  「+ 新增 / - 删除 / 撤销 / 重做」四个按钮，与键盘共用同一套命令。
+- **状态栏**：两行。第一行是修改状态、可见行范围、过滤词与读写权限，临时提示
+  4 秒后自动消失；第二行是可点击的快捷键条（不可用的操作会灰显）。
+- `Ctrl+S` 会先列出逐条变更（新增 / 修改 / 删除），确认后才写盘。
 
 ## 设置
 

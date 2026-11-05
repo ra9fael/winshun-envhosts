@@ -1,8 +1,86 @@
 # ra9fael.envhosts — interactive editor window (v0.2 design)
 
-Status: **design, not implemented.** Nothing in this document is coded yet.
+Status: **implemented (v0.2.1).** Coded in `editor_win.h` (window + GUI thread),
+`editor_model.h` (pure data model, 41 unit tests), wired into `main.cpp` (pinned
+first row + `openEditor` action + external-change + shutdown join), `plugin.json`
+(`ui` + `clipboard:write`, `idleExitSec: 0`), `README.md`, and `integration.py`
+(P1–P6). Verified on a real Windows host via `tests/integration.py` (32/32 pass),
+`editor_model.h` unit tests (41/41) and `logic.h` unit tests (69/69).
+The v0.2.1 pass adds virtual scrolling, visible per-row add/delete/edit commands
+and a two-row status bar; see "GUI refinement pass" below.
+
+**GUI verification (corrected):** the window was opened on a real desktop and
+captured with GDI `PrintWindow` for both `env` and `hosts`. The first capture
+exposed real rendering defects, which were fixed in `editor_win.h`:
+`WM_NCCREATE` returned FALSE because `m_hwnd` was still null during creation
+(`gle 1400` — this was a code bug, NOT a headless limitation); `loadModel()`
+never called `rebuildVisible()` so the table had no rows; the outer/client rect
+mismatch clipped the status bar; fonts were never selected into the DC; filter
+text and Tab switching did not refresh the visible rows; `refreshDetail()` fired
+`EN_CHANGE` and falsely marked the model dirty; edit controls lacked a border.
+After the fix both windows render populated, column-aligned tables with a
+visible detail panel and status bar, and live filtering / Tab switching were
+exercised. `CreateWindowExW` does succeed in this session; the earlier
+"headless" conclusion in the original design note was wrong.
+
+Remaining manual sign-off: keyboard feel, save/conflict dialogs, and the
+foreground-activation behaviour when opened from a launcher `action`.
+
+### GUI refinement pass (v0.2.1)
+
+Three issues reported from the first screenshots, all fixed in `editor_win.h`
+and verified by driving the real window through `tests/gui_preview.py`.
+
+1. **Virtual scrolling.** The table painted only the first screenful because
+   `paint()` broke at `m_rcTable.bottom` with no viewport offset. It now keeps
+   `m_topRow` (index into `m_visible`, or `m_backupIds` on the backup view),
+   `pageRows()`, `ensureVisible()`, `clampScroll()` and `syncScrollbar()`.
+   `WM_VSCROLL` (line/page/thumb/top/bottom), `WM_MOUSEWHEEL` (honouring
+   `SPI_GETWHEELSCROLLLINES`), Home/End/PgUp/PgDn and the mouse hit test all use
+   the same offset. The window keeps `WS_THICKFRAME | WS_VSCROLL` and defaults
+   to a 960x620 client area; column widths are proportional so resizing works.
+   Tab captions show row counts and the status bar shows `rows a-b / N`, so a
+   clipped list can no longer be mistaken for a partial load.
+2. **Per-row add/delete/edit.** The model already had `addNew`, `removeRow`,
+   `toggleDeleted`, `setVar`/`setField` and a 200-step undo stack, but clicking a
+   row immediately moved focus into an EDIT control, so `WM_KEYDOWN` never
+   reached the window. Clicking a row now keeps focus on the table; Enter/F2
+   enters the detail pane; Esc returns. Detail and filter controls are
+   subclassed to forward Ins/Del/PgUp/PgDn/F5/Tab/Ctrl+Z/Y/S to the window.
+   Keyboard, four detail buttons and the status chips all call the same
+   `doAdd/doDelete/doUndo/doRedo/doEdit` commands. `Ins` clears an incompatible
+   filter and scrolls the new row into view; `Del` toggles a deleted marker on
+   existing rows (Del again restores) and removes an unsaved new row outright.
+   `EN_CHANGE` now produces **one undo step per edit session** (400 ms idle,
+   row change or save ends it) instead of one per keystroke, and no longer
+   rebuilds the filtered view mid-typing. Ctrl+S shows the actual change list.
+3. **Two-row status bar.** 24px -> 48px. Row 1 carries state, visible range,
+   filter, scope/writability and transient messages; row 2 is a strip of
+   clickable shortcut chips with disabled states. `setStatus()` messages now
+   expire after 4 s (`kTimerStatus`) instead of permanently replacing the whole
+   status line. Colours: info blue, warning amber, error red, success green.
+
+Hosts comment-only lines are shown as full-width group headings (not squeezed
+into the 8% "enabled" column) and are not editable. They are hidden while a
+filter is active; saving still reproduces them byte for byte.
+
+Verified with `tests/gui_preview.py`: 34 env rows -> two `SB_PAGEDOWN` messages
+move the view to `rows 19-34 / 34`, `Ins` adds and scrolls to a highlighted new
+row, `Del` removes it, and both windows render the two-row bar without overlap.
+
 Scope: the pinned first row of the `env` and `hosts` result lists, and the
 window it opens. The v0.1 inline (launcher) editing stays as it is.
+
+### Decisions taken (D1–D4)
+
+- **D1** → (a) notify only. On `CreateWindowExW` failure the `openEditor` action
+  returns `notify` + `keep`, so the launcher stays open and the existing rows
+  below remain usable. `tests/integration.py` (P3) verifies the failure path
+  returns `notify` + `keep`; on a real desktop the window opens normally.
+- **D2** → (a) read-only + banner. `elevated` is **not** requested; admin-only
+  targets keep the clear error from v0.1.
+- **D3** → (a) hosts 原文 tab is a read-only preview; not editable.
+- **D4** → (a) `clipboard:write` is requested for Ctrl+C inside the window.
 
 Sources used for this design (read, not assumed):
 
@@ -309,13 +387,13 @@ direct "restore" for the window path. The launcher path stays as it is.
 
 | Key | Where | Action |
 |---|---|---|
-| Tab / Shift+Tab | window | Cycle: tabs → filter → table → detail pane → buttons |
+| Tab | window | Next view (用户 / 系统 / 备份, or 条目 / 原文 / 备份); Shift+Tab is not bound |
 | Ctrl+Tab / Ctrl+Shift+Tab | window | Next / previous tab (用户 / 系统 / 备份, or 条目 / 原文 / 备份) |
 | Ctrl+F | window | Focus the filter; Esc in the filter clears it, a second Esc goes back to the table |
 | ↑ ↓ PgUp PgDn Home End | table | Move selection |
 | Enter / F2 | table | Edit the selected row (env: focus value; hosts: focus hostname) |
 | Space | hosts table | Toggle 启用 |
-| Ins / Del | table, list mode | Add / mark deleted (Del again un-marks) |
+| Ins / Del | table | Add a row / toggle the deleted marker (Del again restores); an unsaved new row is removed outright |
 | Alt+↑ / Alt+↓ | env list mode | Move a PATH segment |
 | Ctrl+R | env detail | List mode ↔ raw text |
 | Ctrl+C | table | Copy the value (env) or the full line (hosts) |
@@ -324,6 +402,7 @@ direct "restore" for the window path. The launcher path stays as it is.
 | Ctrl+S | window | Save (opens the change list) |
 | F5 | window | Reload from disk (asks first when dirty) |
 | Esc | table | Close the window (asks first when dirty) |
+| Esc | detail / filter | Return focus to the table; in the filter it also clears the text |
 | Alt+underlined letter | dialogs | Buttons (保存(&S) 不保存(&N)) |
 
 Focus is always visible (system focus rectangle plus a highlighted row).

@@ -23,6 +23,7 @@
 #include <ctime>
 #include <filesystem>
 #include <fstream>
+#include <mutex>
 #include <string>
 #include <vector>
 
@@ -31,6 +32,13 @@
 
 namespace envh {
 namespace native {
+
+// One process-wide lock around every registry/hosts read-modify-write so the
+// launcher's inline actions (protocol thread) and the editor window (GUI thread)
+// never race on the same target.
+inline std::mutex g_writeLock;
+
+
 
 inline std::wstring toWide(const std::string& s) { return winshun::wide(s); }
 inline std::string fromWide(const std::wstring& w) { return winshun::utf8(w); }
