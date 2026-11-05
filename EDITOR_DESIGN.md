@@ -77,7 +77,7 @@ the detail editor below, separated by a draggable splitter. Only the env window
 
 1. **Splitter.** `computeLayout()` derives `m_rcTable` / `m_rcDetail` /
    `m_rcSplitter` from `m_splitterY`, clamped so each pane keeps its minimum
-   (list 112px, detail 150px); `WM_GETMINMAXINFO` enforces the smallest window
+   (list 112px, detail 200px); `WM_GETMINMAXINFO` enforces the smallest window
    that can hold both. Dragging uses `WM_LBUTTONDOWN` on the grip band +
    `SetCapture` + `WM_MOUSEMOVE`/`WM_LBUTTONUP`/`WM_CAPTURECHANGED`, and
    `WM_SETCURSOR` shows `IDC_SIZENS`. `applyLayout()` deliberately does not
@@ -88,8 +88,10 @@ the detail editor below, separated by a draggable splitter. Only the env window
    `pathSplit` / `pathJoin` are now `;` wrappers over them, so the round trip
    `join(split(v)) == v` is unit-tested for `;`, `,`, `:` and TAB.
 3. **Explicit mode switch.** List mode is entered by the user, never inferred:
-   `Ctrl+R` or the self-drawn `分隔项编辑 / 原文编辑` button toggles it, and the
-   `分隔符` button cycles `; , : TAB |`. `Path`/`PATH`-named rows are pinned to
+   `Ctrl+R` or the self-drawn `分隔项编辑 / 原文编辑` button toggles it (the
+   button pair became the `原文│分隔项` segment in v0.4, and the cycling
+   `分隔符` button became a preset + free-text combo there — see the v0.4.0
+   section). `Path`/`PATH`-named rows are pinned to
    `;`. Switching to list mode splits the current value; switching back joins
    the items into the raw box, so the two views are always the same string.
    Items are edited with `Ins` (insert after the selection), `Del`,
@@ -109,6 +111,77 @@ raw shows the original 7-segment string.
 
 Scope: the pinned first row of the `env` and `hosts` result lists, and the
 window it opens. The v0.1 inline (launcher) editing stays as it is.
+
+### Custom delimiters, a stable item viewport and honest conflict detection (v0.4.0)
+
+Four defects reported against the v0.3 env detail pane, plus the focus and reload
+behaviour they exposed.
+
+1. **The delimiter is data, not a cycle.** The `分隔符` button used to step
+   through `; , : TAB |`, so a value separated by anything else — `=>`, a
+   multi-character string — could not be reached at all. It is now a
+   `CBS_DROPDOWN` combo: five localised presets plus free text, with an explicit
+   `应用 / Apply` flat button. `delimiterValueForText` maps a preset label back
+   to its character, so the combo can display `分号 (;)` while the model holds
+   `;`. Nothing re-splits until Apply fires: `applyDelimiter()` rejoins the
+   current items with the *old* delimiter first and only then splits on the new
+   one, so `;` → `=>` → `;` returns the byte-identical value
+   (`test_editor_model.cpp` asserts the round trip and the quoted-segment
+   variant). The choice is remembered per `<scope>/<name>` in `m_delimPrefs`.
+2. **Selecting an item keeps its viewport.** Every commit used to rebuild the
+   list with `LB_RESETCONTENT` and re-assert `LB_SETTOPINDEX(m_partSel)`, which
+   scrolled the selection back to the first row. Win32 has no
+   `LB_UPDATESTRING`, so `updatePartRow()` now deletes and re-inserts the single
+   index under a `PartsGuard` depth counter, and `LBN_SELCHANGE` reads the list's
+   own new cursor *before* `commitPartEdit()` runs — otherwise the commit's
+   re-selection would fight the click that triggered it.
+3. **One control row, one style.** The mode toggle, the delimiter combo and
+   `Apply` share a row: `drawFlatButton` paints the two mode cells and `Apply`
+   with the same geometry, hover/pressed state and disabled colour as the item
+   buttons, and the native combo is sized to the same 22px band. Dark theme is
+   applied to every child through `WM_CTLCOLOR{BK,EDIT,STATIC}` with persistent
+   brushes released in `WM_DESTROY`. `Tab`/`Shift+Tab` walk the field chain
+   (env: 名称 → 类型 → 分隔符 → 值 → 列表 → 项输入框; hosts: 启用 → IP → 主机名 →
+   注释 → 原文) and hand off to the table at either end, so the keyboard never
+   gets stuck in a field.
+4. **Save conflicts on what it can actually write.** Only the user scope (HKCU)
+   is writable from this window, but the guard compared the *full* system+user
+   fingerprint, so any unrelated HKLM change cancelled every save with
+   `外部已修改，已取消保存`. It now compares `EnvModel::computeUserFingerprint`
+   against the freshly read live snapshot, and the dialog is Abort / Retry /
+   Ignore: abort writes nothing, retry reloads and asks you to re-apply, ignore
+   force-writes. `MessageBoxW` runs with `native::g_writeLock` released, because
+   a modal dialog left holding that lock blocks the protocol thread. Afterwards
+   the model is rebuilt from `store.read(m_args.showSystem)` — reading with
+   `false` used to drop every system-variable row from the table on save.
+
+Reload is now a first-class action: `F5` calls `doReload()`, which confirms
+before discarding unsaved edits and lands back on the same row
+(`currentRowRef` → `selectByRef`), while an external change arriving while the
+window is clean reloads silently and one arriving while it is dirty only raises
+the `m_extChanged` marker — your edits are never overwritten behind your back.
+
+```
+├──────────────────────────────────────────────────────────────────────┤
+│                     ══════════   draggable splitter                  │
+├──────────────────────────────────────────────────────────────────────┤
+│ 名称 [Path___________]   类型 [REG_EXPAND_SZ]                         │
+│ ┌ 分隔项列表 ──────────────┐   当前项 9 / 28                          │
+│ │ C:\Windows               │   [C:\sample\dir06________________]     │
+│ │▶C:\sample\dir06          │   [上移] [下移] [插入] [删除]             │
+│ │ C:\sample\dir07          │                                          │
+│ └──────────────────────────┘                                          │
+│ [原文│分隔项]  [分号 (;)         ▾]  [应用]        长度 812 / 32767     │
+└──────────────────────────────────────────────────────────────────────┘
+```
+
+Verified with `tests/gui_preview.py`: 30 assertions over the real window — the
+layout mirror matches the combo's own rect, a 28-segment `Path` splits into 28
+items, clicking the last visible item keeps `topindex` 8, editing it updates that
+row only, `=>` collapses the value to one item and `;` restores it byte-for-byte,
+the rejoined raw box matches, saving through the shortcut chip writes and reads
+back, the 系统 tab still has its rows, an external write yields Abort with the
+external value intact, and `F5` asks before discarding.
 
 ### Decisions taken (D1–D4)
 
@@ -306,7 +379,7 @@ Title: `环境变量 — Win顺`. Default size 960×600 DIP, remembered in
 |---|---|
 | Tabs | 用户 (editable), 系统 (read-only unless D2 is taken; 🔒 badge and greyed editors), 备份 (list of `backups/env/*.json`, newest first). `showSystemVars=false` hides the 系统 tab. |
 | Table | ListView report mode. Columns 名称 / 类型 / 值 (first line, truncated) / ● dirty marker. Sorted by name, case-insensitive. Filter matches name or value, the same rule as `envMatches`. |
-| Detail pane | Edits the selected row. **List mode** is entered explicitly with `Ctrl+R` or the mode button (v0.3: the value is never split silently, so the raw text always stays reachable); `Path`-named rows default to the `;` delimiter. Otherwise a multi-line Edit. |
+| Detail pane | Edits the selected row. **List mode** is entered explicitly with `Ctrl+R` or the `原文│分隔项` segment (the value is never split silently, so the raw text always stays reachable); the delimiter comes from a preset-or-free-text combo and only takes effect on `应用 / Apply`. `Path`-named rows default to the `;` delimiter. Otherwise a multi-line Edit. |
 | List mode items | Each segment shows its expansion and an existence mark for directories: ✓ exists, ✗ missing, ? not checked (UNC or contains an unexpanded `%X%`). Checks run on the GUI thread with a 50 ms budget per refresh, local paths only, no network shares. |
 | 类型 | REG_SZ / REG_EXPAND_SZ. Auto-switches to EXPAND when `%X%` is typed (same as `envTypeForValue`), but the user can override. REG_MULTI_SZ rows are shown read-only (v0.1 also does not edit them). |
 | Validation | Live, from `isValidEnvName` / `isValidEnvValue`: red border and status text. Save is disabled while any row is invalid. Length counter turns amber above 1024 (a later `setx` by any other tool truncates there) and red above 32767 (the Windows limit for one variable). |
@@ -426,7 +499,8 @@ direct "restore" for the window path. The launcher path stays as it is.
 
 | Key | Where | Action |
 |---|---|---|
-| Tab | window | Next view (用户 / 系统 / 备份, or 条目 / 原文 / 备份); Shift+Tab is not bound |
+| Tab / Shift+Tab | detail field | Next / previous field in the pane; at either end it hands focus to the table |
+| Tab | window | Next view (用户 / 系统 / 备份, or 条目 / 原文 / 备份) |
 | Ctrl+Tab / Ctrl+Shift+Tab | window | Next / previous tab (用户 / 系统 / 备份, or 条目 / 原文 / 备份) |
 | Ctrl+F | window | Focus the filter; Esc in the filter clears it, a second Esc goes back to the table |
 | ↑ ↓ PgUp PgDn Home End | table | Move selection |
@@ -483,8 +557,10 @@ All controls have accessible names so Narrator reads 名称, 值, 启用.
 Same layering as `envhosts-plugin-design.md` (L0 manifest … L5 real host).
 New cases only. All write tests use the existing overrides
 `WS_ENVHOSTS_TEST_SUBKEY` (scratch `HKCU\Software\…` key) and
-`WS_ENVHOSTS_TEST_HOSTS` (temp file). The real registry and the real hosts
-are only read, except in the documented manual case M5.
+`WS_ENVHOSTS_TEST_HOSTS` (temp file); the GUI suite also sets
+`WS_ENVHOSTS_TEST_SYSTEM_SUBKEY` to an `HKCU\…` path, so the 系统 tab renders
+fake rows instead of this machine's real HKLM variables. The real registry and
+the real hosts are only read, except in the documented manual case M5.
 
 ### 10.1 L1 — model unit tests (`tests/test_editor_model.cpp`, no Win32)
 
@@ -510,7 +586,7 @@ are only read, except in the documented manual case M5.
 | P3 | `openEditor` twice | One window (count via `EnumThreadWindows` on the plugin's threads from the test harness), second call refocuses |
 | P4 | Inline `env set` while the window is open and clean | Window reloads (checked through a test-only `WM_COPYDATA` "dump state" message in debug builds) |
 | P5 | `shutdown` with unsaved edits | Process exits within 1500 ms, `drafts/env.json` exists, scratch registry unchanged |
-| P6 | Manifest: `ui` present, `idleExitSec` 0, version 0.3.0 | Field check (same manual check as v0.1, no jsonschema) |
+| P6 | Manifest: `ui` present, `idleExitSec` 0, semantic version | Field check (same manual check as v0.1, no jsonschema) |
 
 ### 10.3 L4 — window automation (UI Automation, `tests/ui_editor.py`)
 
@@ -542,7 +618,7 @@ harness, then against the real host.
 
 | ID | Steps | Check |
 |---|---|---|
-| M1 | Install 0.3.0, enable | Permission dialog lists `ui` (and `clipboard:write`) |
+| M1 | Install 0.4.0, enable | Permission dialog lists `ui` (and `clipboard:write`) |
 | M2 | Type `env`, `环境变量 path`, `hosts docker` | Row 1 is 进入交互式编辑界面 every time; Win顺 message log shows `query` / reply with `env:editor` first |
 | M3 | Enter on row 1 | Window in front, focus in table (W1 by hand); message log shows `action openEditor` and the reply |
 | M4 | Leave the window open 15 min, no queries | No `shutdown` in the log (idleExitSec 0) |

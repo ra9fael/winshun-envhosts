@@ -176,20 +176,38 @@ All data stays local under `WS_DATA_DIR`:
   commands as the keyboard.
 - **Two vertically split panes (env window only)**: a draggable splitter sits
   between the table and the detail editor; each pane keeps its minimum height
-  (list 112px, detail 150px) and `WM_GETMINMAXINFO` refuses a window too small
+  (list 112px, detail 200px) and `WM_GETMINMAXINFO` refuses a window too small
   to hold both. The hosts window and the backup view keep the fixed detail strip.
 - **Delimited-item editing**: the `Edit items` button in the detail pane (or
   `Ctrl+R`) splits a long value on a delimiter so you can work on one segment at
   a time — `Ins` inserts after the current item, `Del` removes it, `Alt+Up`/`Alt+Down`
   reorder, and the box beside the list edits it. Every change is rejoined into the
-  variable's value immediately and stays a single undo step. `Path` is pinned to
-  `;`; other values cycle the delimiter through `; , : TAB |` with the delimiter
-  button. `Ctrl+R` again returns to raw text, showing the rejoined string. Splitting
-  is always explicit, so the raw value never becomes unreachable.
+  variable's value immediately and stays a single undo step. Picking an item keeps
+  the list where it is scrolled: updating an item in place never drags the viewport
+  back to the first row. `Path` is pinned to `;`. `Ctrl+R` again returns to raw text,
+  showing the rejoined string. Splitting is always explicit, so the raw value never
+  becomes unreachable.
+- **Delimiter**: the combo next to the mode button presets `semicolon / comma /
+  colon / TAB / pipe` and also accepts any character or string you type (`=>`).
+  Nothing re-splits until you press Enter or click `Apply`: the current items are
+  first rejoined with the old delimiter and then split on the new one, so no value
+  is lost. Separators inside `"quoted"` runs are not split points. The mode button,
+  the combo and `Apply` share one flat self-drawn style that stays consistent in the
+  light and dark themes.
+- **Reload**: `F5` re-reads from disk and lands on the same row; unsaved edits are
+  confirmed before they are dropped. When an external change arrives, a clean window
+  reloads itself while a dirty one only shows a warning and keeps your edits.
 - **Status bar**: two rows. Row 1 shows edit state, visible range, filter and
   writability; transient messages expire after 4 s. Row 2 is a strip of
   clickable shortcut chips, greyed out when unavailable.
+- Inside the detail pane `Tab`/`Shift+Tab` move backwards and forwards between the
+  fields, `Ctrl+Tab`/`Ctrl+Shift+Tab` switch tabs.
 - `Ctrl+S` lists the individual changes (add / modify / delete) before writing.
+  Only a change to the **user** scope (HKCU) after the window opened counts as a
+  conflict, and then the choice is Abort / Retry / Ignore: abort writes nothing,
+  retry re-reads the latest values, ignore overwrites with your edits. After a
+  save the model is reloaded with the current tab settings, so system-variable rows
+  survive it.
 
 ## Settings
 
@@ -205,17 +223,27 @@ All data stays local under `WS_DATA_DIR`:
 - `tests/test_envhosts_logic.cpp` — 69 OS-free unit checks (hosts byte-exact
   round-trip on a sanitised captured file, section comments, env model, grammar,
   validation, stable ids).
-- `tests/test_editor_model.cpp` — 41 OS-free unit checks for the editor data model
+- `tests/test_editor_model.cpp` — 73 OS-free unit checks for the editor data model
   (dirty tracking, undo/redo cap at 200, validation, PATH split/join with quoted
-  segments, multi-hostname hosts rows, byte-exact save preserving BOM/CRLF,
-  fingerprint sensitivity, draft serialisation round-trip, backup loads as
-  unsaved).
+  segments, custom-delimiter round-trip and switching, system-scope edits leaving
+  the user-scope fingerprint untouched, multi-hostname hosts rows, byte-exact save
+  preserving BOM/CRLF, fingerprint sensitivity, draft serialisation round-trip,
+  backup loads as unsaved).
 - `tests/integration.py` — drives the real exe over JSON-RPC on real Windows:
   protocol round-trips, edit/delete/restore on a scratch registry key, 20-query
   side-effect audit (hosts bytes + registry must be untouched), real System32
   hosts write-denial, `settingsChanged` propagation, system-scope delete
   refusal, **and the editor suite** (P1/P2 pinned first row, P3 openEditor wiring,
   P4 manifest fields, P5 draft location, P6 external-change path).
+- `tests/gui_preview.py --no-hold` — 30 assertions against the real window on the
+  desktop, driven over JSON-RPC with a fake 28-segment `Path` in an isolated
+  registry key: split-pane layout, page scrolling, `Ins`/`Del`, list-mode splitting,
+  selection keeping its scroll position, editing an item in place, a custom
+  delimiter round-trip, the rejoined raw value, splitter drag, saving through the
+  shortcut chip and reading the registry back, system rows surviving the save,
+  the Abort branch of an external conflict, and the `F5` reload prompt. Both the
+  user and the system scope point at isolated test keys, every sample value is
+  fake and both keys are deleted afterwards.
 
 ## License
 

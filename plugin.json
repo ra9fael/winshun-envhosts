@@ -6,7 +6,7 @@
     "zh": "环境变量 / hosts 编辑",
     "en": "Env & hosts editor"
   },
-  "version": "0.3.0",
+  "version": "0.4.0",
   "description": {
     "zh": "查看、过滤、改写用户环境变量和 hosts 条目；改写前自动备份，系统级目标未提权时明确降级",
     "en": "Browse, filter and edit user env vars and hosts entries; auto-backup before writes; honest degradation for admin-only targets"
@@ -48,7 +48,7 @@
         "zh": "如 env path；回车进入行内编辑",
         "en": "e.g. env path; Enter edits inline"
       },
-      "icon": "color:#185FA5",
+      "icon": "glyph:U+E713",
       "actions": [
         { "id": "edit", "title": { "zh": "编辑", "en": "Edit" }, "key": "Enter" },
         { "id": "copyValue", "title": { "zh": "复制值", "en": "Copy value" }, "key": "Ctrl+Enter" },
@@ -67,7 +67,7 @@
         "zh": "如 hosts docker；回车注释 / 启用",
         "en": "e.g. hosts docker; Enter toggles"
       },
-      "icon": "color:#107C10",
+      "icon": "glyph:U+E774",
       "actions": [
         { "id": "toggle", "title": { "zh": "注释 / 启用", "en": "Toggle" }, "key": "Enter" },
         { "id": "copyLine", "title": { "zh": "复制整行", "en": "Copy line" }, "key": "Ctrl+Enter" },

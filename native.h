@@ -23,10 +23,12 @@
 #include <chrono>
 #include <cstdio>
 #include <ctime>
+#include <cwchar>
 #include <filesystem>
 #include <fstream>
 #include <mutex>
 #include <string>
+#include <utility>
 #include <vector>
 
 #include "winshun.h"
@@ -54,11 +56,36 @@ struct EnvReadResult {
     std::string errMsg;
 };
 
+// The HKLM subkey holding the system-scope variables. Named so the test-only
+// override in main.cpp can fall back to exactly this path.
+inline std::wstring systemEnvSubkey()
+{
+    return L"SYSTEM\\CurrentControlSet\\Control\\Session Manager\\Environment";
+}
+
+// Root of a system-scope key path: HKLM unless the path spells out its own root
+// ("HKCU\..."), which only the test-only override does so the 系统 tab can show
+// fake rows instead of this machine's real variables. `skip` is the prefix
+// length to drop before opening.
+inline HKEY systemEnvRoot(const std::wstring& sub, size_t& skip)
+{
+    static const std::pair<const wchar_t*, HKEY> kRoots[]
+        = {{L"HKCU\\", HKEY_CURRENT_USER}, {L"HKLM\\", HKEY_LOCAL_MACHINE}};
+    for (const auto& r : kRoots) {
+        const size_t n = std::wcslen(r.first);
+        if (sub.size() > n && _wcsnicmp(sub.data(), r.first, n) == 0) {
+            skip = n;
+            return r.second;
+        }
+    }
+    skip = 0;
+    return HKEY_LOCAL_MACHINE;
+}
+
 class EnvStore {
 public:
     explicit EnvStore(std::wstring userSubkey = L"Environment",
-                      std::wstring sysSubkey
-                      = L"SYSTEM\\CurrentControlSet\\Control\\Session Manager\\Environment")
+                      std::wstring sysSubkey = systemEnvSubkey())
         : m_user(std::move(userSubkey)), m_sys(std::move(sysSubkey))
     {
     }
@@ -80,7 +107,9 @@ public:
         // System scope (read-only in v0.1; needs elevated to write).
         if (includeSystem) {
             HKEY h = nullptr;
-            const LONG rc = RegOpenKeyExW(HKEY_LOCAL_MACHINE, m_sys.c_str(), 0,
+            size_t skip = 0;
+            const HKEY root = systemEnvRoot(m_sys, skip);
+            const LONG rc = RegOpenKeyExW(root, m_sys.c_str() + skip, 0,
                                           KEY_READ | KEY_QUERY_VALUE | KEY_ENUMERATE_SUB_KEYS, &h);
             if (rc == ERROR_SUCCESS) {
                 readValues(h, "system", r.snap);
@@ -108,7 +137,9 @@ public:
     bool canWriteSystem(std::string& errCode)
     {
         HKEY h = nullptr;
-        const LONG rc = RegOpenKeyExW(HKEY_LOCAL_MACHINE, m_sys.c_str(), 0, KEY_SET_VALUE, &h);
+        size_t skip = 0;
+        const HKEY root = systemEnvRoot(m_sys, skip);
+        const LONG rc = RegOpenKeyExW(root, m_sys.c_str() + skip, 0, KEY_SET_VALUE, &h);
         if (rc == ERROR_SUCCESS) {
             RegCloseKey(h);
             return true;

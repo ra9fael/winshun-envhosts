@@ -60,11 +60,12 @@ void testPathSplit()
     CHECK(pathJoin(pathSplit("a;;b;")) == "a;;b;", "path roundtrip empty + trailing");
     CHECK(pathJoin(pathSplit("")) == "", "path roundtrip empty string");
     CHECK(pathJoin(pathSplit("single")) == "single", "path roundtrip single");
-    // Quoted segment keeps its semicolon.
+    // Quoted segment keeps its semicolon, and the quotes themselves: the item
+    // list must be able to rejoin the value byte-for-byte.
     const std::vector<std::string> q = pathSplit("C:\\a;\"D:\\b;c\";E:\\d");
     CHECK(q.size() == 3, "path quoted segment count");
-    CHECK(q[1] == "D:\\b;c", "path quoted segment text");
-    CHECK(pathJoin(q) == "C:\\a;D:\\b;c;E:\\d", "path quoted join");
+    CHECK(q[1] == "\"D:\\b;c\"", "path quoted segment keeps quotes");
+    CHECK(pathJoin(q) == "C:\\a;\"D:\\b;c\";E:\\d", "path quoted join is byte-exact");
 }
 
 void testDelimitedValues()
@@ -76,9 +77,20 @@ void testDelimitedValues()
     CHECK(splitDelimited("a::b", "::", false).size() == 2, "multi-character delimiter");
     CHECK(joinDelimited({"one", "", "three"}, "|") == "one||three", "generic delimiter join");
     CHECK(joinDelimited(splitDelimited("a\tb\tc", "\t", false), "\t") == "a\tb\tc", "tab roundtrip");
-    CHECK(joinDelimited(splitDelimited("\"a;b\";c", ";", true), ";") == "a;b;c", "quoted join drops quotes");
+    CHECK(joinDelimited(splitDelimited("\"a;b\";c", ";", true), ";") == "\"a;b\";c",
+          "quoted join keeps the value byte-exact");
     CHECK(splitDelimited("a,b", ";", false).size() == 1, "absent delimiter yields one part");
     CHECK(splitDelimited("a", "", false).size() == 1, "empty delimiter yields one part");
+    // A custom delimiter is any non-empty string; splitting and rejoining must be
+    // the identity whether the user picked a preset or typed something odd.
+    CHECK(joinDelimited(splitDelimited("a=>b=>c", "=>", false), "=>") == "a=>b=>c",
+          "custom two-character delimiter roundtrip");
+    CHECK(splitDelimited("a=>b=>c", "=>", false).size() == 3, "custom delimiter part count");
+    CHECK(joinDelimited(splitDelimited("a=>b", "=>", false), ";") == "a;b",
+          "delimiter switch rejoins with the new separator");
+    CHECK(joinDelimited(splitDelimited("C:\\a;\"D:\\b;c\";E:\\d", ";", true), "=>")
+              == "C:\\a=>\"D:\\b;c\"=>E:\\d",
+          "quoted segments survive a delimiter switch");
 }
 
 // ---- U4: dirty tracking edit then edit back ---------------------------------
@@ -247,6 +259,56 @@ void testFingerprint()
           "hosts fingerprint changes on size");
 }
 
+// The editor only writes HKCU, so a system-scope change must not look like a
+// conflict against the pending user edits (it used to cancel every Ctrl+S).
+void testUserFingerprintScope()
+{
+    envh::EnvSnapshot snap;
+    envh::EnvVar u;
+    u.scope = "user";
+    u.name = "A";
+    u.type = "REG_SZ";
+    u.value = "1";
+    envh::EnvVar s;
+    s.scope = "system";
+    s.name = "PATH";
+    s.type = "REG_EXPAND_SZ";
+    s.value = "C:\\Windows";
+    snap.vars.push_back(u);
+    snap.vars.push_back(s);
+
+    const envh::edit::EnvModel m = envh::edit::EnvModel::fromSnapshot(snap);
+    CHECK(m.fingerprint == envh::edit::EnvModel::computeFingerprint(snap), "model stores full fingerprint");
+    CHECK(m.userFingerprint == envh::edit::EnvModel::computeUserFingerprint(snap), "model stores user fingerprint");
+    CHECK(m.fingerprint != m.userFingerprint, "full and user fingerprints differ while system vars exist");
+
+    envh::EnvSnapshot changed = snap;
+    changed.vars[1].value = "C:\\Windows;C:\\extra";
+    CHECK(envh::edit::EnvModel::computeUserFingerprint(changed) == m.userFingerprint,
+          "system edit leaves the user fingerprint alone");
+    CHECK(envh::edit::EnvModel::computeFingerprint(changed) != m.fingerprint,
+          "system edit changes the full fingerprint");
+
+    envh::EnvSnapshot added = snap;
+    envh::EnvVar s2 = s;
+    s2.name = "SYSTEMROOT";
+    s2.value = "C:\\Windows";
+    added.vars.push_back(s2);
+    CHECK(envh::edit::EnvModel::computeUserFingerprint(added) == m.userFingerprint,
+          "system addition leaves the user fingerprint alone");
+
+    envh::EnvSnapshot userChanged = snap;
+    userChanged.vars[0].value = "9";
+    CHECK(envh::edit::EnvModel::computeUserFingerprint(userChanged) != m.userFingerprint,
+          "user edit changes the user fingerprint");
+    // Order of vars in the snapshot must not matter.
+    envh::EnvSnapshot shuffled;
+    shuffled.vars.push_back(s);
+    shuffled.vars.push_back(u);
+    CHECK(envh::edit::EnvModel::computeUserFingerprint(shuffled) == m.userFingerprint,
+          "user fingerprint ignores snapshot order");
+}
+
 // ---- U9: draft round-trip with nasty values --------------------------------
 void testDraftRoundTrip()
 {
@@ -367,6 +429,7 @@ int main()
     testHostsMultiHost();
     testHostsByteExact();
     testFingerprint();
+    testUserFingerprintScope();
     testDraftRoundTrip();
     testBackupIntoWork();
     testRowCommands();

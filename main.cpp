@@ -296,6 +296,11 @@ struct EnvHosts : winshun::Plugin {
         const std::string s = winshun::env("WS_ENVHOSTS_TEST_SUBKEY");
         return s.empty() ? std::wstring(L"Environment") : winshun::wide(s);
     }
+    std::wstring testSystemSubkey()
+    {
+        const std::string s = winshun::env("WS_ENVHOSTS_TEST_SYSTEM_SUBKEY");
+        return s.empty() ? envh::native::systemEnvSubkey() : winshun::wide(s);
+    }
     std::string testHostsPath(const Settings& st)
     {
         const std::string s = winshun::env("WS_ENVHOSTS_TEST_HOSTS");
@@ -348,7 +353,7 @@ struct EnvHosts : winshun::Plugin {
 
     winshun::Items envQuery(const envh::ParsedQuery& pq, const Settings& st, bool zh)
     {
-        envh::native::EnvStore store(testUserSubkey());
+        envh::native::EnvStore store(testUserSubkey(), testSystemSubkey());
         const envh::native::EnvReadResult r = store.read(st.showSystem);
         const std::map<std::string, std::string> lookup = envh::envLookup(r.snap);
 
@@ -509,6 +514,7 @@ struct EnvHosts : winshun::Plugin {
             editorwin::OpenArgs oa;
             oa.kind = target;
             oa.userSubkey = testUserSubkey();
+            oa.sysSubkey = testSystemSubkey();
             oa.hostsPath = winshun::wide(testHostsPath(st));
             oa.dataDir = dataDir();
             oa.backupCount = st.backupCount;
@@ -573,7 +579,7 @@ struct EnvHosts : winshun::Plugin {
                     return {notify(tr(zh, "变量名无效", "Invalid name")), winshun::effect::keep()};
                 if (!envh::isValidEnvValue(value))
                     return {notify(tr(zh, "值无效", "Invalid value")), winshun::effect::keep()};
-                envh::native::EnvStore store(testUserSubkey());
+                envh::native::EnvStore store(testUserSubkey(), testSystemSubkey());
                 envh::native::BackupStore backups(dataDir(), st.backupCount);
                 backups.saveEnv(store.read(false).snap); // back up current state first
                 const std::string type = envh::envTypeForValue(value);
@@ -598,7 +604,7 @@ struct EnvHosts : winshun::Plugin {
                                     "System variables need administrator rights and cannot be deleted here")),
                         winshun::effect::keep()};
             const std::string name = target.substr(target.find('/') + 1);
-            envh::native::EnvStore store(testUserSubkey());
+            envh::native::EnvStore store(testUserSubkey(), testSystemSubkey());
             envh::native::BackupStore backups(dataDir(), st.backupCount);
             backups.saveEnv(store.read(false).snap);
             if (!store.deleteVar(name)) {
@@ -736,7 +742,7 @@ struct EnvHosts : winshun::Plugin {
         if (kind == "envRestore") {
             if (a.action != "restore")
                 return {winshun::effect::setQuery("env"), winshun::effect::keep()};
-            envh::native::EnvStore store(testUserSubkey());
+            envh::native::EnvStore store(testUserSubkey(), testSystemSubkey());
             envh::native::BackupStore backups(dataDir(), st.backupCount);
             backups.saveEnv(store.read(false).snap); // keep an undo point
             if (backups.restoreEnv(data["backupId"].toString(), store)) {

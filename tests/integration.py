@@ -11,6 +11,7 @@
 import hashlib
 import json
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -306,12 +307,13 @@ def main():
                                               kind="env", name="WS_EDITOR_PING"))
         time.sleep(0.2)
 
-    print("== P4 manifest declares v0.3.0 + ui + clipboard:write + idleExitSec 0 ==")
+    print("== P4 manifest declares the current version + ui + clipboard:write + idleExitSec 0 ==")
     import json as _json
     plugin_path = os.path.join(HERE, "..", "plugin.json")
     with open(plugin_path, "r", encoding="utf-8") as _f:
         manifest = _json.load(_f)
-    check(manifest.get("version") == "0.3.0", "plugin.json version is 0.3.0", manifest.get("version"))
+    check(re.match(r"^\d+\.\d+\.\d+$", manifest.get("version", "")),
+          "plugin.json carries a semantic version", manifest.get("version"))
     perms = manifest.get("permissions", [])
     check("ui" in perms, "permissions include ui")
     check("clipboard:write" in perms, "permissions include clipboard:write")

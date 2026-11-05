@@ -12,3 +12,5 @@ __pycache__/
 # plugin.json names it as runtime.program). It ships as a GitHub release asset
 # (.wsplugin), not through git. A fresh clone rebuilds it with CMake.
 envhosts.exe
+# A live instance locks the image, so relinking means renaming it out of the way.
+envhosts.exe.running*

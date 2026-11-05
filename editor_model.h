@@ -38,7 +38,7 @@ inline std::vector<std::string> splitDelimited(const std::string& value, const s
     for (std::size_t i = 0; i < value.size();) {
         if (preserveQuoted && value[i] == '"') {
             inQuote = !inQuote;
-            ++i;
+            current += value[i++];
             continue;
         }
         if (!inQuote && value.compare(i, delimiter.size(), delimiter) == 0) {
@@ -97,7 +97,8 @@ struct EnvChange {
 struct EnvModel {
     std::vector<EnvVarRow> base; // committed snapshot (fingerprint source)
     std::vector<EnvVarRow> rows; // working copy shown in the window
-    std::string fingerprint; // FNV-1a over base (scope/name/type/value)
+    std::string fingerprint; // FNV-1a over every scope in base
+    std::string userFingerprint; // FNV-1a over user-scope variables only
 
     static EnvModel fromSnapshot(const EnvSnapshot& snap)
     {
@@ -113,16 +114,31 @@ struct EnvModel {
             m.rows.push_back(r);
         }
         m.fingerprint = computeFingerprint(snap);
+        m.userFingerprint = computeUserFingerprint(snap);
         return m;
     }
 
     // FNV-1a over sorted "scope\nname\n type\nvalue\n" of the snapshot.
     static std::string computeFingerprint(const EnvSnapshot& snap)
     {
+        return fingerprintSnapshot(snap, false);
+    }
+
+    // The editor can only write HKCU values. Changes to HKLM therefore must not
+    // invalidate a pending user edit or make every Ctrl+S look like a conflict.
+    static std::string computeUserFingerprint(const EnvSnapshot& snap)
+    {
+        return fingerprintSnapshot(snap, true);
+    }
+
+private:
+    static std::string fingerprintSnapshot(const EnvSnapshot& snap, bool userOnly)
+    {
         std::vector<std::string> lines;
         for (const EnvVar& v : snap.vars) {
-            std::string l = v.scope + "\n" + toLower(v.name) + "\n" + v.type + "\n" + v.value + "\n";
-            lines.push_back(l);
+            if (userOnly && v.scope != "user")
+                continue;
+            lines.push_back(v.scope + "\n" + toLower(v.name) + "\n" + v.type + "\n" + v.value + "\n");
         }
         std::sort(lines.begin(), lines.end());
         std::string blob;
@@ -130,6 +146,8 @@ struct EnvModel {
             blob += l;
         return fnv1aHex(blob);
     }
+
+public:
 
     static bool varEqual(const EnvVarRow& a, const EnvVarRow& b)
     {
