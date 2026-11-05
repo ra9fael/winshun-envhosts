@@ -67,6 +67,20 @@ void testPathSplit()
     CHECK(pathJoin(q) == "C:\\a;D:\\b;c;E:\\d", "path quoted join");
 }
 
+void testDelimitedValues()
+{
+    using envh::edit::joinDelimited;
+    using envh::edit::splitDelimited;
+    CHECK(joinDelimited(splitDelimited("a,b,,", ",", false), ",") == "a,b,,", "generic delimiter roundtrip");
+    CHECK(splitDelimited("a;b;\"c;d\"", ";", true).size() == 3, "quoted delimiter count");
+    CHECK(splitDelimited("a::b", "::", false).size() == 2, "multi-character delimiter");
+    CHECK(joinDelimited({"one", "", "three"}, "|") == "one||three", "generic delimiter join");
+    CHECK(joinDelimited(splitDelimited("a\tb\tc", "\t", false), "\t") == "a\tb\tc", "tab roundtrip");
+    CHECK(joinDelimited(splitDelimited("\"a;b\";c", ";", true), ";") == "a;b;c", "quoted join drops quotes");
+    CHECK(splitDelimited("a,b", ";", false).size() == 1, "absent delimiter yields one part");
+    CHECK(splitDelimited("a", "", false).size() == 1, "empty delimiter yields one part");
+}
+
 // ---- U4: dirty tracking edit then edit back ---------------------------------
 void testEnvDirty()
 {
@@ -347,6 +361,7 @@ void testRowCommands()
 int main()
 {
     testPathSplit();
+    testDelimitedValues();
     testEnvDirty();
     testUndoRedo();
     testHostsMultiHost();

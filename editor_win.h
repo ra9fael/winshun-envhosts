@@ -95,7 +95,7 @@ public:
         // size so the layout coordinates (which are client-relative) actually fit.
         // WS_THICKFRAME stays on so the table can be enlarged; WS_VSCROLL gives
         // the virtual list a real scrollbar (keyboard, mouse and accessibility).
-        const DWORD style = (WS_OVERLAPPEDWINDOW & ~WS_MAXIMIZEBOX) | WS_VSCROLL;
+        const DWORD style = windowStyle();
         RECT wr {0, 0, m_clientW, m_clientH};
         AdjustWindowRectEx(&wr, style, FALSE, 0);
         m_hwnd = CreateWindowExW(0, kClass, title().c_str(), style,
@@ -201,14 +201,19 @@ private:
     std::vector<int> m_visible; // indices into the model rows (filtered)
     std::vector<std::string> m_backupIds; // for the backup tab
     std::string m_filterText;
-    bool m_listMode = false; // env PATH list/raw toggle
+    bool m_listMode = false;
+    std::string m_listDelimiter = ";";
+    std::vector<std::string> m_valueParts;
+    int m_partSel = 0;
+    int m_splitterY = 0;
+    bool m_dragSplitter = false;
     bool m_extChanged = false;
     bool m_dark = false;
     bool m_loading = false; // suppress EN_CHANGE while refreshDetail fills controls
 
     // controls
     HWND m_filterEdit = nullptr;
-    HWND m_nameEdit = nullptr, m_typeEdit = nullptr, m_valueEdit = nullptr;
+    HWND m_nameEdit = nullptr, m_typeEdit = nullptr, m_valueEdit = nullptr, m_partsList = nullptr, m_partEdit = nullptr;
     HWND m_enabledChk = nullptr, m_ipEdit = nullptr, m_hostEdit = nullptr, m_commentEdit = nullptr;
     HWND m_rawEdit = nullptr;
     HFONT m_editFont = nullptr;
@@ -228,6 +233,8 @@ private:
     RECT m_rcFilter = {};
     RECT m_rcTable = {};
     RECT m_rcDetail = {};
+    RECT m_rcSplitter = {};
+    RECT m_rcDelimiter = {}, m_rcModeBtn = {};
     RECT m_rcStatus = {};
     RECT m_rcStatusRow1 = {}, m_rcStatusRow2 = {};
     RECT m_rcAddBtn = {}, m_rcDelBtn = {}, m_rcUndoBtn = {}, m_rcRedoBtn = {};
@@ -289,6 +296,7 @@ private:
         wc.hCursor = LoadCursorW(nullptr, reinterpret_cast<LPCWSTR>(IDC_ARROW));
         RegisterClassW(&wc);
     }
+    static DWORD windowStyle() { return (WS_OVERLAPPEDWINDOW & ~WS_MAXIMIZEBOX) | WS_VSCROLL; }
     std::wstring title() const
     {
         return wideFromUtf8(m_kind == "env"
@@ -559,7 +567,12 @@ private:
             if (wp == VK_TAB || wp == VK_INSERT || wp == VK_DELETE || wp == VK_PRIOR
                 || wp == VK_NEXT || wp == VK_F5
                 || (ctrl && (wp == 'Z' || wp == 'z' || wp == 'Y' || wp == 'y'
-                              || wp == 'S' || wp == 's'))) {
+                              || wp == 'S' || wp == 's' || wp == 'R' || wp == 'r'))) {
+                return self->onKey(wp);
+            }
+            // Alt+arrows reorder the delimited item under the keyboard focus.
+            if (h == self->m_partsList && (GetKeyState(VK_MENU) & 0x8000) != 0
+                && (wp == VK_UP || wp == VK_DOWN)) {
                 return self->onKey(wp);
             }
         }
@@ -590,6 +603,12 @@ private:
         m_nameEdit = makeEdit(es, 2);
         m_typeEdit = makeEdit(es, 3);
         m_valueEdit = makeEdit(es | ES_MULTILINE | ES_AUTOVSCROLL | WS_VSCROLL, 4);
+        m_partsList = CreateWindowExW(WS_EX_CLIENTEDGE, L"LISTBOX", L"", es | LBS_NOTIFY | LBS_NOINTEGRALHEIGHT | WS_VSCROLL, 0, 0, 10, 20, m_hwnd,
+                                     reinterpret_cast<HMENU>(10), GetModuleHandleW(nullptr), nullptr);
+        if (m_partsList && m_editFont)
+            SendMessageW(m_partsList, WM_SETFONT, reinterpret_cast<WPARAM>(m_editFont), TRUE);
+        m_partEdit = makeEdit(es | ES_AUTOHSCROLL, 11);
+        subclassEdit(m_partsList);
         // hosts detail
         m_enabledChk = CreateWindowExW(0, L"BUTTON", L"", WS_CHILD | BS_AUTOCHECKBOX, 0, 0, 16, 16,
                                        m_hwnd, reinterpret_cast<HMENU>(5), GetModuleHandleW(nullptr), nullptr);
@@ -632,13 +651,33 @@ private:
         // child window paints over it.
         m_rcFilterLabel = {x, 4, x + 82, 28};
         m_rcFilter = {x + 82, 5, m_clientW - 12, 27};
-        const int detailH = 112;
-        const int statusH = 48; // two rows: context / actions
-        m_rcTable = {8, 34, m_clientW - 8, m_clientH - detailH - statusH - 8};
-        m_rcDetail = {8, m_clientH - detailH - statusH, m_clientW - 8, m_clientH - statusH};
-        m_rcStatus = {0, m_clientH - statusH, m_clientW, m_clientH};
-        m_rcStatusRow1 = {0, m_clientH - statusH, m_clientW, m_clientH - statusH + 24};
-        m_rcStatusRow2 = {0, m_clientH - statusH + 24, m_clientW, m_clientH};
+        const int statusH = 48;
+        const int workTop = 34;
+        const int workBottom = m_clientH - statusH;
+        const int minListH = 112, minDetailH = 150, splitterH = 7, fixedDetailH = 112;
+        // Only the env list/detail split is resizable; the hosts editor and the
+        // backup tab keep their original fixed detail height.
+        const bool resizable = (m_kind == "env" && m_tab != 2);
+        if (resizable) {
+            if (m_splitterY == 0)
+                m_splitterY = workBottom - minDetailH - splitterH;
+            m_splitterY = std::max(workTop + minListH,
+                                   std::min(m_splitterY, workBottom - minDetailH - splitterH));
+            m_rcTable = {8, workTop, m_clientW - 8, m_splitterY};
+            m_rcDetail = {8, m_splitterY + splitterH, m_clientW - 8, workBottom};
+            m_rcSplitter = {8, m_splitterY, m_clientW - 8, m_splitterY + splitterH};
+        } else {
+            m_rcTable = {8, workTop, m_clientW - 8, workBottom - fixedDetailH - 8};
+            m_rcDetail = {8, workBottom - fixedDetailH, m_clientW - 8, workBottom};
+            SetRectEmpty(&m_rcSplitter);
+        }
+        // The mode and delimiter buttons share the value-label row and stay clear
+        // of the action buttons, which own the right edge of the first control row.
+        m_rcModeBtn = {m_rcDetail.right - 118, m_rcDetail.top + 40, m_rcDetail.right - 4, m_rcDetail.top + 58};
+        m_rcDelimiter = {m_rcModeBtn.left - 118, m_rcDetail.top + 40, m_rcModeBtn.left - 6, m_rcDetail.top + 58};
+        m_rcStatus = {0, workBottom, m_clientW, m_clientH};
+        m_rcStatusRow1 = {0, workBottom, m_clientW, workBottom + 24};
+        m_rcStatusRow2 = {0, workBottom + 24, m_clientW, m_clientH};
 
         // Action buttons occupy the right edge of the detail panel.
         const int bw = 46, gap = 4;
@@ -773,7 +812,15 @@ private:
                 MoveWindow(m_rawEdit, m_rcTable.left, m_rcTable.top,
                            m_rcTable.right - m_rcTable.left, m_rcTable.bottom - m_rcTable.top, TRUE);
         }
+        if (m_partsList) {
+            ShowWindow(m_partsList, SW_HIDE);
+            if (m_kind == "env" && m_listMode && showDetail && !raw)
+                ShowWindow(m_partsList, SW_SHOW);
+        }
+        if (m_partEdit && (showDetail && !raw && m_kind == "env" && m_listMode)) ShowWindow(m_partEdit, SW_SHOW);
         if (!showDetail || raw) {
+            if (m_partsList) ShowWindow(m_partsList, SW_HIDE);
+            if (m_partEdit) ShowWindow(m_partEdit, SW_HIDE);
             for (HWND e : {m_nameEdit, m_typeEdit, m_valueEdit, m_enabledChk, m_ipEdit, m_hostEdit, m_commentEdit})
                 if (e)
                     ShowWindow(e, SW_HIDE);
@@ -783,21 +830,33 @@ private:
         // label row 1 at detail.top+2, controls at +20, label row 2 at +44,
         // value control at +60.
         const int lx = m_rcDetail.left + 4;
-        const int w = m_rcDetail.right - m_rcDetail.left - 8 - 200; // reserve the action buttons
         const int top = m_rcDetail.top + 20;
         const int valTop = m_rcDetail.top + 60;
+        const int rowW = m_rcDetail.right - lx - 4 - 200; // reserve the action buttons
+        const int valueW = m_rcDetail.right - lx - 4;
+        const int valueH = std::max(24, static_cast<int>(m_rcDetail.bottom - valTop - 6));
         if (m_kind == "env") {
-            show(m_nameEdit, lx, top, w / 2 - 6, 22);
-            show(m_typeEdit, lx + w / 2 + 4, top, w / 2 - 6, 22);
-            const int valH = std::max(24, static_cast<int>(m_rcDetail.bottom - valTop - 6));
-            show(m_valueEdit, lx, valTop, w, valH);
+            show(m_nameEdit, lx, top, rowW / 2 - 6, 22);
+            show(m_typeEdit, lx + rowW / 2 + 4, top, rowW / 2 - 6, 22);
+            if (m_listMode) {
+                if (m_valueEdit)
+                    ShowWindow(m_valueEdit, SW_HIDE);
+                const int listW = std::max(160, valueW * 58 / 100);
+                show(m_partsList, lx, valTop, listW, valueH);
+                show(m_partEdit, lx + listW + 6, valTop, valueW - listW - 6, 24);
+            } else {
+                if (m_partsList)
+                    ShowWindow(m_partsList, SW_HIDE);
+                if (m_partEdit)
+                    ShowWindow(m_partEdit, SW_HIDE);
+                show(m_valueEdit, lx, valTop, valueW, valueH);
+            }
         } else {
             show(m_enabledChk, lx, top + 3, 16, 16);
-            show(m_ipEdit, lx + 24, top, w / 3 - 30, 22);
-            show(m_hostEdit, lx + w / 3, top, w / 3, 22);
-            show(m_commentEdit, lx + 2 * w / 3 + 4, top, w / 3 - 4, 22);
+            show(m_ipEdit, lx + 24, top, rowW / 3 - 30, 22);
+            show(m_hostEdit, lx + rowW / 3, top, rowW / 3, 22);
+            show(m_commentEdit, lx + 2 * rowW / 3 + 4, top, rowW / 3 - 4, 22);
         }
-        refreshDetail();
     }
     void show(HWND e, int x, int y, int w, int h)
     {
@@ -807,11 +866,165 @@ private:
         MoveWindow(e, x, y, w, h, TRUE);
     }
 
+    // ---- delimited-value list mode (env only) ----
+    static std::vector<std::string>& delimiterPresets()
+    {
+        static std::vector<std::string> kDelims = {";", ",", ":", "\t", "|"};
+        return kDelims;
+    }
+    static bool isPathName(const std::string& name)
+    {
+        std::string up;
+        for (char c : name)
+            up += (c >= 'a' && c <= 'z') ? static_cast<char>(c - 32) : c;
+        return up == "PATH";
+    }
+    static std::string guessDelimiter(const std::string& name, const std::string& value)
+    {
+        if (isPathName(name))
+            return ";";
+        for (const std::string& d : delimiterPresets())
+            if (value.find(d) != std::string::npos)
+                return d;
+        return ";";
+    }
+    std::string nextDelimiter() const
+    {
+        const auto& ds = delimiterPresets();
+        for (std::size_t i = 0; i < ds.size(); ++i)
+            if (ds[i] == m_listDelimiter)
+                return ds[(i + 1) % ds.size()];
+        return ds[0];
+    }
+    std::string delimiterLabel() const
+    {
+        if (m_listDelimiter == "\t")
+            return m_args.zh ? "制表符" : "TAB";
+        return m_listDelimiter;
+    }
+
+    // Rebuild the LISTBOX from m_valueParts. refreshPartEdit is false while the
+    // user is typing in the item box: rewriting its text would reset the caret.
+    void syncPartsList(bool refreshPartEdit = true)
+    {
+        if (!m_partsList)
+            return;
+        SendMessageW(m_partsList, LB_RESETCONTENT, 0, 0);
+        for (const auto& part : m_valueParts)
+            SendMessageW(m_partsList, LB_ADDSTRING, 0, reinterpret_cast<LPARAM>(wideFromUtf8(part).c_str()));
+        if (!m_valueParts.empty()) {
+            m_partSel = std::max(0, std::min(m_partSel, static_cast<int>(m_valueParts.size()) - 1));
+            SendMessageW(m_partsList, LB_SETCURSEL, m_partSel, 0);
+            // A rebuild resets the scroll offset; keep the selected item in view.
+            SendMessageW(m_partsList, LB_SETTOPINDEX, m_partSel, 0);
+        } else
+            m_partSel = 0;
+        if (refreshPartEdit)
+            setEdit(m_partEdit, m_partSel >= 0 && m_partSel < static_cast<int>(m_valueParts.size())
+                                       ? m_valueParts[m_partSel]
+                                       : std::string {},
+                    !rowEditable(m_sel));
+        if (m_listMode && m_partEdit)
+            SendMessageW(m_partEdit, EM_SETREADONLY, rowEditable(m_sel) ? FALSE : TRUE, 0);
+    }
+    void commitPartEdit()
+    {
+        if (!m_listMode || m_loading || m_valueParts.empty() || !rowEditable(m_sel))
+            return;
+        const std::string next = getEdit(m_partEdit);
+        if (m_valueParts[m_partSel] == next)
+            return;
+        m_valueParts[m_partSel] = next;
+        // Update only the edited row in place, so the list keeps its scroll pos.
+        const std::wstring wide = wideFromUtf8(next);
+        SendMessageW(m_partsList, LB_DELETESTRING, m_partSel, 0);
+        SendMessageW(m_partsList, LB_INSERTSTRING, m_partSel, reinterpret_cast<LPARAM>(wide.c_str()));
+        SendMessageW(m_partsList, LB_SETCURSEL, m_partSel, 0);
+        syncRawValueEdit();
+        commitDetail();
+    }
+    // Keep the (hidden) raw value box in sync with the joined list, so toggling
+    // back with Ctrl+R and any control-text read see the current value.
+    void syncRawValueEdit()
+    {
+        m_loading = true;
+        setEdit(m_valueEdit, envh::edit::joinDelimited(m_valueParts, m_listDelimiter), !rowEditable(m_sel));
+        m_loading = false;
+    }
+    void addPart()
+    {
+        if (!rowEditable(m_sel))
+            return;
+        commitPartEdit();
+        m_valueParts.insert(m_valueParts.begin() + m_partSel + 1, std::string {});
+        m_partSel = m_partSel + 1;
+        syncRawValueEdit();
+        syncPartsList();
+        commitDetail();
+        SetFocus(m_partEdit);
+    }
+    void deletePart()
+    {
+        if (!rowEditable(m_sel) || m_valueParts.empty())
+            return;
+        m_valueParts.erase(m_valueParts.begin() + m_partSel);
+        if (m_valueParts.empty())
+            m_valueParts.emplace_back();
+        m_partSel = std::min(m_partSel, static_cast<int>(m_valueParts.size()) - 1);
+        syncRawValueEdit();
+        syncPartsList();
+        commitDetail();
+    }
+    void movePart(int delta)
+    {
+        const int to = m_partSel + delta;
+        if (!rowEditable(m_sel) || to < 0 || to >= static_cast<int>(m_valueParts.size()))
+            return;
+        std::swap(m_valueParts[m_partSel], m_valueParts[to]);
+        m_partSel = to;
+        syncRawValueEdit();
+        syncPartsList();
+        commitDetail();
+    }
+    // Raw <-> delimited-item editing (Ctrl+R or the detail-panel button).
+    void toggleListMode()
+    {
+        if (m_kind != "env" || m_tab == 2)
+            return;
+        commitPartEdit();
+        const std::string joined = m_listMode ? envh::edit::joinDelimited(m_valueParts, m_listDelimiter)
+                                              : getEdit(m_valueEdit);
+        m_listMode = !m_listMode;
+        if (m_listMode) {
+            const std::string name = m_visible.empty() ? std::string {} : m_env.rows[m_visible[m_sel]].name;
+            m_listDelimiter = guessDelimiter(name, joined);
+            m_valueParts = envh::edit::splitDelimited(joined, m_listDelimiter, m_listDelimiter == ";");
+            m_partSel = 0;
+            syncRawValueEdit();
+            syncPartsList();
+            applyLayout();
+            SetFocus(m_partsList);
+        } else {
+            m_valueParts.clear();
+            // Write the rejoined value back into the raw box before dropping the
+            // parts; syncing from an empty part list would blank the field.
+            m_loading = true;
+            setEdit(m_valueEdit, joined, !rowEditable(m_sel));
+            m_loading = false;
+            applyLayout();
+            SetFocus(m_valueEdit);
+        }
+        commitDetail();
+        InvalidateRect(m_hwnd, nullptr, TRUE);
+        setStatus(m_listMode ? (m_args.zh ? "分隔项编辑 · 分隔符 " + delimiterLabel()
+                                          : "item list · delimiter " + delimiterLabel())
+                             : (m_args.zh ? "原文编辑" : "raw value editing"),
+                  0);
+    }
+
     // Fill the detail controls from the selected row (no model write).
     void refreshDetail()
     {
-        // SetWindowTextW fires EN_CHANGE; without this guard commitDetail() would
-        // write half-filled controls back into the model and mark it dirty.
         m_loading = true;
         if (m_kind == "env") {
             std::string name, type, value;
@@ -826,6 +1039,13 @@ private:
             setEdit(m_nameEdit, name, ro);
             setEdit(m_typeEdit, type, ro);
             setEdit(m_valueEdit, value, ro);
+            if (isPathName(name))
+                m_listDelimiter = ";";
+            if (m_listMode) {
+                m_valueParts = envh::edit::splitDelimited(value, m_listDelimiter, m_listDelimiter == ";");
+                m_partSel = 0;
+                syncPartsList();
+            }
         } else {
             bool enabled = false, ro = false;
             std::string ip, host, comment;
@@ -874,7 +1094,8 @@ private:
         const int idx = m_visible[m_sel];
         if (m_kind == "env") {
             auto& r = m_env.rows[idx];
-            const std::string name = getEdit(m_nameEdit), value = getEdit(m_valueEdit);
+            const std::string name = getEdit(m_nameEdit);
+            const std::string value = m_listMode ? envh::edit::joinDelimited(m_valueParts, m_listDelimiter) : getEdit(m_valueEdit);
             std::string type = getEdit(m_typeEdit);
             if (type.empty())
                 type = envh::envTypeForValue(value);
@@ -1028,7 +1249,6 @@ private:
 
         // ---- table: header band, column separators, rows ----
         if (m_tab != 2) {
-            drawHeader(mem, fg, dim);
             HGDIOBJ of = SelectObject(mem, monoFont);
             int y = m_rcTable.top + m_headerH;
             if (m_visible.empty()) {
@@ -1092,18 +1312,21 @@ private:
             DeleteObject(dp);
             HGDIOBJ of = SelectObject(mem, smallFont);
             SetTextColor(mem, dim);
-            const int lx = m_rcDetail.left + 4;
-            const int dw = m_rcDetail.right - m_rcDetail.left - 8 - 200;
+        const int lx = m_rcDetail.left + 4;
+        const int dw = m_rcDetail.right - lx - 4 - 200; // matches applyLayout's control row
             if (m_kind == "env") {
                 RECT a {lx, m_rcDetail.top + 2, lx + dw / 2 - 6, m_rcDetail.top + 18};
                 RECT b {lx + dw / 2 + 4, a.top, m_rcDetail.right - 4, a.bottom};
-                RECT c {lx, m_rcDetail.top + 44, m_rcDetail.right - 4, m_rcDetail.top + 60};
+                RECT c {lx, m_rcDetail.top + 44,
+                        (m_listMode ? m_rcDelimiter.left : m_rcModeBtn.left) - 6, m_rcDetail.top + 60};
                 DrawTextW(mem, m_args.zh ? L"名称" : L"Name", -1, &a, DT_LEFT | DT_SINGLELINE);
                 DrawTextW(mem, m_args.zh ? L"类型" : L"Type", -1, &b, DT_LEFT | DT_SINGLELINE);
                 const wchar_t* vlab = m_args.zh
-                    ? (m_listMode ? L"值（列表，每行一段；Ctrl+R 回原文）" : L"值（Ctrl+R 切换列表模式）")
-                    : (m_listMode ? L"Value (list; Ctrl+R raw)" : L"Value (Ctrl+R list)");
-                DrawTextW(mem, vlab, -1, &c, DT_LEFT | DT_SINGLELINE);
+                    ? (m_listMode ? L"分隔项（Ins 增 · Del 删 · Alt+↑↓ 排序 · Ctrl+R 原文）"
+                                  : L"值（Ctrl+R 进入分隔项编辑）")
+                    : (m_listMode ? L"Items (Ins add · Del remove · Alt+↑↓ move · Ctrl+R raw)"
+                                  : L"Value (Ctrl+R edit delimited items)");
+                DrawTextW(mem, vlab, -1, &c, DT_LEFT | DT_SINGLELINE | DT_END_ELLIPSIS);
             } else {
                 RECT b {lx + 24, m_rcDetail.top + 2, lx + dw / 3, m_rcDetail.top + 18};
                 RECT c {lx + dw / 3, b.top, lx + 2 * dw / 3 + 4, b.bottom};
@@ -1117,8 +1340,45 @@ private:
             SelectObject(mem, of);
         }
 
+        // ---- draggable splitter between the env list and its detail panel ----
+        if (m_rcSplitter.right > m_rcSplitter.left) {
+            HBRUSH sb = CreateSolidBrush(m_dark ? RGB(38, 41, 46) : RGB(236, 239, 244));
+            FillRect(mem, &m_rcSplitter, sb);
+            DeleteObject(sb);
+            HPEN gp = CreatePen(PS_SOLID, 1, m_dark ? RGB(96, 104, 116) : RGB(160, 168, 180));
+            HGDIOBJ ogp = SelectObject(mem, gp);
+            const int cx = (m_rcSplitter.left + m_rcSplitter.right) / 2;
+            const int cy = (m_rcSplitter.top + m_rcSplitter.bottom) / 2;
+            for (int d = -14; d <= 14; d += 7) {
+                MoveToEx(mem, cx + d - 2, cy, nullptr);
+                LineTo(mem, cx + d + 2, cy);
+            }
+            SelectObject(mem, ogp);
+            DeleteObject(gp);
+        }
+
         // ---- detail action buttons + two-row status bar ----
         drawActionButtons(mem, smallFont, fg, dim);
+        if (m_kind == "env" && m_tab != 2) {
+            auto drawMini = [&](const RECT& r, const std::string& text) {
+                HBRUSH b = CreateSolidBrush(m_dark ? RGB(48, 52, 58) : RGB(225, 232, 241));
+                FillRect(mem, &r, b);
+                DeleteObject(b);
+                HPEN p = CreatePen(PS_SOLID, 1, m_dark ? RGB(90, 98, 110) : RGB(176, 188, 202));
+                HGDIOBJ o = SelectObject(mem, p);
+                Rectangle(mem, r.left, r.top, r.right, r.bottom);
+                SelectObject(mem, o);
+                DeleteObject(p);
+                SetTextColor(mem, fg);
+                SetBkMode(mem, TRANSPARENT);
+                RECT t = r;
+                DrawTextW(mem, wideFromUtf8(text).c_str(), -1, &t, DT_CENTER | DT_VCENTER | DT_SINGLELINE);
+            };
+            drawMini(m_rcModeBtn, m_listMode ? (m_args.zh ? "原文编辑" : "raw value")
+                                             : (m_args.zh ? "分隔项编辑" : "item list"));
+            if (m_listMode)
+                drawMini(m_rcDelimiter, (m_args.zh ? "分隔符 " : "delim ") + delimiterLabel());
+        }
         drawStatusBar(mem, smallFont, fg, dim);
 
         BitBlt(dc, 0, 0, w, h, mem, 0, 0, SRCCOPY);
@@ -1654,7 +1914,7 @@ private:
         endEdit();
         if (!rowEditable(m_sel))
             return;
-        SetFocus(m_kind == "env" ? m_valueEdit : m_ipEdit);
+        SetFocus(m_kind == "hosts" ? m_ipEdit : (m_listMode && m_partsList ? m_partsList : m_valueEdit));
     }
     void runChip(int id)
     {
@@ -1747,9 +2007,15 @@ private:
             externalChange();
             return 0;
         case WM_COMMAND:
+            if (HIWORD(wp) == LBN_SELCHANGE && reinterpret_cast<HWND>(lp) == m_partsList) {
+                commitPartEdit();
+                m_partSel = static_cast<int>(SendMessageW(m_partsList, LB_GETCURSEL, 0, 0));
+                syncPartsList();
+                return 0;
+            }
             if (HIWORD(wp) == EN_CHANGE) {
                 if (m_loading)
-                    return 0; // programmatic fill, not a user edit
+                    return 0;
                 if (reinterpret_cast<HWND>(lp) == m_filterEdit) {
                     // Typing in the filter box must actually filter the table.
                     m_filterText = getEdit(m_filterEdit);
@@ -1758,12 +2024,23 @@ private:
                     clampScroll();
                     selectRow(0);
                     InvalidateRect(m_hwnd, nullptr, TRUE);
+                } else if (reinterpret_cast<HWND>(lp) == m_partEdit) {
+                    commitPartEdit();
                 } else {
-                    // live-commit detail edits (one undo step per edit session)
                     commitDetail();
                 }
             }
             return 0;
+        case WM_GETMINMAXINFO: {
+            // Keep enough client height for both panes at their minimums
+            // (34 top + 112 list + 7 splitter + 150 detail + 48 status).
+            auto mmi = reinterpret_cast<MINMAXINFO*>(lp);
+            RECT mr {0, 0, 620, 380};
+            AdjustWindowRectEx(&mr, windowStyle(), FALSE, 0);
+            mmi->ptMinTrackSize.x = mr.right - mr.left;
+            mmi->ptMinTrackSize.y = mr.bottom - mr.top;
+            return 0;
+        }
         case WM_SIZE: {
             RECT cr {};
             GetClientRect(m_hwnd, &cr);
@@ -1776,6 +2053,30 @@ private:
         }
         case WM_LBUTTONDOWN: {
             const int x = static_cast<int>(LOWORD(lp)), y = static_cast<int>(HIWORD(lp));
+            if (m_kind == "env" && m_tab != 2 && inRect(m_rcModeBtn, x, y)) {
+                toggleListMode();
+                return 0;
+            }
+            if (m_kind == "env" && m_tab != 2 && m_listMode && inRect(m_rcDelimiter, x, y)) {
+                commitPartEdit();
+                // Re-split from the joined value, so edits made in the item box
+                // survive a delimiter change.
+                const std::string joined = envh::edit::joinDelimited(m_valueParts, m_listDelimiter);
+                m_listDelimiter = nextDelimiter();
+                m_valueParts = envh::edit::splitDelimited(joined, m_listDelimiter, m_listDelimiter == ";");
+                m_partSel = 0;
+                syncRawValueEdit();
+                syncPartsList();
+                commitDetail();
+                setStatus(m_args.zh ? "分隔符: " + delimiterLabel() : "delimiter: " + delimiterLabel());
+                InvalidateRect(m_hwnd, nullptr, TRUE);
+                return 0;
+            }
+            if (m_kind == "env" && m_tab != 2 && inRect(m_rcSplitter, x, y)) {
+                m_dragSplitter = true;
+                SetCapture(m_hwnd);
+                return 0;
+            }
             for (Chip c : m_chips)
                 if (inRect(c.rc, x, y)) {
                     if (chipEnabled(c.id))
@@ -1806,6 +2107,38 @@ private:
             }
             return 0;
         }
+        case WM_MOUSEMOVE:
+            if (m_dragSplitter) {
+                m_splitterY = static_cast<int>(HIWORD(lp));
+                RECT cr {};
+                GetClientRect(m_hwnd, &cr);
+                computeLayout(cr.right, cr.bottom);
+                applyLayout();
+                InvalidateRect(m_hwnd, nullptr, TRUE);
+                return 0;
+            }
+            return 0;
+        case WM_LBUTTONUP:
+            if (m_dragSplitter) {
+                m_dragSplitter = false;
+                ReleaseCapture();
+                return 0;
+            }
+            return 0;
+        case WM_CAPTURECHANGED:
+            m_dragSplitter = false;
+            return 0;
+        case WM_SETCURSOR:
+            if (m_kind == "env" && m_tab != 2) {
+                POINT pt {};
+                GetCursorPos(&pt);
+                ScreenToClient(m_hwnd, &pt);
+                if (inRect(m_rcSplitter, pt.x, pt.y)) {
+                    SetCursor(LoadCursorW(nullptr, IDC_SIZENS));
+                    return TRUE;
+                }
+            }
+            return DefWindowProcW(m_hwnd, msg, wp, lp);
         case WM_KEYDOWN:
             return onKey(wp);
         case WM_CLOSE:
@@ -1851,7 +2184,10 @@ private:
             if (wp == 'Z' || wp == 'z') { doUndo(); return 0; }
             if (wp == 'Y' || wp == 'y') { doRedo(); return 0; }
             if (wp == 'F' || wp == 'f') { if (m_filterEdit) SetFocus(m_filterEdit); return 0; }
-            if (wp == 'R' || wp == 'r') { if (m_kind == "env") { m_listMode = !m_listMode; applyLayout(); } return 0; }
+            if (wp == 'R' || wp == 'r') {
+                toggleListMode();
+                return 0;
+            }
             return 0;
         }
         if (m_tab == 2) {
@@ -1876,6 +2212,14 @@ private:
                 loadBackupIntoWork(m_backupIds[idx]);
             }
             return 0;
+        }
+        const bool alt = (GetKeyState(VK_MENU) & 0x8000) != 0;
+        if (m_kind == "env" && m_listMode && !ctrl) {
+            if (wp == VK_INSERT) { addPart(); return 0; }
+            if (wp == VK_DELETE) { deletePart(); return 0; }
+            if (alt && wp == VK_UP) { movePart(-1); return 0; }
+            if (alt && wp == VK_DOWN) { movePart(1); return 0; }
+            if (wp == VK_RETURN) { commitPartEdit(); SetFocus(m_hwnd); return 0; }
         }
         if (wp == VK_ESCAPE) {
             if (m_kind == "env" ? m_envDirty() : m_hostsDirty()) {

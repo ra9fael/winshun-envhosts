@@ -96,7 +96,8 @@ class Driver:
             env.pop("WS_ENVHOSTS_TEST_HOSTS", None)
         self.proc = subprocess.Popen(
             [EXE], stdin=subprocess.PIPE, stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE, env=env, text=True, bufsize=1)
+            stderr=subprocess.PIPE, env=env, text=True, bufsize=1,
+            encoding="utf-8", errors="replace")
         self._id = 0
         self._reader = threading.Thread(target=self._pump, daemon=True)
         self._buf = []
@@ -163,6 +164,14 @@ class Driver:
         mid = self._next_id()
         self._send({"id": mid, "method": "shutdown", "params": {}})
         self.recv(timeout=2.0)
+        # A resident plugin ignores idle exit by design, so make sure the process
+        # really goes: a leaked instance holds envhosts.exe open and breaks the
+        # next link step.
+        try:
+            self.proc.wait(timeout=3.0)
+        except subprocess.TimeoutExpired:
+            self.proc.kill()
+            self.proc.wait()
 
     def find_item(self, items, kind=None, name=None, contains=None):
         for it in items:
@@ -297,12 +306,12 @@ def main():
                                               kind="env", name="WS_EDITOR_PING"))
         time.sleep(0.2)
 
-    print("== P4 manifest declares v0.2.0 + ui + clipboard:write + idleExitSec 0 ==")
+    print("== P4 manifest declares v0.3.0 + ui + clipboard:write + idleExitSec 0 ==")
     import json as _json
     plugin_path = os.path.join(HERE, "..", "plugin.json")
     with open(plugin_path, "r", encoding="utf-8") as _f:
         manifest = _json.load(_f)
-    check(manifest.get("version") == "0.2.0", "plugin.json version is 0.2.0", manifest.get("version"))
+    check(manifest.get("version") == "0.3.0", "plugin.json version is 0.3.0", manifest.get("version"))
     perms = manifest.get("permissions", [])
     check("ui" in perms, "permissions include ui")
     check("clipboard:write" in perms, "permissions include clipboard:write")

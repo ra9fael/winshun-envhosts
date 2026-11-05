@@ -68,6 +68,45 @@ Verified with `tests/gui_preview.py`: 34 env rows -> two `SB_PAGEDOWN` messages
 move the view to `rows 19-34 / 34`, `Ins` adds and scrolls to a highlighted new
 row, `Del` removes it, and both windows render the two-row bar without overlap.
 
+### Split env pane and delimited-item editing (v0.3.0)
+
+The env window is now two vertically resizable panes: the variable table on top,
+the detail editor below, separated by a draggable splitter. Only the env window
+(non-backup tabs) is resizable; hosts and the backup view keep the fixed
+112px detail strip, so the splitter geometry never leaks into the other layouts.
+
+1. **Splitter.** `computeLayout()` derives `m_rcTable` / `m_rcDetail` /
+   `m_rcSplitter` from `m_splitterY`, clamped so each pane keeps its minimum
+   (list 112px, detail 150px); `WM_GETMINMAXINFO` enforces the smallest window
+   that can hold both. Dragging uses `WM_LBUTTONDOWN` on the grip band +
+   `SetCapture` + `WM_MOUSEMOVE`/`WM_LBUTTONUP`/`WM_CAPTURECHANGED`, and
+   `WM_SETCURSOR` shows `IDC_SIZENS`. `applyLayout()` deliberately does not
+   re-read the controls, so a drag or a resize never resets the caret or the
+   text being typed.
+2. **Item editing of a delimited value.** `editor_model.h` gained
+   `splitDelimited` / `joinDelimited` (quote-aware, empty segments preserved);
+   `pathSplit` / `pathJoin` are now `;` wrappers over them, so the round trip
+   `join(split(v)) == v` is unit-tested for `;`, `,`, `:` and TAB.
+3. **Explicit mode switch.** List mode is entered by the user, never inferred:
+   `Ctrl+R` or the self-drawn `分隔项编辑 / 原文编辑` button toggles it, and the
+   `分隔符` button cycles `; , : TAB |`. `Path`/`PATH`-named rows are pinned to
+   `;`. Switching to list mode splits the current value; switching back joins
+   the items into the raw box, so the two views are always the same string.
+   Items are edited with `Ins` (insert after the selection), `Del`,
+   `Alt+Up/Down` (reorder) and the item box beside the list; every change
+   rejoins into the model value and stays inside the one-undo-step-per-session
+   rule. Read-only rows (system scope) get a read-only item box and list.
+
+Not implemented from the original §4 mockup: expansion preview with ✓/✗
+existence badges, `去重` and `删不存在`. The mode is entered explicitly instead
+of auto-detected from `;` or a name list, because silently splitting an
+arbitrary value would make the raw text unreachable.
+
+Verified with `tests/gui_preview.py` on the real desktop: splitter drag, item
+list of a 7-segment `Path`, `Ins` + typed item text (`D:\new\item` appears in
+both the list and the rejoined value), `Del` removes it, and toggling back to
+raw shows the original 7-segment string.
+
 Scope: the pinned first row of the `env` and `hosts` result lists, and the
 window it opens. The v0.1 inline (launcher) editing stays as it is.
 
@@ -267,7 +306,7 @@ Title: `环境变量 — Win顺`. Default size 960×600 DIP, remembered in
 |---|---|
 | Tabs | 用户 (editable), 系统 (read-only unless D2 is taken; 🔒 badge and greyed editors), 备份 (list of `backups/env/*.json`, newest first). `showSystemVars=false` hides the 系统 tab. |
 | Table | ListView report mode. Columns 名称 / 类型 / 值 (first line, truncated) / ● dirty marker. Sorted by name, case-insensitive. Filter matches name or value, the same rule as `envMatches`. |
-| Detail pane | Edits the selected row. **List mode** is used when the value contains `;` or the name is in the list set (`Path`, `PATHEXT`, `PSModulePath`, `CLASSPATH`, `INCLUDE`, `LIB`). Otherwise a multi-line Edit. Ctrl+R switches between list and raw text. |
+| Detail pane | Edits the selected row. **List mode** is entered explicitly with `Ctrl+R` or the mode button (v0.3: the value is never split silently, so the raw text always stays reachable); `Path`-named rows default to the `;` delimiter. Otherwise a multi-line Edit. |
 | List mode items | Each segment shows its expansion and an existence mark for directories: ✓ exists, ✗ missing, ? not checked (UNC or contains an unexpanded `%X%`). Checks run on the GUI thread with a 50 ms budget per refresh, local paths only, no network shares. |
 | 类型 | REG_SZ / REG_EXPAND_SZ. Auto-switches to EXPAND when `%X%` is typed (same as `envTypeForValue`), but the user can override. REG_MULTI_SZ rows are shown read-only (v0.1 also does not edit them). |
 | Validation | Live, from `isValidEnvName` / `isValidEnvValue`: red border and status text. Save is disabled while any row is invalid. Length counter turns amber above 1024 (a later `setx` by any other tool truncates there) and red above 32767 (the Windows limit for one variable). |
@@ -471,7 +510,7 @@ are only read, except in the documented manual case M5.
 | P3 | `openEditor` twice | One window (count via `EnumThreadWindows` on the plugin's threads from the test harness), second call refocuses |
 | P4 | Inline `env set` while the window is open and clean | Window reloads (checked through a test-only `WM_COPYDATA` "dump state" message in debug builds) |
 | P5 | `shutdown` with unsaved edits | Process exits within 1500 ms, `drafts/env.json` exists, scratch registry unchanged |
-| P6 | Manifest: `ui` present, `idleExitSec` 0, version 0.2.0 | Field check (same manual check as v0.1, no jsonschema) |
+| P6 | Manifest: `ui` present, `idleExitSec` 0, version 0.3.0 | Field check (same manual check as v0.1, no jsonschema) |
 
 ### 10.3 L4 — window automation (UI Automation, `tests/ui_editor.py`)
 
@@ -503,7 +542,7 @@ harness, then against the real host.
 
 | ID | Steps | Check |
 |---|---|---|
-| M1 | Install 0.2.0, enable | Permission dialog lists `ui` (and `clipboard:write`) |
+| M1 | Install 0.3.0, enable | Permission dialog lists `ui` (and `clipboard:write`) |
 | M2 | Type `env`, `环境变量 path`, `hosts docker` | Row 1 is 进入交互式编辑界面 every time; Win顺 message log shows `query` / reply with `env:editor` first |
 | M3 | Enter on row 1 | Window in front, focus in table (W1 by hand); message log shows `action openEditor` and the reply |
 | M4 | Leave the window open 15 min, no queries | No `shutdown` in the log (idleExitSec 0) |

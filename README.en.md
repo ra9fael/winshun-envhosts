@@ -174,6 +174,18 @@ All data stays local under `WS_DATA_DIR`:
   `Esc` returns focus to the table, `Ctrl+Z`/`Ctrl+Y` undo/redo. Four buttons on
   the right of the detail pane (`+ Add`, `- Del`, `Undo`, `Redo`) call the same
   commands as the keyboard.
+- **Two vertically split panes (env window only)**: a draggable splitter sits
+  between the table and the detail editor; each pane keeps its minimum height
+  (list 112px, detail 150px) and `WM_GETMINMAXINFO` refuses a window too small
+  to hold both. The hosts window and the backup view keep the fixed detail strip.
+- **Delimited-item editing**: the `Edit items` button in the detail pane (or
+  `Ctrl+R`) splits a long value on a delimiter so you can work on one segment at
+  a time — `Ins` inserts after the current item, `Del` removes it, `Alt+Up`/`Alt+Down`
+  reorder, and the box beside the list edits it. Every change is rejoined into the
+  variable's value immediately and stays a single undo step. `Path` is pinned to
+  `;`; other values cycle the delimiter through `; , : TAB |` with the delimiter
+  button. `Ctrl+R` again returns to raw text, showing the rejoined string. Splitting
+  is always explicit, so the raw value never becomes unreachable.
 - **Status bar**: two rows. Row 1 shows edit state, visible range, filter and
   writability; transient messages expire after 4 s. Row 2 is a strip of
   clickable shortcut chips, greyed out when unavailable.

@@ -28,40 +28,50 @@ namespace edit {
 // PATH helpers (env list-mode editing)
 // ---------------------------------------------------------------------------
 
-// Split a PATH-style value on ';', but not inside double quotes (so a segment
-// like "C:\a;b" keeps its semicolon). Empty segments are preserved so a trailing
-// ';' survives a round trip. Join(split(x)) == x for any x.
-inline std::vector<std::string> pathSplit(const std::string& v)
+inline std::vector<std::string> splitDelimited(const std::string& value, const std::string& delimiter, bool preserveQuoted)
 {
-    std::vector<std::string> out;
-    std::string cur;
+    if (delimiter.empty())
+        return {value};
+    std::vector<std::string> parts;
+    std::string current;
     bool inQuote = false;
-    for (std::size_t i = 0; i < v.size(); ++i) {
-        const char c = v[i];
-        if (c == '"') {
+    for (std::size_t i = 0; i < value.size();) {
+        if (preserveQuoted && value[i] == '"') {
             inQuote = !inQuote;
-            continue; // quotes are not stored in the segment text
-        }
-        if (c == ';' && !inQuote) {
-            out.push_back(cur);
-            cur.clear();
+            ++i;
             continue;
         }
-        cur += c;
+        if (!inQuote && value.compare(i, delimiter.size(), delimiter) == 0) {
+            parts.push_back(current);
+            current.clear();
+            i += delimiter.size();
+            continue;
+        }
+        current += value[i++];
     }
-    out.push_back(cur);
-    return out;
+    parts.push_back(current);
+    return parts;
+}
+
+inline std::string joinDelimited(const std::vector<std::string>& parts, const std::string& delimiter)
+{
+    std::string value;
+    for (std::size_t i = 0; i < parts.size(); ++i) {
+        if (i)
+            value += delimiter;
+        value += parts[i];
+    }
+    return value;
+}
+
+inline std::vector<std::string> pathSplit(const std::string& v)
+{
+    return splitDelimited(v, ";", true);
 }
 
 inline std::string pathJoin(const std::vector<std::string>& segs)
 {
-    std::string out;
-    for (std::size_t i = 0; i < segs.size(); ++i) {
-        if (i)
-            out += ';';
-        out += segs[i];
-    }
-    return out;
+    return joinDelimited(segs, ";");
 }
 
 // ---------------------------------------------------------------------------

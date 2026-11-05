@@ -14,6 +14,7 @@ import json
 import os
 import struct
 import subprocess
+import sys
 import tempfile
 import threading
 import time
@@ -43,10 +44,12 @@ with open(HOSTS, "w", encoding="utf-8", newline="\r\n") as f:
 # Environment key and the real hosts file are never touched.
 with winreg.CreateKeyEx(winreg.HKEY_CURRENT_USER, SUBKEY, 0, winreg.KEY_SET_VALUE) as k:
     winreg.SetValueEx(k, "EPICS_CA_ADDR_LIST", 0, winreg.REG_SZ,
-                      "10.10.81.255 192.168.138.255")
+                      "192.0.2.55 198.51.100.55")
     winreg.SetValueEx(k, "LANG", 0, winreg.REG_SZ, "C")
     winreg.SetValueEx(k, "Path", 0, winreg.REG_EXPAND_SZ,
-                      r"C:\Windows\System32;C:\Windows")
+                      r"C:\Windows\System32;C:\Windows;C:\Windows\System32"
+                      r"\Wbem;C:\Program Files\Git\cmd;D:\tools\Qt\bin;D:\dev\vstools"
+                      r"\bin;C:\Users\sample\AppData\Local\Programs\Python\Python314")
     winreg.SetValueEx(k, "WS_DEMO_NOTE", 0, winreg.REG_SZ, "sample value for GUI preview")
     # Enough rows to force scrolling: the table shows ~16 rows at default size.
     for i in range(1, 31):
@@ -62,8 +65,10 @@ env["WS_DATA_DIR"] = DATA
 env["WS_ENVHOSTS_TEST_SUBKEY"] = SUBKEY
 env["WS_ENVHOSTS_TEST_HOSTS"] = HOSTS
 
+LOG = os.path.join(DATA, "plugin.log")
 proc = subprocess.Popen([EXE], stdin=subprocess.PIPE, stdout=subprocess.PIPE,
-                        stderr=subprocess.PIPE, env=env, text=True, bufsize=1,
+                        stderr=open(LOG, "w", encoding="utf-8", errors="replace"),
+                        env=env, text=True, bufsize=1,
                         encoding="utf-8", errors="replace")
 buf = []
 lock = threading.Lock()
@@ -224,8 +229,40 @@ def capture(hwnd, bmp_path):
 user32.PostMessageW.argtypes = [wintypes.HWND, wintypes.UINT,
                                wintypes.WPARAM, wintypes.LPARAM]
 WM_VSCROLL, WM_MOUSEWHEEL, WM_KEYDOWN = 0x0115, 0x020A, 0x0100
+WM_LBUTTONDOWN, WM_LBUTTONUP, WM_MOUSEMOVE = 0x0201, 0x0202, 0x0200
+WM_CHAR = 0x0102
 SB_PAGEDOWN = 3
 VK_INSERT, VK_DELETE = 0x2D, 0x2E
+
+user32.GetDlgCtrlID.argtypes = [wintypes.HWND]
+user32.SetWindowTextW.argtypes = [wintypes.HWND, wintypes.LPCWSTR]
+
+ENUMCB2 = ctypes.WINFUNCTYPE(ctypes.c_bool, wintypes.HWND, wintypes.LPARAM)
+user32.EnumChildWindows.argtypes = [wintypes.HWND, ENUMCB2, wintypes.LPARAM]
+
+
+def child_by_id(hwnd, ctrl_id):
+    hit = []
+
+    def cb(h, _):
+        if user32.GetDlgCtrlID(h) == ctrl_id:
+            hit.append(h)
+            return False
+        return True
+
+    user32.EnumChildWindows(hwnd, ENUMCB2(cb), 0)
+    return hit[0] if hit else None
+
+
+def lparam(x, y):
+    return (y << 16) | (x & 0xFFFF)
+
+
+def focus_row(hwnd, ref):
+    call("action", {"command": "env", "action": "open", "text": "", "item": {
+        "id": "env:editor",
+        "data": {"kind": "openEditor", "target": "env", "select": ref,
+                 "filter": ""}}})
 
 
 def shot(hwnd, name):
@@ -266,5 +303,56 @@ if env_hwnd:
     time.sleep(0.5)
     shot(env_hwnd, "env_deleted")
 
+    # ---- delimited-value list mode ----
+    # Row 0 of the detail panel is the multi-segment Path row. The mode button is
+    # self-drawn at (right-118 .. right-4, detail.top+40 .. +58); with the default
+    # 960x620 client and splitter at y=415 that is x 834-948, y 462-480.
+    focus_row(env_hwnd, "user/Path")
+    time.sleep(0.5)
+    user32.PostMessageW(env_hwnd, WM_LBUTTONDOWN, 1, lparam(890, 470))
+    user32.PostMessageW(env_hwnd, WM_LBUTTONUP, 0, lparam(890, 470))
+    time.sleep(0.6)
+    shot(env_hwnd, "env_list_mode")
+
+    # Drag the splitter up ~115 px: the detail pane must grow and the list box
+    # must show more items. Client coords; the splitter band sits at y 415-422.
+    user32.PostMessageW(env_hwnd, WM_LBUTTONDOWN, 1, lparam(500, 418))
+    for y in (400, 360, 330, 300):
+        user32.PostMessageW(env_hwnd, WM_MOUSEMOVE, 1, lparam(500, y))
+        time.sleep(0.05)
+    user32.PostMessageW(env_hwnd, WM_LBUTTONUP, 0, lparam(500, 300))
+    time.sleep(0.4)
+    shot(env_hwnd, "env_splitter_dragged")
+
+    # Insert an item after the selection, type into the item box (EN_CHANGE must
+    # rejoin the value without resetting the caret), then delete it again.
+    user32.PostMessageW(env_hwnd, WM_KEYDOWN, VK_INSERT, 0)
+    time.sleep(0.3)
+    part = child_by_id(env_hwnd, 11)
+    log("PART_EDIT", hex(part) if part else None)
+    if part:
+        # Post WM_CHAR rather than SetWindowTextW: only the character path runs
+        # the control's own change handling, which is what emits EN_CHANGE.
+        for ch in "D:\\new\\item":
+            user32.PostMessageW(part, WM_CHAR, ord(ch), 0)
+            time.sleep(0.02)
+        time.sleep(0.5)
+    shot(env_hwnd, "env_part_edited")
+    user32.PostMessageW(env_hwnd, WM_KEYDOWN, VK_DELETE, 0)
+    time.sleep(0.4)
+    shot(env_hwnd, "env_part_deleted")
+    # Back to raw through the same button: the value box must show the rejoined
+    # string, which proves the item edit reached the model.
+    user32.PostMessageW(env_hwnd, WM_LBUTTONDOWN, 1, lparam(890, 355))
+    user32.PostMessageW(env_hwnd, WM_LBUTTONUP, 0, lparam(890, 355))
+    time.sleep(0.6)
+    shot(env_hwnd, "env_raw_again")
+
 log("DATA_DIR", DATA)
-time.sleep(900)
+if "--no-hold" in sys.argv:
+    proc.kill()
+    proc.wait()
+    with open(LOG, encoding="utf-8", errors="replace") as f:
+        log("PLUGIN_LOG_TAIL", f.read()[-1200:])
+else:
+    time.sleep(900)
