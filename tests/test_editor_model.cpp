@@ -416,6 +416,61 @@ void testRowCommands()
     CHECK(!em.isDirty(), "env restored row returns to a clean state");
 }
 
+// ---- hosts header fold + duplicate host names -------------------------------
+void testHostsHeaderAndDuplicates()
+{
+    using envh::edit::HostsModel;
+    const std::string ms =
+        "\xEF\xBB\xBF# Copyright (c) 1993-2009 Microsoft Corp.\r\n"
+        "#\r\n"
+        "# For example:\r\n"
+        "#\r\n"
+        "#      102.54.94.97     rhino.acme.com          # source server\r\n"
+        "#       38.25.63.10     x.acme.com              # x client host\r\n"
+        "127.0.0.1       kubernetes.docker.internal\r\n"
+        "# Added by Docker Desktop\r\n"
+        "172.17.114.61 host.docker.internal\r\n"
+        "127.0.0.1 kubernetes.docker.internal\r\n";
+    HostsModel m = HostsModel::fromParsed(envh::parseHosts(ms), true);
+    CHECK(m.headerEnd() == 5, "header fold covers the leading comment block incl. samples");
+    CHECK(m.rows.size() == 5, "header + 3 entries + 1 section heading");
+    CHECK(m.rows[0].isHeader && m.rows[0].isSection, "first row is the folded header");
+    std::size_t entries = 0;
+    for (const auto& r : m.rows)
+        entries += r.isSection ? 0 : 1;
+    CHECK(entries == 3, "sample lines are no longer disabled entries");
+    CHECK(!m.isDirty() && m.changeList().empty(), "fresh model is clean with no bogus changes");
+    CHECK(m.serializeWork() == ms, "header fold keeps the file byte-exact");
+    const auto dup = m.duplicateFlags();
+    CHECK(!dup[1] && dup[4], "second kubernetes.docker.internal line is flagged");
+    CHECK(m.duplicateCount() == 1, "one duplicate line");
+    m.setEnabled(4, false);
+    CHECK(m.duplicateCount() == 0, "a disabled line is not a duplicate");
+
+    // A file that starts with a disabled entry has no header.
+    const std::string noHeader = "# 10.0.0.1 a.test\n10.0.0.2 b.test\n";
+    HostsModel n = HostsModel::fromParsed(envh::parseHosts(noHeader), false);
+    CHECK(n.headerEnd() == -1, "a leading disabled entry is not swallowed as header");
+    CHECK(n.rows.size() == 2 && n.rows[0].commented && !n.rows[0].isSection,
+          "leading disabled entry stays an entry");
+
+    // Drafts written before folding carried the header lines as rows.
+    HostsModel old = HostsModel::fromParsed(envh::parseHosts(ms), true);
+    winshun::Json::Array arr;
+    for (int line = 0; line < 10; ++line) {
+        winshun::Json::Object o;
+        o["origin"] = line;
+        o["isSection"] = line < 4 || line == 7;
+        o["commented"] = line < 6 || line == 7;
+        arr.push_back(winshun::Json(std::move(o)));
+    }
+    winshun::Json::Object root;
+    root["rows"] = winshun::Json(std::move(arr));
+    old.fromDraft(winshun::Json(std::move(root)));
+    CHECK(!old.rows.empty() && old.rows[0].isHeader, "old draft is re-folded under one header");
+    CHECK(old.rows.size() == 5, "old draft header lines collapse into one row");
+}
+
 // ---- U2: data carried into the window (protocol layer tests this) -----------
 // Covered by integration.py P1/P2; here we just assert the row builders we will
 // use produce stable ids and item-level Enter = openEditor.
@@ -433,6 +488,7 @@ int main()
     testDraftRoundTrip();
     testBackupIntoWork();
     testRowCommands();
+    testHostsHeaderAndDuplicates();
 
     std::cerr << "editor_model tests: " << (g_total - g_failed) << "/" << g_total << " passed\n";
     return g_failed == 0 ? 0 : 1;

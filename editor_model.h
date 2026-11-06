@@ -425,6 +425,7 @@ private:
 struct HostsRow {
     int origin = -1; // index into HostsParsed::lines, -1 = new row
     bool isSection = false; // comment-only divider ("# Added by Docker")
+    bool isHeader = false; // the folded leading comment block (implies isSection)
     std::string sectionText; // raw divider text (kept byte-exact)
     bool commented = false; // leading '#' present
     std::string ip;
@@ -451,17 +452,61 @@ struct HostsModel {
         return std::to_string(content.size()) + ":" + fnv1aHex(content);
     }
 
+    // The leading comment block of a hosts file (Microsoft's template, a
+    // vendor banner) is folded into one heading row. Without this the two
+    // sample lines "#  102.54.94.97  rhino.acme.com" showed up as disabled
+    // entries. The block only counts as a header when it starts with prose: a
+    // file whose first content line is a commented host spec has no header,
+    // so a disabled first entry is never swallowed. Returns the last line
+    // index of the block, or -1.
+    static int findHeaderEnd(const HostsParsed& h)
+    {
+        int end = -1;
+        bool sawProse = false;
+        for (std::size_t i = 0; i < h.lines.size(); ++i) {
+            const std::string& t = h.lines[i].text;
+            if (trimCopy(t).empty())
+                continue;
+            if (!lineIsCommented(t))
+                break;
+            const HostsEntry e = parseHostLine(t, static_cast<int>(i));
+            if (!e.section && !sawProse)
+                break;
+            if (e.section)
+                sawProse = true;
+            end = static_cast<int>(i);
+        }
+        return end;
+    }
+
     static HostsModel fromParsed(const HostsParsed& h, bool dominantCrlf)
     {
         HostsModel m;
         m.base = h;
         m.fingerprint = contentFingerprint(serializeHosts(h));
-        for (const HostsLine& line : h.lines) {
+        m.m_headerEnd = findHeaderEnd(h);
+        bool headerPushed = false;
+        for (std::size_t i = 0; i < h.lines.size(); ++i) {
+            const HostsLine& line = h.lines[i];
             if (line.text.empty())
                 continue; // blank lines kept by line index, not as rows
-            const HostsEntry e = parseHostLine(line.text, static_cast<int>(&line - &h.lines[0]));
+            const int idx = static_cast<int>(i);
+            if (idx <= m.m_headerEnd) {
+                if (!headerPushed) {
+                    HostsRow r;
+                    r.origin = idx;
+                    r.crlf = line.crlf;
+                    r.isSection = true;
+                    r.isHeader = true;
+                    r.sectionText = line.text;
+                    m.rows.push_back(r);
+                    headerPushed = true;
+                }
+                continue;
+            }
+            const HostsEntry e = parseHostLine(line.text, idx);
             HostsRow r;
-            r.origin = static_cast<int>(&line - &h.lines[0]);
+            r.origin = idx;
             r.crlf = line.crlf;
             if (e.section) {
                 r.isSection = true;
@@ -487,7 +532,7 @@ struct HostsModel {
             if (e.raw.empty() && !r.isSection)
                 return true; // base had nothing here
             if (r.isSection) {
-                if (r.sectionText != base.lines[r.origin].text)
+                if (!r.isHeader && r.sectionText != base.lines[r.origin].text)
                     return true;
                 continue;
             }
@@ -504,6 +549,10 @@ struct HostsModel {
     {
         std::vector<HostsChange> out;
         for (const HostsRow& r : rows) {
+            // Headings are display-only. They used to fall through to the
+            // comment-state check below and report a bogus "enable line N".
+            if (r.isSection)
+                continue;
             const int line = r.origin >= 0 ? r.origin + 1 : -1;
             if (r.isNew && !r.deleted) {
                 HostsChange c;
@@ -559,6 +608,34 @@ struct HostsModel {
         return false;
     }
 
+    // A host name that an earlier enabled line already maps. Windows uses the
+    // first match, so the later line is either redundant or silently ignored.
+    std::vector<bool> duplicateFlags() const
+    {
+        std::vector<bool> out(rows.size(), false);
+        std::map<std::string, std::size_t> seen;
+        for (std::size_t i = 0; i < rows.size(); ++i) {
+            const HostsRow& r = rows[i];
+            if (r.isSection || r.deleted || r.commented)
+                continue;
+            for (const std::string& hn : r.hostnames) {
+                if (hn.empty())
+                    continue;
+                if (!seen.emplace(toLower(hn), i).second)
+                    out[i] = true;
+            }
+        }
+        return out;
+    }
+    std::size_t duplicateCount() const
+    {
+        std::size_t n = 0;
+        for (bool b : duplicateFlags())
+            n += b ? 1 : 0;
+        return n;
+    }
+    int headerEnd() const { return m_headerEnd; }
+
     // Re-emit the full file. Untouched lines are copied byte-for-byte so the
     // BOM, CRLF/LF mix, blank lines and comments survive. Only edited/new lines
     // are (re)serialized from the row fields.
@@ -573,6 +650,10 @@ struct HostsModel {
             if (r.origin >= 0)
                 byOrigin[r.origin] = &r;
         for (std::size_t i = 0; i < base.lines.size(); ++i) {
+            if (static_cast<int>(i) <= m_headerEnd) {
+                out.lines.push_back(base.lines[i]); // folded header: byte-exact
+                continue;
+            }
             const auto it = byOrigin.find(static_cast<int>(i));
             if (it == byOrigin.end()) {
                 // No row references this line: blank lines stay, host lines are
@@ -705,6 +786,7 @@ struct HostsModel {
             winshun::Json::Object o;
             o["origin"] = r.origin;
             o["isSection"] = r.isSection;
+            o["isHeader"] = r.isHeader;
             o["sectionText"] = r.sectionText;
             o["commented"] = r.commented;
             o["ip"] = r.ip;
@@ -730,6 +812,11 @@ struct HostsModel {
         for (const winshun::Json& e : d["rows"].toArray()) {
             HostsRow r;
             r.origin = static_cast<int>(e["origin"].toInt(-1));
+            // The header block is owned by the base file, not the draft: a
+            // draft written before folding existed carries its lines as
+            // separate rows, which are dropped here and re-folded below.
+            if (r.origin >= 0 && r.origin <= m_headerEnd)
+                continue;
             r.isSection = e["isSection"].toBool();
             r.sectionText = e["sectionText"].toString();
             r.commented = e["commented"].toBool();
@@ -742,6 +829,20 @@ struct HostsModel {
             r.crlf = e["crlf"].toBool();
             rows.push_back(r);
         }
+        if (m_headerEnd >= 0) {
+            for (std::size_t i = 0; i <= static_cast<std::size_t>(m_headerEnd) && i < base.lines.size(); ++i) {
+                if (base.lines[i].text.empty())
+                    continue;
+                HostsRow h;
+                h.origin = static_cast<int>(i);
+                h.crlf = base.lines[i].crlf;
+                h.isSection = true;
+                h.isHeader = true;
+                h.sectionText = base.lines[i].text;
+                rows.insert(rows.begin(), h);
+                break;
+            }
+        }
     }
 
     bool dominantCrlf() const { return m_dominantCrlf; }
@@ -750,6 +851,7 @@ private:
     std::vector<std::vector<HostsRow>> m_undo;
     std::vector<std::vector<HostsRow>> m_redo;
     bool m_dominantCrlf = false;
+    int m_headerEnd = -1; // last line index of the folded header, -1 = none
 
     HostsEntry baseEntry(int origin) const
     {
