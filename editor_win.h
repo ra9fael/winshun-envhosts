@@ -35,27 +35,9 @@
 #include "logic.h"
 #include "native.h"
 #include "editor_model.h"
+#include "editor_common.h"
 
 namespace editorwin {
-
-// ---- arguments the protocol thread hands to the window -----------------------
-struct OpenArgs {
-    std::string kind; // "env" | "hosts"
-    std::wstring userSubkey = L"Environment"; // HKCU subkey (test override allowed)
-    std::wstring sysSubkey = envh::native::systemEnvSubkey(); // HKLM subkey (test override allowed)
-    std::wstring hostsPath; // full path to hosts
-    std::string dataDir; // WS_DATA_DIR (backups/ and drafts/<kind>.json live here)
-    int backupCount = 10;
-    bool showSystem = true;
-    std::string filter;
-    std::string select; // "user/NAME" (env) or 1-based line (hosts)
-    winshun::Json draft; // empty => ignore
-    bool zh = true;
-    bool dark = false;
-    bool writable = true; // hosts writability probe at open time
-    bool systemWritable = false; // env: HKLM writable (elevated plugin)
-    bool elevated = false; // the plugin process runs with an elevated token
-};
 
 constexpr UINT WM_APP_FOCUS = WM_APP + 1; // apply a new OpenArgs (keep edits)
 constexpr UINT WM_APP_EXTCHANGE = WM_APP + 2; // external target change

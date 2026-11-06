@@ -1,5 +1,6 @@
 # Build output is never committed or packaged into .wsplugin.
 build/
+build-qml/
 dist/
 CMakeFiles/
 *.obj

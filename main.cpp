@@ -23,7 +23,14 @@
 
 #ifdef _WIN32
 #include "native.h"
+#ifdef ENVHOSTS_QML_EDITOR
+#include <QGuiApplication>
+#include <QMetaObject>
+#include <thread>
+#include "qt/qt_editor.h"
+#else
 #include "editor_win.h"
+#endif
 #endif
 
 static_assert(sizeof(void*) == 8, "ra9fael.envhosts must be built as x64; a 32-bit build edits the wrong System32\\drivers\\etc\\hosts via the Wow64 redirector");
@@ -817,7 +824,23 @@ struct EnvHosts : winshun::Plugin {
 
 } // namespace
 
-int main()
+int main(int argc, char** argv)
 {
+#ifdef ENVHOSTS_QML_EDITOR
+    // Qt Quick requires the GUI thread, so the Qt loop owns the main thread and
+    // the JSON-RPC loop moves to a worker. stdio stays owned by the protocol
+    // thread; the GUI thread never writes to it.
+    QGuiApplication app(argc, argv);
+    app.setQuitOnLastWindowClosed(false);
+    editorwin::initialize();
+    std::thread protocol([] {
+        EnvHosts().serve();
+        QMetaObject::invokeMethod(qApp, "quit", Qt::QueuedConnection);
+    });
+    const int rc = app.exec();
+    protocol.join();
+    return rc;
+#else
     return EnvHosts().serve();
+#endif
 }

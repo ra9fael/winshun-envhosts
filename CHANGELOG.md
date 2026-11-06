@@ -8,6 +8,13 @@ single source of truth; release tags are `v<version>`.
 ## [Unreleased]
 
 ### Added
+- Qt Quick editor prototype (opt-in, `-DENVHOSTS_QML_EDITOR=ON`, qml branch).
+  A read-only env/hosts window built with Qt Quick replaces the GDI window in
+  that build while the protocol, models and storage stay unchanged. The
+  prototype builds into `build-qml/bin` so it never overwrites the shipped
+  `envhosts.exe`; editing, drafts, backups and the hosts 原文 tab are not
+  migrated yet. `QML_MIGRATION_PHASE0.md` records the contract that migration
+  must preserve.
 - The plugin declares the `elevated` permission (requires Win顺 ≥ 0.19.0, hence
   the new `minWinShun`). When Win顺 runs as administrator and the user confirmed
   the plugin card once, the plugin starts elevated: the 系统 tab edits system
