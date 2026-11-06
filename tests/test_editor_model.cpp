@@ -471,6 +471,72 @@ void testHostsHeaderAndDuplicates()
     CHECK(old.rows.size() == 5, "old draft header lines collapse into one row");
 }
 
+// ---- hosts raw-text editing --------------------------------------------------
+static std::string toCrlfView(std::string s)
+{
+    if (s.size() >= 3 && static_cast<unsigned char>(s[0]) == 0xEF)
+        s.erase(0, 3);
+    std::string out;
+    for (std::size_t i = 0; i < s.size(); ++i) {
+        if (s[i] == '\n' && (i == 0 || s[i - 1] != '\r'))
+            out += '\r';
+        out += s[i];
+    }
+    return out;
+}
+void testHostsRawEdit()
+{
+    using envh::edit::HostsModel;
+    // LF file with a BOM and no trailing newline.
+    const std::string lf = "\xEF\xBB\xBF# hosts\n127.0.0.1 a.test\n10.0.0.1 b.test";
+    HostsModel m = HostsModel::fromParsed(envh::parseHosts(lf), false);
+    const std::string view = toCrlfView(m.serializeWork());
+    CHECK(!m.applyRaw(view), "unchanged raw text (CRLF view of an LF file) is a no-op");
+    CHECK(!m.isDirty() && !m.canUndo(), "no-op raw apply leaves the model clean");
+
+    std::string edited = view;
+    edited.replace(edited.find("b.test"), 6, "c.test");
+    CHECK(m.applyRaw(edited), "edited raw text is applied");
+    CHECK(m.serializeWork() == "\xEF\xBB\xBF# hosts\n127.0.0.1 a.test\n10.0.0.1 c.test",
+          "raw apply keeps BOM, LF endings and the missing trailing newline");
+    CHECK(m.isDirty(), "raw apply makes the model dirty against disk");
+    CHECK(m.rows.back().hostnames.size() == 1 && m.rows.back().hostnames[0] == "c.test",
+          "rows are rebuilt from the raw text");
+    const auto ch = m.changeList();
+    CHECK(ch.size() == 2 && ch[0].kind == "add" && ch[1].kind == "delete",
+          "raw edit change list is a line diff against disk");
+
+    // A row edit on top of the raw edit, then two undos.
+    m.setEnabled(m.rows.size() - 1, false);
+    CHECK(m.serializeWork().find("# 10.0.0.1 c.test") != std::string::npos, "row edit after raw edit");
+    m.undo();
+    CHECK(m.serializeWork().find("10.0.0.1 c.test") != std::string::npos
+              && m.serializeWork().find("# 10.0.0.1") == std::string::npos,
+          "first undo reverts only the row edit");
+    m.undo();
+    CHECK(m.serializeWork() == lf && !m.isDirty(), "second undo reverts the whole raw edit in one step");
+    m.redo();
+    CHECK(m.serializeWork().find("c.test") != std::string::npos, "redo re-applies the raw edit");
+
+    // Adding lines to a CRLF file: new lines get CRLF, untouched keep theirs.
+    const std::string crlf = "127.0.0.1 a.test\r\n10.0.0.1 b.test\r\n";
+    HostsModel c = HostsModel::fromParsed(envh::parseHosts(crlf), true);
+    CHECK(c.applyRaw(toCrlfView(c.serializeWork()) + "10.0.0.2 d.test\r\n"), "appended line applies");
+    CHECK(c.serializeWork() == crlf + "10.0.0.2 d.test\r\n", "CRLF file stays CRLF with a trailing newline");
+
+    // Invalid IP typed in the raw text is caught by the existing save gate.
+    HostsModel bad = HostsModel::fromParsed(envh::parseHosts(crlf), true);
+    bad.applyRaw("127.0.0.1 a.test\r\n10.0.0.300 b.test\r\n");
+    CHECK(bad.hasInvalid(), "invalid IP from raw text blocks save");
+
+    // Drafts written after a raw edit restore the same text.
+    HostsModel d1 = HostsModel::fromParsed(envh::parseHosts(lf), false);
+    d1.applyRaw(edited);
+    HostsModel d2 = HostsModel::fromParsed(envh::parseHosts(lf), false);
+    d2.fromDraft(d1.toDraft());
+    CHECK(d2.serializeWork() == d1.serializeWork(), "draft after a raw edit round-trips");
+}
+
 // ---- U2: data carried into the window (protocol layer tests this) -----------
 // Covered by integration.py P1/P2; here we just assert the row builders we will
 // use produce stable ids and item-level Enter = openEditor.
@@ -489,6 +555,7 @@ int main()
     testBackupIntoWork();
     testRowCommands();
     testHostsHeaderAndDuplicates();
+    testHostsRawEdit();
 
     std::cerr << "editor_model tests: " << (g_total - g_failed) << "/" << g_total << " passed\n";
     return g_failed == 0 ? 0 : 1;

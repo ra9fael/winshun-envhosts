@@ -193,6 +193,8 @@ public:
 
     void persistDraftIfDirty()
     {
+        if (m_kind == "hosts" && m_tab == 1)
+            commitRaw(); // a pending raw edit belongs in the draft too
         if (m_kind == "env" && m_envDirty())
             writeDraft(m_env.toDraft());
         else if (m_kind == "hosts" && m_hostsDirty())
@@ -244,6 +246,8 @@ private:
     HWND m_enabledChk = nullptr, m_ipEdit = nullptr, m_hostEdit = nullptr, m_commentEdit = nullptr;
     HWND m_rawEdit = nullptr;
     HFONT m_editFont = nullptr;
+    HFONT m_monoFont = nullptr; // hosts raw tab
+    std::string m_rawShown; // raw tab text as last loaded (CRLF), to detect edits
     HBRUSH m_darkBgBrush = nullptr, m_darkFieldBrush = nullptr, m_lightPanelBrush = nullptr;
     int m_hover = 0;
 
@@ -350,11 +354,7 @@ private:
             const envh::native::HostsReadResult r = store.read();
             if (r.ok) {
                 const envh::HostsParsed p = envh::parseHosts(r.content);
-                bool crlf = false;
-                for (const auto& l : p.lines)
-                    if (!l.text.empty())
-                        crlf = l.crlf;
-                m_hosts = envh::edit::HostsModel::fromParsed(p, crlf);
+                m_hosts = envh::edit::HostsModel::fromParsed(p, dominantCrlf(p));
                 m_hasHosts = true;
             }
         }
@@ -474,19 +474,26 @@ private:
             const envh::native::HostsReadResult r = store.read();
             if (r.ok) {
                 const envh::HostsParsed p = envh::parseHosts(r.content);
-                bool crlf = false;
-                for (const auto& l : p.lines)
-                    if (!l.text.empty())
-                        crlf = l.crlf;
-                m_hosts = envh::edit::HostsModel::fromParsed(p, crlf);
+                m_hosts = envh::edit::HostsModel::fromParsed(p, dominantCrlf(p));
             }
         }
         m_extChanged = false;
         rebuildVisible();
         if (ref.empty() || !selectByRef(ref))
             selectRow(m_sel);
+        if (m_kind == "hosts" && m_tab == 1)
+            loadRaw();
         applyLayout();
         InvalidateRect(m_hwnd, nullptr, TRUE);
+    }
+    // The ending a new or rewritten line gets: whichever of CRLF / LF most
+    // lines of the file already use (ties go to CRLF, the Windows default).
+    static bool dominantCrlf(const envh::HostsParsed& p)
+    {
+        int crlf = 0, lf = 0;
+        for (const auto& l : p.lines)
+            (l.crlf ? crlf : lf) += 1;
+        return crlf >= lf;
     }
 
     // F5 / "重新载入": never drop unsaved edits silently.
@@ -690,9 +697,41 @@ private:
             editSubs().erase(h);
             return CallWindowProcW(old, h, msg, wp, lp);
         }
+        if (self && h == self->m_rawEdit) {
+            if (msg == WM_CHAR && wp == L'\t') {
+                // Insert a real tab; hosts files use tabs as column separators.
+                SendMessageW(h, EM_REPLACESEL, TRUE, reinterpret_cast<LPARAM>(L"\t"));
+                return 0;
+            }
+            if (msg == WM_CHAR && (wp == 0x13 || wp == 0x01 || wp == 0x19))
+                return 0; // swallow the Ctrl+S / Ctrl+A / Ctrl+Y control characters (beep)
+            if (msg == WM_LBUTTONUP || msg == WM_KEYUP) {
+                const LRESULT r = CallWindowProcW(old, h, msg, wp, lp);
+                InvalidateRect(self->m_hwnd, &self->m_rcStatusRow1, FALSE);
+                return r;
+            }
+        }
         if (self && msg == WM_KEYDOWN) {
             const bool ctrl = (GetKeyState(VK_CONTROL) & 0x8000) != 0;
             const bool shift = (GetKeyState(VK_SHIFT) & 0x8000) != 0;
+            if (h == self->m_rawEdit) {
+                // The raw box is a text editor: its own Ctrl+Z / Ctrl+Y, arrows,
+                // PgUp/PgDn, Del and Enter stay native. Only window-level keys
+                // leave it. Ctrl+A is added because a plain EDIT lacks it.
+                if (ctrl && (wp == 'S' || wp == 's')) { self->save(); return 0; }
+                if (ctrl && (wp == 'A' || wp == 'a')) { SendMessageW(h, EM_SETSEL, 0, -1); return 0; }
+                if (ctrl && (wp == 'Y' || wp == 'y')) {
+                    // EDIT has a single-level undo where a second EM_UNDO redoes.
+                    if (SendMessageW(h, EM_CANUNDO, 0, 0))
+                        SendMessageW(h, EM_UNDO, 0, 0);
+                    return 0;
+                }
+                if (ctrl && wp == VK_TAB) return self->onKey(wp);
+                if (wp == VK_ESCAPE && !ctrl) { PostMessageW(self->m_hwnd, WM_CLOSE, 0, 0); return 0; }
+                const LRESULT r = CallWindowProcW(old, h, msg, wp, lp);
+                InvalidateRect(self->m_hwnd, &self->m_rcStatusRow1, FALSE); // caret line
+                return r;
+            }
             if (h == self->m_filterEdit) {
                 // Esc in the filter clears it and returns focus to the table;
                 // Ctrl+Z must stay a native text undo here.
@@ -810,11 +849,17 @@ private:
         m_hostEdit = makeEdit(es, 7);
         m_commentEdit = makeEdit(es, 8);
         // hosts raw tab
-        m_rawEdit = CreateWindowExW(WS_EX_CLIENTEDGE, L"EDIT", L"", WS_CHILD | ES_MULTILINE | ES_READONLY | WS_VSCROLL, 0, 0, 10, 10,
+        m_rawEdit = CreateWindowExW(WS_EX_CLIENTEDGE, L"EDIT", L"",
+                                    WS_CHILD | ES_MULTILINE | ES_AUTOVSCROLL | ES_AUTOHSCROLL | ES_NOHIDESEL
+                                        | ES_WANTRETURN | WS_VSCROLL | WS_HSCROLL,
+                                    0, 0, 10, 10,
                                     m_hwnd, reinterpret_cast<HMENU>(9), GetModuleHandleW(nullptr), nullptr);
-        SendMessageW(m_rawEdit, EM_FMTLINES, 0, 0);
-        if (m_rawEdit && m_editFont)
-            SendMessageW(m_rawEdit, WM_SETFONT, reinterpret_cast<WPARAM>(m_editFont), TRUE);
+        SendMessageW(m_rawEdit, EM_SETLIMITTEXT, 0, 0); // hosts files can exceed the 30k default
+        // Monospace so IP / host columns line up as they do in the file.
+        m_monoFont = makeFont(14, false, L"Consolas", FIXED_PITCH | FF_MODERN);
+        if (m_rawEdit)
+            SendMessageW(m_rawEdit, WM_SETFONT, reinterpret_cast<WPARAM>(m_monoFont ? m_monoFont : m_editFont), TRUE);
+        subclassEdit(m_rawEdit);
     }
 
     HWND makeEdit(DWORD style, int id)
@@ -861,9 +906,13 @@ private:
             m_rcDetail = {8, m_splitterY + splitterH, m_clientW - 8, workBottom};
             m_rcSplitter = {8, m_splitterY, m_clientW - 8, m_splitterY + splitterH};
         } else {
+            // The hosts raw tab has no detail strip: the text box runs down to
+            // the status bar instead of leaving 112px empty below it.
+            const bool rawTab = m_kind == "hosts" && m_tab == 1;
             const int detailH = m_kind == "hosts" && m_tab == 0 ? 146 : fixedDetailH;
-            m_rcTable = {8, workTop, m_clientW - 8, workBottom - detailH - 8};
-            m_rcDetail = {8, workBottom - detailH, m_clientW - 8, workBottom};
+            m_rcTable = {8, workTop, m_clientW - 8, rawTab ? workBottom - 8 : workBottom - detailH - 8};
+            m_rcDetail = rawTab ? RECT {8, workBottom, m_clientW - 8, workBottom}
+                                : RECT {8, workBottom - detailH, m_clientW - 8, workBottom};
             SetRectEmpty(&m_rcSplitter);
         }
 
@@ -998,6 +1047,13 @@ private:
     {
         if (!m_hwnd)
             return;
+        // The raw text box scrolls itself; a second, window-level bar sized
+        // for the entry list would sit next to it.
+        if (m_kind == "hosts" && m_tab == 1) {
+            ShowScrollBar(m_hwnd, SB_VERT, FALSE);
+            return;
+        }
+        ShowScrollBar(m_hwnd, SB_VERT, TRUE);
         SCROLLINFO si {};
         si.cbSize = sizeof(si);
         si.fMask = SIF_RANGE | SIF_PAGE | SIF_POS | SIF_DISABLENOSCROLL;
@@ -1055,22 +1111,9 @@ private:
             if (raw) {
                 MoveWindow(m_rawEdit, m_rcTable.left, m_rcTable.top,
                            m_rcTable.right - m_rcTable.left, m_rcTable.bottom - m_rcTable.top, TRUE);
-                // Nothing filled this box before, so the Raw tab was always
-                // blank. Show the file as it would be written now (unsaved
-                // edits included); a multi-line EDIT needs CRLF to break lines.
-                std::string text = m_hasHosts ? m_hosts.serializeWork() : std::string {};
-                if (text.size() >= 3 && static_cast<unsigned char>(text[0]) == 0xEF)
-                    text.erase(0, 3);
-                std::string crlf;
-                crlf.reserve(text.size() + text.size() / 16);
-                for (std::size_t i = 0; i < text.size(); ++i) {
-                    if (text[i] == '\n' && (i == 0 || text[i - 1] != '\r'))
-                        crlf += '\r';
-                    crlf += text[i];
-                }
-                m_loading = true;
-                SetWindowTextW(m_rawEdit, wideFromUtf8(crlf).c_str());
-                m_loading = false;
+                // Writable hosts: the raw text is a second way to edit the file.
+                // Read-only (no admin) or a refused UTF-16 file keeps it locked.
+                SendMessageW(m_rawEdit, EM_SETREADONLY, rawEditable() ? FALSE : TRUE, 0);
             }
         }
         if (m_partsList) {
@@ -1736,7 +1779,7 @@ private:
         } else {
             for (const auto& r : m_hosts.rows)
                 if (!r.isSection && !r.deleted) ++nFirst;
-            nSecond = static_cast<int>(m_hosts.rows.size());
+            nSecond = static_cast<int>(m_hosts.toParsed().lines.size()); // real file lines
         }
         tabs[0] += L" (" + std::to_wstring(nFirst) + L")";
         tabs[1] += L" (" + std::to_wstring(nSecond) + L")";
@@ -1963,7 +2006,7 @@ private:
         EndPaint(m_hwnd, &ps);
     }
 
-    bool isDirty() const { return m_kind == "env" ? m_envDirty() : m_hostsDirty(); }
+    bool isDirty() const { return m_kind == "env" ? m_envDirty() : (m_hostsDirty() || rawDirty()); }
     bool canUndo() const { return m_kind == "env" ? m_env.canUndo() : m_hosts.canUndo(); }
     bool canRedo() const { return m_kind == "env" ? m_env.canRedo() : m_hosts.canRedo(); }
 
@@ -2006,10 +2049,18 @@ private:
         if (dirty) {
             const int n = m_kind == "env" ? static_cast<int>(m_env.changeList().size())
                                           : static_cast<int>(m_hosts.changeList().size());
-            s += " · " + std::to_string(n) + (zh ? " 项变更" : " changes");
+            if (n > 0)
+                s += " · " + std::to_string(n) + (zh ? " 项变更" : " changes");
         }
+        const bool rawTab = m_kind == "hosts" && m_tab == 1;
         const int nRows = rowCount();
-        if (nRows > 0) {
+        if (rawTab) {
+            const auto lc = rawCaretLine();
+            s += zh ? " · 第 " + std::to_string(lc.first) + " 行 / 共 " + std::to_string(lc.second) + " 行"
+                    : " · line " + std::to_string(lc.first) + " / " + std::to_string(lc.second);
+            if (rawDirty())
+                s += zh ? " · 原文已修改" : " · raw text edited";
+        } else if (nRows > 0) {
             const int a = m_topRow + 1;
             const int b = std::min(nRows, m_topRow + pageRows());
             s += zh ? (" · 第 " + std::to_string(a) + "–" + std::to_string(b) + " / 共 " + std::to_string(nRows) + " 行")
@@ -2052,6 +2103,10 @@ private:
     }
     bool chipEnabled(int id) const
     {
+        // In the raw tab the text box owns editing (its own Ctrl+Z / Ctrl+Y);
+        // only save and close apply.
+        if (m_kind == "hosts" && m_tab == 1)
+            return id == kChipSave ? isDirty() : id == kChipClose;
         switch (id) {
         case kChipAdd: return canAddRow();
         case kChipDel: return canDeleteRow();
@@ -2326,6 +2381,10 @@ private:
     void save()
     {
         endEdit();
+        if (m_kind == "hosts" && m_tab == 1) {
+            commitRaw();
+            loadRaw(); // show the applied text so the box and the model agree
+        }
         const bool dirty = isDirty();
         if (!dirty) {
             setStatus(m_args.zh ? "没有改动" : "No changes");
@@ -2447,7 +2506,7 @@ private:
                 return;
             }
             const envh::HostsParsed p = envh::parseHosts(rr.content);
-            m_hosts = envh::edit::HostsModel::fromParsed(p, m_hosts.dominantCrlf());
+            m_hosts = envh::edit::HostsModel::fromParsed(p, dominantCrlf(p));
             clearDraft();
             setStatus(m_args.zh ? "已保存 hosts" : "Saved hosts", 3);
         }
@@ -2509,11 +2568,7 @@ private:
                 return;
             std::string content((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
             const envh::HostsParsed p = envh::parseHosts(content);
-            bool crlf = false;
-            for (const auto& l : p.lines)
-                if (!l.text.empty())
-                    crlf = l.crlf;
-            m_hosts = envh::edit::HostsModel::fromParsed(p, crlf);
+            m_hosts = envh::edit::HostsModel::fromParsed(p, dominantCrlf(p));
         }
         switchTab(0);
         setStatus(m_args.zh ? ("已载入备份 " + id + "（未保存）") : ("Loaded " + id + " (unsaved)"));
@@ -2603,6 +2658,10 @@ private:
     void doUndo()
     {
         endEdit();
+        if (m_kind == "hosts" && m_tab == 1) {
+            SendMessageW(m_rawEdit, EM_UNDO, 0, 0); // text-level undo inside the raw box
+            return;
+        }
         if (m_kind == "env")
             m_env.undo();
         else
@@ -2643,16 +2702,86 @@ private:
     {
         if (m_tab == i)
             return;
+        // Leaving the raw tab applies its text to the model (like any other
+        // edit in this window, nothing reaches the file before Ctrl+S).
+        if (m_kind == "hosts" && m_tab == 1)
+            commitRaw();
         m_topRowByTab[m_tab] = m_topRow;
         m_tab = i;
         if (i == 2)
             refreshBackups();
         m_topRow = m_topRowByTab[i];
         rebuildVisible();
+        RECT cr {};
+        GetClientRect(m_hwnd, &cr);
+        computeLayout(cr.right, cr.bottom); // the raw tab has no detail strip
         clampScroll();
         selectRow(m_topRow);
+        if (m_kind == "hosts" && i == 1)
+            loadRaw();
         applyLayout();
+        if (m_kind == "hosts" && i == 1 && m_rawEdit)
+            SetFocus(m_rawEdit); // wheel / PgUp / PgDn go to the text box
         InvalidateRect(m_hwnd, nullptr, TRUE);
+    }
+
+    // ---- hosts raw tab ----
+    bool rawEditable() const
+    {
+        return m_kind == "hosts" && m_hasHosts && m_args.writable && m_errorBanner().empty();
+    }
+    // Fill the raw box with what Ctrl+S would write now. A multi-line EDIT
+    // only breaks lines on CRLF, so LF is widened here and narrowed again in
+    // HostsModel::applyRaw.
+    void loadRaw()
+    {
+        if (!m_rawEdit)
+            return;
+        std::string text = m_hasHosts ? m_hosts.serializeWork() : std::string {};
+        if (text.size() >= 3 && static_cast<unsigned char>(text[0]) == 0xEF
+            && static_cast<unsigned char>(text[1]) == 0xBB && static_cast<unsigned char>(text[2]) == 0xBF)
+            text.erase(0, 3);
+        std::string crlf;
+        crlf.reserve(text.size() + text.size() / 16);
+        for (std::size_t i = 0; i < text.size(); ++i) {
+            if (text[i] == '\n' && (i == 0 || text[i - 1] != '\r'))
+                crlf += '\r';
+            crlf += text[i];
+        }
+        m_loading = true;
+        SetWindowTextW(m_rawEdit, wideFromUtf8(crlf).c_str());
+        SendMessageW(m_rawEdit, EM_EMPTYUNDOBUFFER, 0, 0);
+        m_loading = false;
+        m_rawShown = getEdit(m_rawEdit);
+    }
+    bool rawDirty() const
+    {
+        return m_kind == "hosts" && m_tab == 1 && m_rawEdit && rawEditable() && getEdit(m_rawEdit) != m_rawShown;
+    }
+    // Parse the raw text back into the model. One raw edit = one undo step.
+    void commitRaw()
+    {
+        if (!rawDirty())
+            return;
+        const std::string text = getEdit(m_rawEdit);
+        if (m_hosts.applyRaw(text)) {
+            rebuildVisible();
+            setStatus(m_args.zh ? "已应用原文修改（未保存）" : "Raw edit applied (unsaved)", 3);
+        }
+        m_rawShown = text;
+    }
+    // 1-based caret line and total line count of the raw box.
+    std::pair<int, int> rawCaretLine() const
+    {
+        if (!m_rawEdit)
+            return {0, 0};
+        const int line = static_cast<int>(SendMessageW(m_rawEdit, EM_LINEFROMCHAR, static_cast<WPARAM>(-1), 0)) + 1;
+        int total = static_cast<int>(SendMessageW(m_rawEdit, EM_GETLINECOUNT, 0, 0));
+        // EDIT counts the empty line after a final newline; the file does not.
+        const std::string t = getEdit(m_rawEdit);
+        if (total > 1 && !t.empty() && t.back() == '\n')
+            --total;
+        return {std::min(line, total), total};
     }
 
     // ---- wndproc ----
@@ -2795,6 +2924,8 @@ private:
                     InvalidateRect(m_hwnd, nullptr, TRUE);
                 } else if (reinterpret_cast<HWND>(lp) == m_partEdit) {
                     commitPartEdit();
+                } else if (reinterpret_cast<HWND>(lp) == m_rawEdit) {
+                    InvalidateRect(m_hwnd, nullptr, FALSE); // dirty marker + Ctrl+S chip
                 } else {
                     commitDetail();
                 }
@@ -2946,6 +3077,8 @@ private:
         case WM_KEYDOWN:
             return onKey(wp);
         case WM_CLOSE:
+            if (m_kind == "hosts" && m_tab == 1)
+                commitRaw();
             if (m_kind == "env" ? m_envDirty() : m_hostsDirty()) {
                 const int r = MessageBoxW(m_hwnd,
                                           wideFromUtf8(m_args.zh ? "有未保存的修改，保存后再关闭？" : "Unsaved changes; save before closing?").c_str(),
@@ -2967,7 +3100,11 @@ private:
                 DeleteObject(m_editFont);
                 m_editFont = nullptr;
             }
-            for (HBRUSH* b : {&m_darkBgBrush, &m_darkFieldBrush}) {
+            if (m_monoFont) {
+                DeleteObject(m_monoFont);
+                m_monoFont = nullptr;
+            }
+            for (HBRUSH* b : {&m_darkBgBrush, &m_darkFieldBrush, &m_lightPanelBrush}) {
                 if (*b) {
                     DeleteObject(*b);
                     *b = nullptr;

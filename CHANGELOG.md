@@ -8,6 +8,11 @@ single source of truth; release tags are `v<version>`.
 ## [Unreleased]
 
 ### Added
+- The hosts 原文 tab is editable when hosts is writable. The text is parsed back
+  into the entries when you leave the tab, press Ctrl+S or close; one undo step
+  reverts the whole raw edit. BOM, line endings and the final newline are kept,
+  and untouched lines save byte-for-byte. The tab fills the window, uses Consolas,
+  shows only the text box's scrollbar, and its count is the file's line count.
 - Custom delimiters. The env delimiter control is now a combo with five localised
   presets (`分号 / 逗号 / 冒号 / 制表符 / 竖线`) that also accepts any free text such
   as `=>`, and it takes effect only on `Enter` or the `应用` button: the items are

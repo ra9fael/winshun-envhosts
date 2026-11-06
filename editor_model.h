@@ -443,9 +443,10 @@ struct HostsChange {
 };
 
 struct HostsModel {
-    HostsParsed base; // committed; untouched lines re-emitted byte-exact
+    HostsParsed disk; // the file as read; dirtiness, conflicts and backups use this
+    HostsParsed base; // what the rows index into (== disk until the raw text is edited)
     std::vector<HostsRow> rows; // working copy, in file order
-    std::string fingerprint; // FNV over content + size
+    std::string fingerprint; // FNV over the disk content + size
 
     static std::string contentFingerprint(const std::string& content)
     {
@@ -482,16 +483,28 @@ struct HostsModel {
     static HostsModel fromParsed(const HostsParsed& h, bool dominantCrlf)
     {
         HostsModel m;
+        m.disk = h;
         m.base = h;
         m.fingerprint = contentFingerprint(serializeHosts(h));
-        m.m_headerEnd = findHeaderEnd(h);
+        m.m_dominantCrlf = dominantCrlf;
+        m.buildRows();
+        return m;
+    }
+
+    // Rebuild every row from `base`. Used on load and after the raw text has
+    // been edited, which invalidates all row -> line references at once.
+    void buildRows()
+    {
+        const HostsParsed& h = base;
+        rows.clear();
+        m_headerEnd = findHeaderEnd(h);
         bool headerPushed = false;
         for (std::size_t i = 0; i < h.lines.size(); ++i) {
             const HostsLine& line = h.lines[i];
             if (line.text.empty())
                 continue; // blank lines kept by line index, not as rows
             const int idx = static_cast<int>(i);
-            if (idx <= m.m_headerEnd) {
+            if (idx <= m_headerEnd) {
                 if (!headerPushed) {
                     HostsRow r;
                     r.origin = idx;
@@ -499,7 +512,7 @@ struct HostsModel {
                     r.isSection = true;
                     r.isHeader = true;
                     r.sectionText = line.text;
-                    m.rows.push_back(r);
+                    rows.push_back(r);
                     headerPushed = true;
                 }
                 continue;
@@ -517,36 +530,67 @@ struct HostsModel {
                 r.hostnames = e.hostnames.empty() ? std::vector<std::string> {e.hostname} : e.hostnames;
                 r.comment = e.comment;
             }
-            m.rows.push_back(r);
+            rows.push_back(r);
         }
-        m.m_dominantCrlf = dominantCrlf;
-        return m;
     }
 
+    // The raw tab's text, as the user sees it (one string, any line endings).
+    // It replaces `base` and every row; `disk` is untouched so dirtiness,
+    // conflict checks and backups still refer to the real file. The BOM, the
+    // dominant line ending and the trailing-newline state of the current text
+    // are kept, so a raw edit that only changes one line saves only that line.
+    // Returns false (and changes nothing) when the text is identical.
+    bool applyRaw(const std::string& text)
+    {
+        std::string body;
+        body.reserve(text.size());
+        for (std::size_t i = 0; i < text.size(); ++i) {
+            if (text[i] == '\r' && i + 1 < text.size() && text[i + 1] == '\n')
+                continue; // normalise CRLF -> LF; endings are re-applied below
+            body += text[i];
+        }
+        const bool trailing = base.lines.empty() ? true : base.trailingNewline;
+        if (!body.empty() && body.back() == '\n')
+            body.pop_back();
+        HostsParsed next;
+        next.bom = base.bom;
+        next.trailingNewline = trailing;
+        if (!body.empty() || !base.lines.empty()) {
+            std::size_t start = 0;
+            for (std::size_t i = 0; i <= body.size(); ++i) {
+                if (i == body.size() || body[i] == '\n') {
+                    HostsLine l;
+                    l.text = body.substr(start, i - start);
+                    l.crlf = m_dominantCrlf;
+                    next.lines.push_back(std::move(l));
+                    start = i + 1;
+                }
+            }
+        }
+        // A line whose text did not change keeps its original ending, so a
+        // mixed CRLF/LF file is not normalised by an unrelated raw edit.
+        for (std::size_t i = 0; i < next.lines.size() && i < base.lines.size(); ++i)
+            if (next.lines[i].text == base.lines[i].text)
+                next.lines[i].crlf = base.lines[i].crlf;
+        if (serializeHosts(next) == serializeWork())
+            return false;
+        pushUndo();
+        base = std::move(next);
+        buildRows();
+        return true;
+    }
+
+    // Dirty means "saving would change the file", whichever way the edit was
+    // made (row edits, raw text, or both).
     bool isDirty() const
     {
-        for (const HostsRow& r : rows) {
-            if (r.isNew || r.deleted)
-                return true;
-            const HostsEntry e = baseEntry(r.origin);
-            if (e.raw.empty() && !r.isSection)
-                return true; // base had nothing here
-            if (r.isSection) {
-                if (!r.isHeader && r.sectionText != base.lines[r.origin].text)
-                    return true;
-                continue;
-            }
-            if (e.commented != r.commented || e.ip != r.ip || e.comment != r.comment)
-                return true;
-            std::vector<std::string> baseHosts = e.hostnames.empty() ? std::vector<std::string> {e.hostname} : e.hostnames;
-            if (baseHosts != r.hostnames)
-                return true;
-        }
-        return false;
+        return serializeWork() != serializeHosts(disk);
     }
 
     std::vector<HostsChange> changeList() const
     {
+        if (!sameLines(base, disk))
+            return lineDiff();
         std::vector<HostsChange> out;
         for (const HostsRow& r : rows) {
             // Headings are display-only. They used to fall through to the
@@ -690,9 +734,23 @@ struct HostsModel {
     std::string serializeWork() const { return serializeHosts(toParsed()); }
 
     // --- mutations ---
+    // An undo step is (base, rows, header): a raw edit replaces all three at
+    // once, so restoring only the rows would point them into the wrong text.
+    struct Snapshot {
+        HostsParsed base;
+        std::vector<HostsRow> rows;
+        int headerEnd = -1;
+    };
+    Snapshot snapshot() const { return {base, rows, m_headerEnd}; }
+    void restore(Snapshot s)
+    {
+        base = std::move(s.base);
+        rows = std::move(s.rows);
+        m_headerEnd = s.headerEnd;
+    }
     void pushUndo()
     {
-        m_undo.push_back(rows);
+        m_undo.push_back(snapshot());
         if (m_undo.size() > 200)
             m_undo.erase(m_undo.begin());
         m_redo.clear();
@@ -703,16 +761,16 @@ struct HostsModel {
     {
         if (m_undo.empty())
             return;
-        m_redo.push_back(rows);
-        rows = m_undo.back();
+        m_redo.push_back(snapshot());
+        restore(std::move(m_undo.back()));
         m_undo.pop_back();
     }
     void redo()
     {
         if (m_redo.empty())
             return;
-        m_undo.push_back(rows);
-        rows = m_redo.back();
+        m_undo.push_back(snapshot());
+        restore(std::move(m_redo.back()));
         m_redo.pop_back();
     }
 
@@ -802,6 +860,10 @@ struct HostsModel {
         }
         winshun::Json::Object root;
         root["rows"] = winshun::Json(std::move(arr));
+        // Rows index `base`. After a raw edit that is not the file on disk, so
+        // the draft must carry it or the rows would be re-read against disk.
+        if (!sameLines(base, disk))
+            root["baseText"] = serializeHosts(base);
         return winshun::Json(std::move(root));
     }
     void fromDraft(const winshun::Json& d)
@@ -809,6 +871,13 @@ struct HostsModel {
         rows.clear();
         m_undo.clear();
         m_redo.clear();
+        if (d["baseText"].isString()) {
+            base = parseHosts(d["baseText"].toString());
+            m_headerEnd = findHeaderEnd(base);
+        } else {
+            base = disk;
+            m_headerEnd = findHeaderEnd(base);
+        }
         for (const winshun::Json& e : d["rows"].toArray()) {
             HostsRow r;
             r.origin = static_cast<int>(e["origin"].toInt(-1));
@@ -848,8 +917,8 @@ struct HostsModel {
     bool dominantCrlf() const { return m_dominantCrlf; }
 
 private:
-    std::vector<std::vector<HostsRow>> m_undo;
-    std::vector<std::vector<HostsRow>> m_redo;
+    std::vector<Snapshot> m_undo;
+    std::vector<Snapshot> m_redo;
     bool m_dominantCrlf = false;
     int m_headerEnd = -1; // last line index of the folded header, -1 = none
 
@@ -859,6 +928,54 @@ private:
         if (origin < 0 || origin >= static_cast<int>(base.lines.size()))
             return e;
         return parseHostLine(base.lines[origin].text, origin);
+    }
+
+    static bool sameLines(const HostsParsed& a, const HostsParsed& b)
+    {
+        if (a.bom != b.bom || a.trailingNewline != b.trailingNewline || a.lines.size() != b.lines.size())
+            return false;
+        for (std::size_t i = 0; i < a.lines.size(); ++i)
+            if (a.lines[i].text != b.lines[i].text || a.lines[i].crlf != b.lines[i].crlf)
+                return false;
+        return true;
+    }
+
+    // After a raw edit the rows index a different text than the file, so the
+    // change list is a plain line diff (LCS) of disk -> what would be saved.
+    std::vector<HostsChange> lineDiff() const
+    {
+        const HostsParsed work = toParsed();
+        const auto& a = disk.lines;
+        const auto& b = work.lines;
+        const std::size_t n = a.size(), m = b.size();
+        std::vector<std::vector<int>> L(n + 1, std::vector<int>(m + 1, 0));
+        for (std::size_t i = n; i-- > 0;)
+            for (std::size_t j = m; j-- > 0;)
+                L[i][j] = a[i].text == b[j].text ? L[i + 1][j + 1] + 1 : std::max(L[i + 1][j], L[i][j + 1]);
+        std::vector<HostsChange> out;
+        std::size_t i = 0, j = 0;
+        auto add = [&](const char* kind, int line, const std::string& detail) {
+            HostsChange c;
+            c.kind = kind;
+            c.line = line;
+            c.detail = detail;
+            out.push_back(c);
+        };
+        while (i < n || j < m) {
+            if (i < n && j < m && a[i].text == b[j].text) {
+                ++i;
+                ++j;
+            } else if (j < m && (i == n || L[i][j + 1] >= L[i + 1][j])) {
+                add("add", static_cast<int>(j + 1), "+ " + b[j].text);
+                ++j;
+            } else {
+                add("delete", static_cast<int>(i + 1), "- " + a[i].text);
+                ++i;
+            }
+        }
+        if (out.empty() && serializeHosts(work) != serializeHosts(disk))
+            add("modify", -1, "~ line endings");
+        return out;
     }
 
     bool rowChanged(const HostsRow& r, int origin) const

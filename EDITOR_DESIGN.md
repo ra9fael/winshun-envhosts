@@ -203,6 +203,35 @@ custom box, the raw tab text and a duplicate line; `test_editor_model.cpp` adds
 the header fold, byte-exact round trip, leading-disabled-entry and old-draft
 re-fold cases (86 checks).
 
+### Editable raw tab
+
+D3 was revised from "read-only preview" to editable text with parse-back.
+
+- **Model.** `HostsModel` keeps two texts. `disk` is the file as read, used for
+  dirtiness (`serializeWork() != disk`), the conflict fingerprint and backups.
+  `base` is what the rows index into. `applyRaw(text)` replaces `base` and
+  rebuilds every row; `disk` is untouched. An undo step is a `Snapshot` of
+  `base` + rows + header, so one raw edit undoes in one step. A draft written
+  after a raw edit carries `baseText`.
+- **Format.** The EDIT shows CRLF. `applyRaw` drops the CR, re-applies the
+  file's dominant ending to changed lines, keeps each unchanged line's own
+  ending, and keeps the BOM and trailing-newline state. An unchanged text is a
+  no-op (no undo step, not dirty).
+- **When it applies.** Leaving the tab (click, Ctrl+Tab), Ctrl+S, and close /
+  draft autosave call `commitRaw()`. No separate Apply button: like every other
+  edit in this window it only changes the working copy, and Ctrl+S still
+  confirms the real write.
+- **Change list.** After a raw edit rows no longer map 1:1 to disk lines, so
+  `changeList()` falls back to an LCS line diff (`+ line` / `- line`).
+- **Keys.** Inside the box Ctrl+Z / Ctrl+Y are the EDIT's own text undo, Tab
+  inserts a tab, Ctrl+A selects all, Ctrl+S saves, Esc closes. The Ins / Del /
+  Enter / undo chips are disabled on this tab.
+- **Layout.** No detail strip on this tab; the box ends 8px above the status
+  bar and the window's own scrollbar is hidden. The tab count is the file's
+  line count; the status line shows `第 n 行 / 共 m 行 · 原文已修改`.
+- **Invalid text** is allowed while typing; after it is applied the bad rows
+  block Ctrl+S through the existing `hasInvalid()`.
+
 ### Decisions taken (D1–D4)
 
 - **D1** → (a) notify only. On `CreateWindowExW` failure the `openEditor` action
@@ -211,7 +240,7 @@ re-fold cases (86 checks).
   returns `notify` + `keep`; on a real desktop the window opens normally.
 - **D2** → (a) read-only + banner. `elevated` is **not** requested; admin-only
   targets keep the clear error from v0.1.
-- **D3** → (a) hosts 原文 tab is a read-only preview; not editable.
+- **D3** → revised in v0.4.1 to (b). The hosts 原文 tab is editable when hosts is writable; the text is parsed back into the model when you leave the tab, press Ctrl+S or close. See "Editable raw tab" above.
 - **D4** → (a) `clipboard:write` is requested for Ctrl+C inside the window.
 
 Sources used for this design (read, not assumed):
@@ -393,13 +422,13 @@ and there is no **打开文件位置** button — see D2.
 | Area | Behaviour |
 |---|---|
 | Writability | Probed with the same write test as v0.1 when the window opens and again before each save, then reported in the status line as `· 可写` / `· 只读`. There is no path / encoding / line-ending header band. |
-| Read-only state | When the probe fails, the banner `只读：当前没有写权限，无法保存` is drawn and every edit control is disabled (`m_args.writable` gates the editors, 新增 and toggle). Navigation, filter, copy and the 原文 view keep working. No **打开文件位置** button, no UAC prompt — see D2. |
+| Read-only state | When the probe fails every edit control is disabled (`m_args.writable` gates the editors, the raw text box, 新增 and toggle) and the status line says `只读（需管理员）`. Navigation, filter, copy and the 原文 view keep working. No **打开文件位置** button, no UAC prompt — see D2. |
 | UTF-16 file | Same as v0.1: `E_HOSTS_UTF16` banner, the whole window is read-only, no conversion offer. |
 | 条目 tab | One row per `HostsEntry`. Section dividers (comment-only lines) are shown as group headings, not as rows. Blank lines and free comments are not shown but are kept by line index, so saving reproduces them byte for byte. |
 | Columns | 启用 (checkbox = not commented), IP, 主机名, 注释 (trailing `#…`), 行 (1-based line number), ● dirty / ! invalid. In-place edit with F2 or double-click (ListView label edit for 主机名, an overlay Edit for other cells). |
 | Lines with several hostnames | v0.1 `parseHostLine` keeps only `tok[1]`. The editor needs all of them, so the model gets `std::vector<std::string> hostnames` and the cell shows `a.test b.test`. Editing re-joins with one space. Only edited lines are re-serialised; others stay raw. |
 | Validation | `ipv4Valid`, an IPv6 check, `hostValid` per hostname. Warnings, not errors: the same hostname enabled on two lines (the first one wins, so the second does nothing), `0.0.0.0` vs `127.0.0.1` duplicates. |
-| 原文 tab | Read-only monospace view of the file as it will be written (preview of the save). Becomes editable only in D3. |
+| 原文 tab | Monospace (Consolas) text of the file as it will be written, filling the work area down to the status bar; only the text box scrolls. Editable when hosts is writable and not UTF-16, read-only otherwise. See "Editable raw tab". |
 | New row | Ins adds `127.0.0.1` + focused empty hostname at the end of the current group (or at the file end when no group is selected). |
 
 ---
@@ -529,7 +558,7 @@ All controls have accessible names so Narrator reads 名称, 值, 启用.
 |---|---|---|---|
 | D1 | What does row 1 do when the window cannot open (old host, foreground fails)? | a) notify only; b) fall back to v0.1 inline list | a), plus the existing rows remain usable below it |
 | D2 | System env and protected hosts | a) read-only + banner (no new permission); b) add `elevated`: writable only when WinShun itself runs as admin, never a UAC prompt | a) for v0.2. b) widens the trust needed for the whole plugin; it can come later as a separate step. |
-| D3 | hosts 原文 tab editable? | a) read-only preview; b) full text editing with parse-back | a). b) makes the line-index model and conflict handling much harder. |
+| D3 | hosts 原文 tab editable? | a) read-only preview; b) full text editing with parse-back | a) in v0.2; b) since v0.4.1, with the `disk` / `base` split described under "Editable raw tab". |
 | D4 | Keep `clipboard:write`? | a) yes, Ctrl+C in window; b) no, copy only from launcher rows | a) — copying a value is the most common action |
 
 ---

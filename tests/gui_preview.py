@@ -579,15 +579,56 @@ if hosts_hwnd:
           "hosts enabled checkbox toggles and restores", "%s -> %s -> %s" % (before, after, restored))
     shot(hosts_hwnd, "hosts_detail_styled")
 
-    # ---- raw tab shows the file ---------------------------------------------
+    # ---- raw tab: one scrollbar, fills the work area, editable ---------------
     click_at(hosts_hwnd, 138, 16)  # 原文 tab
     time.sleep(0.4)
-    raw_txt = get_text(child_by_id(hosts_hwnd, 9))
+    raw_h = child_by_id(hosts_hwnd, 9)
+    raw_txt = get_text(raw_h)
     check("host01.example.com" in raw_txt and raw_txt.count("\n") >= 25,
           "hosts raw tab shows the whole file", repr(raw_txt[:80]))
+    GWL_STYLE, WS_VSCROLL_BIT, ES_READONLY_BIT = -16, 0x00200000, 0x0800
+    user32.GetWindowLongW.restype = ctypes.c_long
+    check(not (user32.GetWindowLongW(hosts_hwnd, GWL_STYLE) & WS_VSCROLL_BIT),
+          "raw tab hides the window's own scrollbar (only the text box scrolls)")
+    _, rrc = child_client_rect(hosts_hwnd, 9)
+    hcw, hch = client_size(hosts_hwnd)
+    status_top = hch - 48
+    check(rrc and 0 <= status_top - rrc[3] <= 8, "raw box reaches the status bar",
+          "%s status_top=%d" % (rrc, status_top))
+    check(not (user32.GetWindowLongW(raw_h, GWL_STYLE) & ES_READONLY_BIT),
+          "raw box is editable when hosts is writable")
     shot(hosts_hwnd, "hosts_raw")
-    click_at(hosts_hwnd, 54, 16)  # back to 条目
-    time.sleep(0.4)
+    # Edit one line in the raw text, then leave the tab: the entry must show it.
+    edited = raw_txt.replace("host05.example.com host05", "rawedit.example.com host05")
+    set_text(hosts_hwnd, raw_h, 9, edited)  # WM_SETTEXT: SetWindowTextW can't cross processes
+    time.sleep(0.2)
+    shot(hosts_hwnd, "hosts_raw_edited")
+    click_at(hosts_hwnd, 54, 16)  # back to 条目 -> applies the raw text
+    time.sleep(0.5)
+    check(not user32.IsWindowVisible(raw_h), "raw box hides on the entries tab")
+    check(user32.GetWindowLongW(hosts_hwnd, GWL_STYLE) & WS_VSCROLL_BIT,
+          "entries tab brings the window scrollbar back")
+    focus_hosts_line = 8  # host05 is on line 8 (3 header lines + host01..04)
+    call("action", {"command": "hosts", "action": "open", "text": "", "item": {
+        "id": "hosts:editor", "data": {"kind": "openEditor", "target": "hosts",
+                                       "select": str(focus_hosts_line), "filter": ""}}})
+    time.sleep(0.5)
+    check(get_text(child_by_id(hosts_hwnd, 7)) == "rawedit.example.com host05",
+          "raw edit shows up as the entry on that line", get_text(child_by_id(hosts_hwnd, 7)))
+    shot(hosts_hwnd, "hosts_after_raw_edit")
+    # Save through the Ctrl+S chip and read the temp file back.
+    hlayout = mirror_layout(hcw, hch)
+    click_at(hosts_hwnd, *center(hlayout["chips"][5]))
+    dlg = find_dialog(2.5)
+    check(dlg is not None, "hosts save asks for confirmation")
+    if dlg:
+        press_dialog_button(dlg, IDYES)
+    time.sleep(0.6)
+    with open(HOSTS, "rb") as f:
+        saved = f.read()
+    check(b"rawedit.example.com host05" in saved and saved.count(b"\n") == saved.count(b"\r\n"),
+          "save writes the raw edit to the hosts file with CRLF kept", repr(saved[:120]))
+    shot(hosts_hwnd, "hosts_saved_after_raw_edit")
 
 if env_hwnd:
     cw, ch = client_size(env_hwnd)

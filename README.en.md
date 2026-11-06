@@ -202,6 +202,12 @@ All data stays local under `WS_DATA_DIR`:
   host name an earlier enabled line already maps gets a red `!` next to its line
   number and the status bar counts them. Read-only no longer draws a red banner;
   the status bar says `read-only (needs admin)`.
+- **hosts Raw tab**: the whole file in a monospace text box that fills the window.
+  When hosts is writable you can edit it directly; the text is applied to the
+  entries when you leave the tab, press `Ctrl+S` or close, and one `Ctrl+Z` on
+  the entries tab undoes the whole raw edit. Inside the box `Ctrl+Z` / `Ctrl+Y`
+  are text undo / redo. Line endings, BOM and the final newline are kept, so
+  unchanged lines save byte-for-byte. Read-only hosts keep the box read-only.
 - **Reload**: `F5` re-reads from disk and lands on the same row; unsaved edits are
   confirmed before they are dropped. When an external change arrives, a clean window
   reloads itself while a dirty one only shows a warning and keeps your edits.
