@@ -14,7 +14,8 @@ single source of truth; release tags are `v<version>`.
   variables (and the launcher's system-var delete works), save/backup/conflict
   detection cover both scopes, and hosts writes succeed. There is still no UAC
   prompt from the plugin — write access follows a real registry probe, never the
-  token alone. The ⓘ at the right end of the status bar opens a permission
+  token alone. The 权限 button at the right end of the status bar (amber when
+  restricted, blue when writable) opens a permission
   explanation (what is writable now and the two steps to run elevated).
 - The hosts 原文 tab is editable when hosts is writable. The text is parsed back
   into the entries when you leave the tab, press Ctrl+S or close; one undo step
@@ -62,6 +63,9 @@ single source of truth; release tags are `v<version>`.
   use Win顺's real English UI labels. No runtime change.
 
 ### Fixed
+- Moving or picking a 分隔项 now updates the "当前项 N/M" counter and the
+  Up/Down enable states immediately (they were painted in the window buffer and
+  only refreshed on the next unrelated repaint).
 - A leftover draft is no longer applied silently when the window opens. A draft
   that had marked the user `Path` deleted made the row look locked: greyed fields,
   no delimiter, no item buttons. The window now asks 恢复 / 丢弃, and a row marked

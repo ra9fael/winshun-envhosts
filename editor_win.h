@@ -1406,6 +1406,19 @@ private:
             : std::string {};
         setEdit(m_partEdit, text, !rowEditable(m_sel));
     }
+    // The "当前项 N/M" counter and the Up/Down enable states are painted in the
+    // WM_PAINT buffer, not by the list box child. List-only updates (select,
+    // move, insert, delete) must therefore invalidate that strip or the counter
+    // stays on the previous item.
+    void invalidatePartChrome()
+    {
+        RECT rc = m_rcItemHint;
+        UnionRect(&rc, &rc, &m_rcPartUp);
+        UnionRect(&rc, &rc, &m_rcPartDown);
+        UnionRect(&rc, &rc, &m_rcPartInsert);
+        UnionRect(&rc, &rc, &m_rcPartDelete);
+        InvalidateRect(m_hwnd, &rc, FALSE);
+    }
     // Rebuild only when the delimiter, row, mode or live model changed. A normal
     // selection is handled by updatePartRow/LB_SETCURSEL and must preserve top.
     void rebuildPartsList(bool preserveTop = false)
@@ -1471,6 +1484,7 @@ private:
             SendMessageW(m_partsList, LB_SETCURSEL, m_partSel, 0);
             ensurePartVisible();
         }
+        invalidatePartChrome();
         syncRawValueEdit();
         commitDetail();
         showCurrentPart();
@@ -1497,6 +1511,7 @@ private:
             SendMessageW(m_partsList, LB_SETCURSEL, m_partSel, 0);
             ensurePartVisible();
         }
+        invalidatePartChrome();
         syncRawValueEdit();
         commitDetail();
         showCurrentPart();
@@ -1517,6 +1532,7 @@ private:
             SendMessageW(m_partsList, LB_SETCURSEL, m_partSel, 0);
             ensurePartVisible();
         }
+        invalidatePartChrome();
         syncRawValueEdit();
         commitDetail();
         showCurrentPart();
@@ -2279,17 +2295,29 @@ private:
         SetTextColor(dc, t1);
         RECT r1 = m_rcStatusRow1;
         r1.left += 8;
-        r1.right -= 8;
-        // The "ⓘ" permission entry lives at the right end of row 1; reserve room
-        // for it so the text never runs underneath.
-        const RECT ri {m_rcStatusRow1.right - 30, m_rcStatusRow1.top,
-                       m_rcStatusRow1.right - 8, m_rcStatusRow1.bottom};
+        // The permission entry lives at the right end of row 1 as a small flat
+        // button (plain text: the U+24D8 glyph is missing from some CJK fonts,
+        // so a drawn character would risk rendering as a box).
+        const bool elevatedNow = m_kind == "env" ? m_args.systemWritable : m_args.writable;
+        const LONG infoW = 46;
+        const RECT ri {m_rcStatusRow1.right - infoW - 8, m_rcStatusRow1.top + 3,
+                       m_rcStatusRow1.right - 8, m_rcStatusRow1.bottom - 3};
         m_rcInfo = ri;
         r1.right = ri.left;
         DrawTextW(dc, wideFromUtf8(statusRow1Text()).c_str(), -1, &r1,
                   DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_END_ELLIPSIS);
-        SetTextColor(dc, flash ? t1 : (m_dark ? RGB(120, 170, 230) : RGB(16, 92, 168)));
-        DrawTextW(dc, L"ⓘ", -1, &m_rcInfo, DT_CENTER | DT_VCENTER | DT_SINGLELINE);
+        HBRUSH ib = CreateSolidBrush(m_dark ? RGB(48, 52, 58) : RGB(255, 255, 255));
+        FillRect(dc, &ri, ib);
+        DeleteObject(ib);
+        HBRUSH ie = CreateSolidBrush(elevatedNow ? (m_dark ? RGB(90, 96, 104) : RGB(190, 196, 204))
+                                                  : (m_dark ? RGB(170, 130, 40) : RGB(202, 138, 30)));
+        FrameRect(dc, &ri, ie);
+        DeleteObject(ie);
+        RECT it = ri;
+        SetTextColor(dc, elevatedNow ? (m_dark ? RGB(180, 215, 255) : RGB(12, 68, 124))
+                                     : (m_dark ? RGB(235, 190, 100) : RGB(150, 98, 10)));
+        DrawTextW(dc, m_args.zh ? L"权限" : L"Perms",
+                  -1, &it, DT_CENTER | DT_VCENTER | DT_SINGLELINE | DT_END_ELLIPSIS);
         for (Chip c : m_chips) {
             const bool en = chipEnabled(c.id);
             HBRUSH cb = CreateSolidBrush(en ? (m_dark ? RGB(48, 52, 58) : RGB(255, 255, 255))
@@ -2992,6 +3020,7 @@ private:
                     m_partSel = sel;
                 SendMessageW(m_partsList, LB_SETCURSEL, m_partSel, 0);
                 showCurrentPart();
+                invalidatePartChrome();
                 return 0;
             }
             if (HIWORD(wp) == EN_CHANGE) {

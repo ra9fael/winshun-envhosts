@@ -616,8 +616,8 @@ struct EnvHosts : winshun::Plugin {
                 // Elevated plugin (Plan A): write HKLM when the probe passes.
                 std::string werr;
                 if (!store.canWriteSystem(werr))
-                    return {notify(tr(zh, "系统变量需要管理员权限：以管理员运行 Win顺 并在插件卡片点“确认”后重试（状态栏 ⓘ 有说明）",
-                                        "System variables need administrator rights: run Win顺 as admin and confirm the plugin card, then retry (see the status-bar ⓘ)")),
+                    return {notify(tr(zh, "系统变量需要管理员权限：以管理员运行 Win顺 并在插件卡片点“确认”后重试（编辑器状态栏右下角“权限”有说明）",
+                                        "System variables need administrator rights: run Win顺 as admin and confirm the plugin card, then retry (see the Perms button in the editor's status bar)")),
                             winshun::effect::keep()};
                 backups.saveEnv(store.read(true).snap, true);
                 if (!store.deleteVar(name, "system")) {
