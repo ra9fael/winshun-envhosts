@@ -1,13 +1,15 @@
-# ra9fael.envhosts — interactive editor window (v0.2 design)
+# ra9fael.envhosts — interactive editor window (v0.2 → v0.4 design)
 
-Status: **implemented (v0.2.1).** Coded in `editor_win.h` (window + GUI thread),
-`editor_model.h` (pure data model, 41 unit tests), wired into `main.cpp` (pinned
+Status: **implemented (v0.4.0).** Coded in `editor_win.h` (window + GUI thread),
+`editor_model.h` (pure data model, 73 unit checks), wired into `main.cpp` (pinned
 first row + `openEditor` action + external-change + shutdown join), `plugin.json`
 (`ui` + `clipboard:write`, `idleExitSec: 0`), `README.md`, and `integration.py`
 (P1–P6). Verified on a real Windows host via `tests/integration.py` (32/32 pass),
-`editor_model.h` unit tests (41/41) and `logic.h` unit tests (69/69).
-The v0.2.1 pass adds virtual scrolling, visible per-row add/delete/edit commands
-and a two-row status bar; see "GUI refinement pass" below.
+`editor_model.h` unit checks (73/73), `logic.h` unit tests (69/69) and the 30
+assertions of `tests/gui_preview.py`. The three passes below are the design
+history: v0.2.1 virtual scrolling and the status bar, v0.3.0 the split pane and
+delimited-item editing, v0.4.0 the delimiter combo, the stable item viewport and
+the save-conflict fixes.
 
 **GUI verification (corrected):** the window was opened on a real desktop and
 captured with GDI `PrintWindow` for both `env` and `hosts`. The first capture
@@ -161,19 +163,15 @@ before discarding unsaved edits and lands back on the same row
 window is clean reloads silently and one arriving while it is dirty only raises
 the `m_extChanged` marker — your edits are never overwritten behind your back.
 
-```
-├──────────────────────────────────────────────────────────────────────┤
-│                     ══════════   draggable splitter                  │
-├──────────────────────────────────────────────────────────────────────┤
-│ 名称 [Path___________]   类型 [REG_EXPAND_SZ]                         │
-│ ┌ 分隔项列表 ──────────────┐   当前项 9 / 28                          │
-│ │ C:\Windows               │   [C:\sample\dir06________________]     │
-│ │▶C:\sample\dir06          │   [上移] [下移] [插入] [删除]             │
-│ │ C:\sample\dir07          │                                          │
-│ └──────────────────────────┘                                          │
-│ [原文│分隔项]  [分号 (;)         ▾]  [应用]        长度 812 / 32767     │
-└──────────────────────────────────────────────────────────────────────┘
-```
+![环境变量编辑器 v0.4 示意图](EDITOR_DESIGN_v0.4.svg)
+
+Four things in that picture were deliberately not built, because the shipped
+window already answers them another way: the delimiter combo has no separate
+`重置` button (its five presets *are* the reset), no `已应用` dot (the status
+line prints `分隔符: ;` instead), the item list has no row-number gutter (the
+`当前项 9 / 28` counter covers it), and `保存` stayed a `Ctrl+S 保存` chip in the
+shared shortcut row rather than a button in the status bar, so env and hosts
+keep one bottom band. The segmented labels are shortened to `原文│分隔项`.
 
 Verified with `tests/gui_preview.py`: 30 assertions over the real window — the
 layout mirror matches the combo's own rect, a 28-segment `Path` splits into 28
@@ -305,17 +303,7 @@ foreground lock against Windows' intent.
 
 ## 3. Architecture
 
-```
- main thread (protocol)            GUI thread "env"         GUI thread "hosts"
- serve(): query / action           message loop             message loop
-   │  openEditor ───────────────►  EnvEditorModel           HostsEditorModel
-   │  inline set/toggle/delete       │                        │
-   │       │                         │ save                   │ save
-   ▼       ▼                         ▼                        ▼
- ┌──────────────────── native.h (EnvStore / HostsStore / BackupStore) ───────┐
- │   one process-wide std::mutex g_writeLock around every read-modify-write  │
- └───────────────────────────────────────────────────────────────────────────┘
-```
+![编辑器线程架构](EDITOR_ARCHITECTURE.svg)
 
 New files:
 
@@ -354,36 +342,18 @@ listed as a known limitation.
 Title: `环境变量 — Win顺`. Default size 960×600 DIP, remembered in
 `WS_DATA_DIR/editor.json` (position, size, column widths, last tab).
 
-```
-┌ 环境变量 — Win顺 ─────────────────────────────────────────────── □ ✕ ┐
-│ [用户 (12)] [系统 (34) 🔒] [备份]          过滤: [path_______] (Ctrl+F)│
-├──────────────────────────────────────────────────────────────────────┤
-│ 名称            │ 类型           │ 值                               │●│
-│ JAVA_HOME       │ REG_SZ         │ C:\jdk-21                        │ │
-│▶Path            │ REG_EXPAND_SZ  │ %USERPROFILE%\bin;C:\tools;…     │●│
-│ TEMP            │ REG_EXPAND_SZ  │ %USERPROFILE%\AppData\Local\Temp │ │
-├──────────────────────────────────────────────────────────────────────┤
-│ 名称 [Path____________]  类型 [REG_EXPAND_SZ ▾]                       │
-│ ┌ 列表编辑（按 ; 拆分）──────────────────────┐ [新增 Ins] [删除 Del] │
-│ │ %USERPROFILE%\bin      → C:\Users\r\bin  ✓ │ [上移 Alt+↑]          │
-│ │ C:\tools               → C:\tools        ✓ │ [下移 Alt+↓]          │
-│ │ D:\old\sdk             → D:\old\sdk      ✗ │ [去重] [删不存在]     │
-│ └────────────────────────────────────────────┘ [原文 Ctrl+R]         │
-│ 展开值: C:\Users\r\bin;C:\tools;D:\old\sdk          长度 812 / 32767 │
-├──────────────────────────────────────────────────────────────────────┤
-│ ● 2 项未保存 · 用户作用域可写 · 系统作用域只读（需管理员）   [保存 Ctrl+S]│
-└──────────────────────────────────────────────────────────────────────┘
-```
+The shipped window is [EDITOR_DESIGN_v0.4.svg](EDITOR_DESIGN_v0.4.svg); the
+table below is the authoritative description of each area.
 
 | Area | Behaviour |
 |---|---|
-| Tabs | 用户 (editable), 系统 (read-only unless D2 is taken; 🔒 badge and greyed editors), 备份 (list of `backups/env/*.json`, newest first). `showSystemVars=false` hides the 系统 tab. |
+| Tabs | 用户 (editable), 系统 (read-only unless D2 is taken; greyed editors), 备份 (list of `backups/env/*.json`, newest first). `showSystemVars=false` hides the 系统 tab. |
 | Table | ListView report mode. Columns 名称 / 类型 / 值 (first line, truncated) / ● dirty marker. Sorted by name, case-insensitive. Filter matches name or value, the same rule as `envMatches`. |
 | Detail pane | Edits the selected row. **List mode** is entered explicitly with `Ctrl+R` or the `原文│分隔项` segment (the value is never split silently, so the raw text always stays reachable); the delimiter comes from a preset-or-free-text combo and only takes effect on `应用 / Apply`. `Path`-named rows default to the `;` delimiter. Otherwise a multi-line Edit. |
-| List mode items | Each segment shows its expansion and an existence mark for directories: ✓ exists, ✗ missing, ? not checked (UNC or contains an unexpanded `%X%`). Checks run on the GUI thread with a 50 ms budget per refresh, local paths only, no network shares. |
+| List mode items | One row per segment, in order, with the selected row and the viewport preserved across an in-place edit. `上移 / 下移 / 插入 / 删除` (or `Alt+↑↓`, `Ins`, `Del`) act on that segment only, and `当前项 n / m` reports the position. No expansion or existence marks — those were dropped as v0.1 sketch. |
 | 类型 | REG_SZ / REG_EXPAND_SZ. Auto-switches to EXPAND when `%X%` is typed (same as `envTypeForValue`), but the user can override. REG_MULTI_SZ rows are shown read-only (v0.1 also does not edit them). |
 | Validation | Live, from `isValidEnvName` / `isValidEnvValue`: red border and status text. Save is disabled while any row is invalid. Length counter turns amber above 1024 (a later `setx` by any other tool truncates there) and red above 32767 (the Windows limit for one variable). |
-| New / delete | Ins adds a row with a focused empty name. Del marks the row deleted (strikethrough) until save; it does not disappear, so it can be undone. |
+| New / delete | Ins adds a blank row with the name focused. Del removes the row from the working copy at once; it is undone with `Ctrl+Z`, and nothing reaches the registry until `Ctrl+S`. |
 
 ---
 
@@ -391,27 +361,17 @@ Title: `环境变量 — Win顺`. Default size 960×600 DIP, remembered in
 
 Title: `hosts — Win顺`. Default 900×560 DIP.
 
-```
-┌ hosts — Win顺 ──────────────────────────────────────────────── □ ✕ ┐
-│ C:\Windows\System32\drivers\etc\hosts · UTF-8 BOM · CRLF · 🔒 只读    │
-│ ⚠ 当前没有写权限。以管理员身份运行 Win顺 后可保存。[打开文件位置]      │
-│ [条目] [原文] [备份]                       过滤: [docker____] (Ctrl+F)│
-├────────────────────────────────────────────────────────────────────┤
-│ 启用 │ IP              │ 主机名                  │ 注释       │ 行 │●│
-│ ── # Added by Docker Desktop ─────────────────────────────────── 22 │ │
-│ [✓]  │ 192.168.1.5     │ host.docker.internal    │            │ 23 │ │
-│ [ ]  │ 127.0.0.1       │ kubernetes.docker.inte… │ old        │ 25 │●│
-│ [✓]  │ 10.0.0.300      │ a.test                  │            │ 31 │!│
-├────────────────────────────────────────────────────────────────────┤
-│ ! 第 31 行：IP 无效 (10.0.0.300)                                    │
-│ ● 1 项未保存 · 重复主机名 0 · 冲突 0                     [保存 Ctrl+S]│
-└────────────────────────────────────────────────────────────────────┘
-```
+![hosts 编辑器示意图](EDITOR_HOSTS_DESIGN_v0.4.svg)
+
+The picture is the shipped layout. Two things from the v0.1 sketch were never
+built and are described in the table as they actually behave: there is no path
+/ encoding / line-ending header band (writability shows in the status line),
+and there is no **打开文件位置** button — see D2.
 
 | Area | Behaviour |
 |---|---|
-| Header | Path, encoding, line endings, writability. Writability comes from the same write probe as v0.1, checked when the window opens and again before each save. |
-| Read-only banner | Shown when the probe fails. All edit controls are disabled. Navigation, filter, copy and 原文 view keep working. The banner says what is needed and offers **打开文件位置** (`SHOpenFolderAndSelectItems`), not a UAC prompt. See D2. |
+| Writability | Probed with the same write test as v0.1 when the window opens and again before each save, then reported in the status line as `· 可写` / `· 只读`. There is no path / encoding / line-ending header band. |
+| Read-only state | When the probe fails, the banner `只读：当前没有写权限，无法保存` is drawn and every edit control is disabled (`m_args.writable` gates the editors, 新增 and toggle). Navigation, filter, copy and the 原文 view keep working. No **打开文件位置** button, no UAC prompt — see D2. |
 | UTF-16 file | Same as v0.1: `E_HOSTS_UTF16` banner, the whole window is read-only, no conversion offer. |
 | 条目 tab | One row per `HostsEntry`. Section dividers (comment-only lines) are shown as group headings, not as rows. Blank lines and free comments are not shown but are kept by line index, so saving reproduces them byte for byte. |
 | Columns | 启用 (checkbox = not commented), IP, 主机名, 注释 (trailing `#…`), 行 (1-based line number), ● dirty / ! invalid. In-place edit with F2 or double-click (ListView label edit for 主机名, an overlay Edit for other cells). |

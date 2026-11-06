@@ -1,0 +1,57 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="900" height="400" viewBox="0 0 900 400" role="img" aria-labelledby="title desc">
+  <title id="title">EnvHosts editor thread architecture</title>
+  <desc id="desc">The protocol main thread opens the env and hosts GUI threads; all three reach the registry and hosts file through native.h under one process-wide write lock.</desc>
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#5b6b80"/>
+    </marker>
+    <style>
+      text { font-family: "Segoe UI", "Microsoft YaHei UI", sans-serif; fill: #202733; }
+      .title { font-size: 16px; font-weight: 600; }
+      .body { font-size: 13px; }
+      .mono { font-family: Consolas, "Cascadia Mono", monospace; font-size: 13px; }
+      .label { font-size: 12px; fill: #5b6b80; }
+      .box { fill: #f6f8fb; stroke: #b8c3d1; stroke-width: 1.5; }
+      .store { fill: #eaf2ff; stroke: #4a7bd0; stroke-width: 1.5; }
+      .line { stroke: #5b6b80; stroke-width: 1.5; fill: none; }
+    </style>
+  </defs>
+  <rect width="900" height="400" fill="#ffffff"/>
+
+  <!-- main thread -->
+  <rect class="box" x="30" y="30" width="260" height="170" rx="8"/>
+  <text class="title" x="50" y="60">main thread (protocol)</text>
+  <text class="mono" x="50" y="88">serve(): query / action</text>
+  <text class="mono" x="50" y="124">openEditor</text>
+  <text class="mono" x="50" y="160">inline set / toggle / delete</text>
+
+  <!-- env GUI thread -->
+  <rect class="box" x="370" y="30" width="230" height="170" rx="8"/>
+  <text class="title" x="390" y="60">GUI thread "env"</text>
+  <text class="body" x="390" y="88">message loop</text>
+  <text class="mono" x="390" y="124">EnvEditorModel</text>
+
+  <!-- hosts GUI thread -->
+  <rect class="box" x="640" y="30" width="230" height="170" rx="8"/>
+  <text class="title" x="660" y="60">GUI thread "hosts"</text>
+  <text class="body" x="660" y="88">message loop</text>
+  <text class="mono" x="660" y="124">HostsEditorModel</text>
+
+  <!-- openEditor arrows -->
+  <path class="line" d="M140,120 L362,120" marker-end="url(#arrow)"/>
+  <path class="line" d="M330,120 L330,14 L755,14 L755,28" marker-end="url(#arrow)"/>
+  <text class="label" x="200" y="112">openEditor</text>
+
+  <!-- writes down to native.h -->
+  <path class="line" d="M160,170 L160,282" marker-end="url(#arrow)"/>
+  <text class="label" x="168" y="250">inline write</text>
+  <path class="line" d="M485,200 L485,282" marker-end="url(#arrow)"/>
+  <text class="label" x="493" y="250">save</text>
+  <path class="line" d="M800,200 L800,282" marker-end="url(#arrow)"/>
+  <text class="label" x="808" y="250">save</text>
+
+  <!-- native.h -->
+  <rect class="store" x="30" y="290" width="840" height="80" rx="8"/>
+  <text class="title" x="50" y="320">native.h  ·  EnvStore / HostsStore / BackupStore</text>
+  <text class="body" x="50" y="348">one process-wide <tspan class="mono">std::mutex g_writeLock</tspan> around every read-modify-write</text>
+</svg>
