@@ -608,10 +608,19 @@ if hosts_hwnd:
     check(not user32.IsWindowVisible(raw_h), "raw box hides on the entries tab")
     check(user32.GetWindowLongW(hosts_hwnd, GWL_STYLE) & WS_VSCROLL_BIT,
           "entries tab brings the window scrollbar back")
+    # Minimise the window, then re-open through the launcher: the editor must
+    # restore itself (showAndActivate) instead of staying minimised. Whether it
+    # also takes the foreground depends on Windows' focus rights for the
+    # plugin process, so only the restore is asserted here.
+    user32.ShowWindow(hosts_hwnd, 6)  # SW_MINIMIZE
+    time.sleep(0.3)
+    check(user32.IsIconic(hosts_hwnd) != 0, "hosts window is minimised for the re-open test")
     focus_hosts_line = 8  # host05 is on line 8 (3 header lines + host01..04)
     call("action", {"command": "hosts", "action": "open", "text": "", "item": {
         "id": "hosts:editor", "data": {"kind": "openEditor", "target": "hosts",
                                        "select": str(focus_hosts_line), "filter": ""}}})
+    time.sleep(0.5)
+    check(user32.IsIconic(hosts_hwnd) == 0, "re-opening restores a minimised editor")
     time.sleep(0.5)
     check(get_text(child_by_id(hosts_hwnd, 7)) == "rawedit.example.com host05",
           "raw edit shows up as the entry on that line", get_text(child_by_id(hosts_hwnd, 7)))

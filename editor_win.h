@@ -126,6 +126,7 @@ public:
         selectRow(0);
         ShowWindow(m_hwnd, SW_SHOWNORMAL);
         UpdateWindow(m_hwnd);
+        showAndActivate();
         offerDraft();
         SetTimer(m_hwnd, kTimerDraft, 30000, nullptr);
 
@@ -141,6 +142,28 @@ public:
             }
         }
         persistDraftIfDirty();
+    }
+
+    // Bring the window up front once per user action, never permanently: the
+    // launcher opened (or re-focused) the editor, so restore it if minimised
+    // and try to activate it. A freshly spawned plugin process may lack the
+    // foreground rights (the host started it, not the user), and Windows can
+    // refuse SetForegroundWindow; in that case flash the taskbar button
+    // instead of stealing focus. No WS_EX_TOPMOST anywhere - once shown the
+    // window behaves like any other and the user can put it behind.
+    void showAndActivate()
+    {
+        if (!m_hwnd)
+            return;
+        if (IsIconic(m_hwnd))
+            ShowWindow(m_hwnd, SW_RESTORE);
+        else if (!IsWindowVisible(m_hwnd))
+            ShowWindow(m_hwnd, SW_SHOW);
+        SetForegroundWindow(m_hwnd);
+        if (GetForegroundWindow() != m_hwnd) {
+            FLASHWINFO fi {sizeof(FLASHWINFO), m_hwnd, FLASHW_ALL | FLASHW_TIMERNOFG, 0, 0};
+            FlashWindowEx(&fi);
+        }
     }
 
     // Called from another thread via PostMessage(WM_APP_FOCUS, , new OpenArgs*).
@@ -166,6 +189,9 @@ public:
         if (!a->select.empty())
             selectByRef(a->select);
         InvalidateRect(m_hwnd, nullptr, TRUE);
+        // Re-focusing an existing editor is a user action too: bring it up
+        // front (restore if minimised, flash if foreground rights are denied).
+        showAndActivate();
     }
 
     // Posted by the protocol thread after an inline write (and by any other
