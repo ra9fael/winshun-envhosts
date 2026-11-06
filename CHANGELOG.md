@@ -15,6 +15,13 @@ single source of truth; release tags are `v<version>`.
   `envhosts.exe`; editing, drafts, backups and the hosts 原文 tab are not
   migrated yet. `QML_MIGRATION_PHASE0.md` records the contract that migration
   must preserve.
+- QML deployment: the plugin ships its own Qt 6 runtime.
+  `tools/deploy_qml.ps1` assembles a pruned ~45 MB runtime (Basic style only,
+  Qt LGPLv3 text included) and `tools/package.py --runtime-dir` bundles it into
+  the `.wsplugin`; the packaged exe comes from the runtime folder, so a QML
+  package never mixes the GDI binary with the Qt runtime. Switching the default
+  to QML requires `runtime.memoryMB: 512` (measured 253 MB with one window,
+  268 MB with both).
 - The plugin declares the `elevated` permission (requires Win顺 ≥ 0.19.0, hence
   the new `minWinShun`). When Win顺 runs as administrator and the user confirmed
   the plugin card once, the plugin starts elevated: the 系统 tab edits system

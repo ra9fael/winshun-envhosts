@@ -103,12 +103,43 @@
 
 ## 10. 待确认项
 
-- [TBD] 目标是插件进程自带 Qt/QML，还是要求 QML 页面嵌入 Win顺 主界面？当前公开协议未确认支持后者。
-- [TBD] Qt 版本、是否静态/动态部署、QML modules 与平台插件的发布方式；宿主 Qt 是否可复用没有通用第三方保证。
-- [TBD] 新插件包体、启动耗时、内存预算的可接受阈值；当前 manifest 的 `memoryMB: 64` 是否必须保持。
+- 承载方式与 Qt 部署已由 §11 定案，不再是待确认项。
+- [TBD] 首次打开耗时能否收敛到可接受范围（见 §11 的 1.35 s 实测）。
 - [TBD] 当前实际安装包、Win顺 版本及 elevated 确认成功/失败的端到端证据；插件清单声明不等同于宿主已授权。
 - [TBD] 当前 workspace 的最新提交、远端同步状态和正式发布版本；版本号 `0.4.0` 与变更记录的版本描述需要发布前统一。
 - [TBD] 新旧草稿/备份格式是否跨版本长期兼容，以及系统变量备份的纳入范围与恢复确认策略。
+
+## 11. 部署方式决策（已定）
+
+**结论：插件自带 Qt 6 运行时，随 `.wsplugin` 分发；不复用宿主 Qt、不做静态 Qt 构建。**
+
+理由与实测（Qt 6.12.0 / MSVC 2022 x64 / Windows 11）：
+
+| 方案 | 结果 |
+|---|---|
+| 自带动态 Qt（选定） | 运行时 44.7 MB、145 个文件；`.wsplugin` 实测 48.6 MB、195 个文件，低于宿主 256 MB 上限 |
+| 复用 Win顺 的 Qt | 主仓文档只说明内置 `winshun.switches` 复用宿主 Qt，没有第三方插件可用宿主 Qt 的公开契约；版本漂移风险不可控 |
+| 静态 Qt 单文件 | 本机无静态 Qt，需自行编译数小时；体积与内存不会明显下降，且 LGPLv3 下静态链接需额外提供可替换目标文件 |
+| 把 QML 页面嵌进宿主 UI | 当前协议没有第三方 QML 页面挂载接口，需要先改宿主，不在插件侧可解 |
+
+具体做法：
+
+- QML 编译进插件 qrc（`qt_add_qml_module`），运行时**不散落 .qml 源文件**；`QQuickStyle` 固定为 `Basic`。
+- `tools/deploy_qml.ps1`：`windeployqt --qmldir qt/qml` 生成基础部署，再裁掉非 Basic 样式、`qmltooling`、`imageformats` 与未用 DLL，并复制 Qt LGPLv3 许可证文本到 `licenses/qt/`。脚本对 `envhosts.exe`、`Qt6QuickControls2*.dll`、`platforms/qwindows.dll`、`qml/QtQuick/Controls/Basic` 做存在性校验。
+- `tools/package.py --runtime-dir build-qml/deploy`：把运行时按插件根目录布局写入 `.wsplugin`，并用运行时目录里的 `envhosts.exe` 覆盖仓库里的 GDI 构建，避免包内出现“QML exe + 缺失 Qt”或“GDI exe + Qt 运行时”的错配。
+- 原型构建输出到 `build-qml/bin`，不覆盖仓库根目录的 `envhosts.exe`；默认构建仍是 GDI，回归测试不受影响。
+
+必须随迁移一起调整的清单字段（切换到 QML 为默认构建时）：
+
+- `runtime.memoryMB`：实测单窗口 253 MB、env + hosts 双窗口 268 MB，必须从 `64` 提到宿主默认的 `512`，否则作业对象会杀掉进程。
+- `runtime.sandbox` 仍为 `normal`；`ui` 权限不变。
+- 首次打开耗时：action → 窗口可见实测 **1.35 s**（进程启动到窗口 1.42 s），高于 400 ms 反馈阈值。后续切片应先显示窗口骨架再填充内容，或复用已加载的 QML 引擎；该指标需在阶段 4 前收敛。
+- 包体从约 3.5 MB（单 exe）增长到约 48.6 MB，属于分发成本而非运行成本，需在发布说明中明确。
+
+未决/需外部确认：
+
+- [TBD] Qt LGPLv3 合规材料：仓库需附完整许可证文本（部署脚本已复制），发布说明需声明 Qt 版本与可替换 DLL。
+- [TBD] 是否对新增 Qt DLL 做签名；未签名二进制会触发 SmartScreen 提示，需与发布流程一并决定。
 
 ## 参考文件
 

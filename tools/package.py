@@ -4,10 +4,14 @@
 Usage:
   python tools/package.py              # package the committed files + the built exe
   python tools/package.py --tag v1.2.3 # also require the tag to match plugin.json
+  python tools/package.py --runtime-dir build-qml/deploy  # QML build: bundle Qt runtime
 
 What goes in: every file tracked by git (``git ls-files``), except paths that
 start with a dot (.github, .gitignore, ...), plus ``runtime.program`` from
-plugin.json (the built exe, which is not committed). The zip is deterministic
+plugin.json (the built exe, which is not committed). With ``--runtime-dir``,
+every file under that folder is added at its plugin-root-relative path and its
+copy of ``runtime.program`` replaces the in-tree build, so a QML package always
+carries the matching exe and Qt runtime. The zip is deterministic
 (sorted names, fixed timestamps, stored, not compressed), so the same inputs
 always give the same sha256. plugin.json sits at the archive root, which is
 what WinShun's "install from archive" expects.
@@ -51,6 +55,9 @@ def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--tag", help="release tag; must be v<version from plugin.json>")
     ap.add_argument("--out", default=str(ROOT / "dist"), help="output folder (default: dist/)")
+    ap.add_argument("--runtime-dir",
+                    help="folder with extra runtime files (Qt DLLs/QML modules) laid out "
+                         "relative to the plugin root; used by the QML build")
     args = ap.parse_args()
 
     manifest = json.loads((ROOT / "plugin.json").read_text(encoding="utf-8"))
@@ -76,13 +83,26 @@ def main() -> int:
     if missing:
         return fail(f"tracked but missing on disk: {missing}")
 
+    # QML build: extra runtime files (Qt DLLs, platform plugins, QML modules) live
+    # outside git, produced by tools/deploy_qml.ps1. Names are plugin-root relative.
+    # The runtime copy of runtime.program wins over the in-tree build, so a QML
+    # package never mixes the GDI exe with the Qt runtime.
+    paths: dict[str, Path] = {name: ROOT / name for name in files}
+    if args.runtime_dir:
+        runtime = Path(args.runtime_dir)
+        if not runtime.is_dir():
+            return fail(f"runtime dir {runtime} does not exist")
+        for p in sorted(runtime.rglob("*")):
+            if p.is_file():
+                paths[p.relative_to(runtime).as_posix()] = p
+
     out = Path(args.out)
     out.mkdir(parents=True, exist_ok=True)
     target = out / f"{pid}-{version}.wsplugin"
     total = 0
     with zipfile.ZipFile(target, "w", zipfile.ZIP_STORED) as z:
-        for name in files:
-            data = (ROOT / name).read_bytes()
+        for name in sorted(paths):
+            data = paths[name].read_bytes()
             total += len(data)
             info = zipfile.ZipInfo(name, FIXED_TIME)
             info.compress_type = zipfile.ZIP_STORED
@@ -95,7 +115,8 @@ def main() -> int:
 
     digest = hashlib.sha256(target.read_bytes()).hexdigest()
     (out / f"{target.name}.sha256").write_text(f"{digest}  {target.name}\n", encoding="ascii")
-    print(f"{target.name}: {len(files)} files, {target.stat().st_size} bytes, sha256 {digest}")
+    print(f"{target.name}: {len(paths)} files, "
+          f"{target.stat().st_size} bytes, sha256 {digest}")
 
     notes = changelog_section(version)
     if notes is None:
