@@ -46,11 +46,14 @@ with winreg.CreateKeyEx(winreg.HKEY_CURRENT_USER, SYS_SUBKEY, 0, winreg.KEY_SET_
 HOSTS = os.path.join(DATA, "hosts.preview")
 with open(HOSTS, "w", encoding="utf-8", newline="\r\n") as f:
     f.write("# sample hosts for GUI preview\n")
+    f.write("#\n")
+    f.write("#      102.54.94.97     rhino.acme.com          # source server\n")
     for i in range(1, 25):
         f.write("10.%d.%d.%d host%02d.example.com host%02d  # row %02d\n"
                 % (i // 10, i, i, i, i, i))
     f.write("# trailing group\n")
     f.write("127.0.0.1 localhost\n")
+    f.write("127.0.0.2 host03.example.com\n")  # duplicate of line 6, flagged '!'
 
 # Preview-only sample rows in the isolated test subkey. The real user
 # Environment key and the real hosts file are never touched.
@@ -411,7 +414,7 @@ def mirror_layout(cw, ch):
     splitter_y = max(work_top + min_list_h, work_bottom - min_detail_h - splitter_h)
     detail = (8, splitter_y + splitter_h, cw - 8, work_bottom)
     lx, mode_h = detail[0] + 4, 22
-    mode_top = detail[1] + 40
+    mode_top = detail[1] + 48
     available = max(160, detail[2] - lx - 208)
     mode_w = max(132, min(180, available * 30 // 100))
     apply_w = max(54, min(72, available * 14 // 100))
@@ -576,12 +579,22 @@ if hosts_hwnd:
           "hosts enabled checkbox toggles and restores", "%s -> %s -> %s" % (before, after, restored))
     shot(hosts_hwnd, "hosts_detail_styled")
 
+    # ---- raw tab shows the file ---------------------------------------------
+    click_at(hosts_hwnd, 138, 16)  # 原文 tab
+    time.sleep(0.4)
+    raw_txt = get_text(child_by_id(hosts_hwnd, 9))
+    check("host01.example.com" in raw_txt and raw_txt.count("\n") >= 25,
+          "hosts raw tab shows the whole file", repr(raw_txt[:80]))
+    shot(hosts_hwnd, "hosts_raw")
+    click_at(hosts_hwnd, 54, 16)  # back to 条目
+    time.sleep(0.4)
+
 if env_hwnd:
     cw, ch = client_size(env_hwnd)
     layout = mirror_layout(cw, ch)
     combo_h, combo_rc = child_client_rect(env_hwnd, 12)
-    check(combo_rc is not None and combo_rc[1] == layout["delimiter"][1],
-          "layout mirror matches the delimiter combo", str(combo_rc))
+    check(combo_h and not user32.IsWindowVisible(combo_h),
+          "custom delimiter box stays hidden until 自定义… is chosen")
 
     # ---- table scrolling ----------------------------------------------------
     pos0 = list_scroll_pos(env_hwnd)
@@ -615,7 +628,6 @@ if env_hwnd:
     value_edit = child_by_id(env_hwnd, 4)
     check(bool(parts) and user32.IsWindowVisible(parts), "item list shows in list mode")
     check(not user32.IsWindowVisible(value_edit), "raw value box hides in list mode")
-    check(send(combo_h, 0x0146) == 5, "delimiter combo offers five presets", str(send(combo_h, 0x0146)))
     count = send(parts, LB_GETCOUNT)
     check(count == len(PATH_SEGS), "every segment becomes an item", f"{count} != {len(PATH_SEGS)}")
     shot(env_hwnd, "env_list_mode")
@@ -646,22 +658,28 @@ if env_hwnd:
     shot(env_hwnd, "env_part_edited")
 
     # ---- custom delimiter, applied explicitly -------------------------------
-    ced = combo_edit_hwnd(combo_h)
-    check(bool(ced), "delimiter combo exposes its edit", str(ced))
+    # The delimiter is a flat button; its menu posts WM_COMMAND 200..205.
+    # 205 = 自定义… shows the edit box in the button's place.
+    user32.PostMessageW(env_hwnd, WM_COMMAND, 205, 0)
+    time.sleep(0.4)
+    ced = combo_h
+    _, ced_rc = child_client_rect(env_hwnd, 12)
+    check(user32.IsWindowVisible(ced) and ced_rc and ced_rc[1] == layout["delimiter"][1],
+          "自定义… shows the delimiter box in the button slot", str(ced_rc))
     set_text(env_hwnd, ced, 0, "=>", notify=False)
     user32.PostMessageW(ced, WM_KEYDOWN, VK_RETURN, 0)
     time.sleep(0.4)
+    check(not user32.IsWindowVisible(ced), "Enter applies and hides the custom box")
     check(send(parts, LB_GETCOUNT) == 1, "custom delimiter re-splits the whole value",
           str(send(parts, LB_GETCOUNT)))
     check(lb_text(parts, 0) == joined, "delimiter switch keeps the value intact", lb_text(parts, 0))
-    set_text(env_hwnd, ced, 0, ";", notify=False)
-    user32.PostMessageW(ced, WM_KEYDOWN, VK_RETURN, 0)
+    shot(env_hwnd, "env_delimiter_custom")
+    user32.PostMessageW(env_hwnd, WM_COMMAND, 200, 0)  # preset 分号 (;) applies at once
     time.sleep(0.4)
     check(send(parts, LB_GETCOUNT) == len(segs), "delimiter switch back restores the items",
           str(send(parts, LB_GETCOUNT)))
     check(lb_text(parts, target) == typed, "item text survives the delimiter round trip",
           lb_text(parts, target))
-    shot(env_hwnd, "env_delimiter_custom")
 
     # ---- back to raw: the value box must show the rejoined value ------------
     click_at(env_hwnd, *center(layout["modeRaw"]))

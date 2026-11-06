@@ -122,10 +122,11 @@ All data stays local under `WS_DATA_DIR`:
   env write and delete (kept: `backupCount`, default 10).
 - `backups/hosts/<timestamp>.hosts` — verbatim hosts bytes taken before every
   hosts write (kept: `backupCount`).
-- `drafts/editor.json` — unsaved edits in the interactive editor window, written
-  automatically every 30 s and on shutdown/close. Reopening the editor offers to
-  restore from the draft. Only the editor writes drafts; no registry/hosts writes
-  happen here.
+- `drafts/env.json` / `drafts/hosts.json` — unsaved edits in the interactive editor
+  window, written automatically every 30 s and on shutdown/close. Reopening the
+  editor asks Restore / Discard: Restore shows them as unsaved edits (Ctrl+S is
+  still required), Discard deletes the draft file. Only the editor writes drafts;
+  no registry/hosts writes happen here.
 - Nothing is uploaded; no telemetry; secrets/settings are never logged.
 
 ## Failure handling
@@ -170,7 +171,8 @@ All data stays local under `WS_DATA_DIR`:
   The window is resizable and column widths scale with it.
 - **Per-row commands**: `Ins` adds a row (and clears an incompatible filter so
   the new row is visible), `Del` marks a row deleted (press again to restore;
-  an unsaved new row is removed outright), `Enter`/`F2` enters the detail pane,
+  an unsaved new row is removed outright; a marked row shows a red notice in the
+  detail pane and stays read-only until restored), `Enter`/`F2` enters the detail pane,
   `Esc` returns focus to the table, `Ctrl+Z`/`Ctrl+Y` undo/redo. Four buttons on
   the right of the detail pane (`+ Add`, `- Del`, `Undo`, `Redo`) call the same
   commands as the keyboard.
@@ -187,13 +189,19 @@ All data stays local under `WS_DATA_DIR`:
   back to the first row. `Path` is pinned to `;`. `Ctrl+R` again returns to raw text,
   showing the rejoined string. Splitting is always explicit, so the raw value never
   becomes unreachable.
-- **Delimiter**: the combo next to the mode button presets `semicolon / comma /
-  colon / TAB / pipe` and also accepts any character or string you type (`=>`).
-  Nothing re-splits until you press Enter or click `Apply`: the current items are
-  first rejoined with the old delimiter and then split on the new one, so no value
-  is lost. Separators inside `"quoted"` runs are not split points. The mode button,
-  the combo and `Apply` share one flat self-drawn style that stays consistent in the
-  light and dark themes.
+- **Delimiter**: a self-drawn dropdown button next to the mode button (e.g.
+  `Semicolon (;) ▾`). Its menu offers `semicolon / comma / colon / Tab / pipe`,
+  applied as soon as you pick one. `Custom…` swaps the button for a text box that
+  takes any character or string (`=>`), applied with Enter or `Apply` and dropped
+  with `Esc`. Re-splitting first rejoins the items with the old delimiter, so no
+  value is lost. Separators inside `"quoted"` runs are not split points. The mode
+  button, the delimiter button and `Apply` share one flat self-drawn style.
+- **hosts entries tab**: the leading comment block (Microsoft's template text and
+  its `rhino.acme.com` samples) folds into one "file header" row instead of
+  showing up as disabled entries; the Raw tab shows it in full. A line that maps a
+  host name an earlier enabled line already maps gets a red `!` next to its line
+  number and the status bar counts them. Read-only no longer draws a red banner;
+  the status bar says `read-only (needs admin)`.
 - **Reload**: `F5` re-reads from disk and lands on the same row; unsaved edits are
   confirmed before they are dropped. When an external change arrives, a clean window
   reloads itself while a dirty one only shows a warning and keeps your edits.

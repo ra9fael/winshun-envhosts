@@ -181,6 +181,28 @@ the rejoined raw box matches, saving through the shortcut chip writes and reads
 back, the 系统 tab still has its rows, an external write yields Abort with the
 external value intact, and `F5` asks before discarding.
 
+### v0.4.1 fix pass
+
+Root causes found after a desktop review, each fixed in `editor_win.h` /
+`editor_model.h`:
+
+| Symptom | Cause | Fix |
+|---|---|---|
+| User variables could not be edited | `loadModel()` applied a leftover draft silently; that draft had marked `Path` deleted, and `rowEditable()` is false for deleted rows | `offerDraft()` asks 恢复 / 丢弃 once the window is visible (丢弃 deletes the file); a deleted row shows a red notice in the detail pane |
+| Delimiter control looked unlike 原文│分隔项 / 应用 | native `COMBOBOX` with `WS_EX_CLIENTEDGE`; the toolbar row also overlapped 名称/类型 by 2px | self-drawn dropdown button + `TrackPopupMenu` presets (applied at once); `自定义…` shows a flat EDIT in the same slot; toolbar moved to `top+48` |
+| Active 分隔项 cell blank | `Rectangle()` filled with the default white brush over the accent fill | border drawn with `NULL_BRUSH` |
+| Red read-only banner on hosts | duplicated the status line and covered y 30–50 (table top, backup list) | banner only for real errors; status says `只读（需管理员）` |
+| hosts 启用 font | the checkbox never got `WM_SETFONT` | set the UI font; light-theme `WM_CTLCOLORSTATIC` returns the panel brush |
+| hosts samples counted as entries | `# 102.54.94.97 rhino.acme.com` parses as a commented host spec | `findHeaderEnd()` folds a leading comment block that starts with prose into one header row; serialisation copies it byte-exact |
+| Bogus `enable line N` changes | `changeList()` compared section rows' comment state | headings are skipped |
+| Duplicate host names unnoticed | — | `duplicateFlags()` marks later enabled lines `!`; status bar counts them |
+| 原文 tab empty, no column headers | nothing set `m_rawEdit`'s text; `drawHeader()` was never called | raw tab shows `serializeWork()`; header band drawn |
+
+`tests/gui_preview.py` covers the delimiter menu commands (200–205), the hidden
+custom box, the raw tab text and a duplicate line; `test_editor_model.cpp` adds
+the header fold, byte-exact round trip, leading-disabled-entry and old-draft
+re-fold cases (86 checks).
+
 ### Decisions taken (D1–D4)
 
 - **D1** → (a) notify only. On `CreateWindowExW` failure the `openEditor` action
@@ -349,11 +371,11 @@ table below is the authoritative description of each area.
 |---|---|
 | Tabs | 用户 (editable), 系统 (read-only unless D2 is taken; greyed editors), 备份 (list of `backups/env/*.json`, newest first). `showSystemVars=false` hides the 系统 tab. |
 | Table | ListView report mode. Columns 名称 / 类型 / 值 (first line, truncated) / ● dirty marker. Sorted by name, case-insensitive. Filter matches name or value, the same rule as `envMatches`. |
-| Detail pane | Edits the selected row. **List mode** is entered explicitly with `Ctrl+R` or the `原文│分隔项` segment (the value is never split silently, so the raw text always stays reachable); the delimiter comes from a preset-or-free-text combo and only takes effect on `应用 / Apply`. `Path`-named rows default to the `;` delimiter. Otherwise a multi-line Edit. |
+| Detail pane | Edits the selected row. **List mode** is entered explicitly with `Ctrl+R` or the `原文│分隔项` segment (the value is never split silently, so the raw text always stays reachable); the delimiter comes from a preset menu or a custom text box (see "v0.4.1 fix pass" below). `Path`-named rows default to the `;` delimiter. Otherwise a multi-line Edit. |
 | List mode items | One row per segment, in order, with the selected row and the viewport preserved across an in-place edit. `上移 / 下移 / 插入 / 删除` (or `Alt+↑↓`, `Ins`, `Del`) act on that segment only, and `当前项 n / m` reports the position. No expansion or existence marks — those were dropped as v0.1 sketch. |
 | 类型 | REG_SZ / REG_EXPAND_SZ. Auto-switches to EXPAND when `%X%` is typed (same as `envTypeForValue`), but the user can override. REG_MULTI_SZ rows are shown read-only (v0.1 also does not edit them). |
 | Validation | Live, from `isValidEnvName` / `isValidEnvValue`: red border and status text. Save is disabled while any row is invalid. Length counter turns amber above 1024 (a later `setx` by any other tool truncates there) and red above 32767 (the Windows limit for one variable). |
-| New / delete | Ins adds a blank row with the name focused. Del removes the row from the working copy at once; it is undone with `Ctrl+Z`, and nothing reaches the registry until `Ctrl+S`. |
+| New / delete | Ins adds a blank row with the name focused. Del marks the row deleted (red text, `Del 恢复` chip, a red notice in the detail pane); the row stays read-only until Del is pressed again. An unsaved new row is removed outright. Nothing reaches the registry until `Ctrl+S`. |
 
 ---
 
@@ -442,7 +464,7 @@ Re-basing (merge the user's edits onto the new disk state) is out of scope.
 | Esc / ✕ / Alt+F4 | no | Close. |
 | | yes | Dialog: 保存 (S) / 不保存 (N) / 取消 (Esc). Default button 取消. |
 | `shutdown` from host, plugin disabled, WinShun exit | yes | No dialog (the host waits only a short time). Write `work` as a draft to `WS_DATA_DIR/drafts/<kind>.json`, close, join. Never write to the registry or hosts. |
-| Next open with a draft present | — | Banner `有上次未保存的修改（2026-11-05 23:10）[恢复] [丢弃]`. Restore applies the draft as unsaved edits on top of a fresh read. Rows changed on disk since then are flagged as conflicts. |
+| Next open with a draft present | — | Dialog `发现上次未保存的修改（N 项）` with 是 (restore) / 否 (discard, deletes the file). Restore applies the draft as unsaved edits on top of a fresh read. Never applied silently. |
 | Process killed (crash, job end) | yes | Lost. Drafts are also autosaved every 30 s while dirty, so at most 30 s of edits are lost. |
 
 ### 6.5 Backups tab

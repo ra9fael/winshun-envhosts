@@ -120,11 +120,11 @@ public:
         }
         m_editFont = makeFont(13, false, L"Microsoft YaHei UI", DEFAULT_PITCH | FF_DONTCARE);
         createControls();
-        attachDelimiterCombo();
         applyLayout();
         selectRow(0);
         ShowWindow(m_hwnd, SW_SHOWNORMAL);
         UpdateWindow(m_hwnd);
+        offerDraft();
         SetTimer(m_hwnd, kTimerDraft, 30000, nullptr);
 
         MSG msg;
@@ -233,15 +233,18 @@ private:
     bool m_extChanged = false;
     bool m_dark = false;
     bool m_loading = false; // suppress EN_CHANGE while refreshDetail fills controls
+    winshun::Json m_pendingDraft; // leftover draft awaiting the restore prompt
 
     // controls
     HWND m_filterEdit = nullptr;
     HWND m_nameEdit = nullptr, m_typeEdit = nullptr, m_valueEdit = nullptr, m_partsList = nullptr, m_partEdit = nullptr;
-    HWND m_delimCombo = nullptr, m_delimEdit = nullptr;
+    HWND m_delimEdit = nullptr; // custom-delimiter box, visible only while m_delimCustom
+    bool m_delimCustom = false;
+    std::string m_pendingDelim; // a preset picked from the menu, applied immediately
     HWND m_enabledChk = nullptr, m_ipEdit = nullptr, m_hostEdit = nullptr, m_commentEdit = nullptr;
     HWND m_rawEdit = nullptr;
     HFONT m_editFont = nullptr;
-    HBRUSH m_darkBgBrush = nullptr, m_darkFieldBrush = nullptr;
+    HBRUSH m_darkBgBrush = nullptr, m_darkFieldBrush = nullptr, m_lightPanelBrush = nullptr;
     int m_hover = 0;
 
     // Scrolling: m_topRow indexes m_visible (or m_backupIds on the backup tab).
@@ -342,13 +345,6 @@ private:
             const envh::native::EnvReadResult r = store.read(m_args.showSystem);
             m_env = envh::edit::EnvModel::fromSnapshot(r.snap);
             m_hasEnv = true;
-            // Auto-restore a leftover draft from a previous dirty close.
-            const std::string draft = readDraft();
-            if (!draft.empty()) {
-                const auto j = winshun::Json::parse(draft);
-                if (j && !j->isNull())
-                    loadDraft(*j, /*markDirty=*/true);
-            }
         } else {
             envh::native::HostsStore store(m_args.hostsPath);
             const envh::native::HostsReadResult r = store.read();
@@ -361,12 +357,15 @@ private:
                 m_hosts = envh::edit::HostsModel::fromParsed(p, crlf);
                 m_hasHosts = true;
             }
-            const std::string draft = readDraft();
-            if (!draft.empty()) {
-                const auto j = winshun::Json::parse(draft);
-                if (j && !j->isNull())
-                    loadDraft(*j, /*markDirty=*/true);
-            }
+        }
+        // A leftover draft from a previous dirty close is NOT applied silently:
+        // restoring it unseen made rows look locked (e.g. a draft that had
+        // marked Path deleted). offerDraft() asks once the window is visible.
+        const std::string draft = readDraft();
+        if (!draft.empty()) {
+            const auto j = winshun::Json::parse(draft);
+            if (j && !j->isNull())
+                m_pendingDraft = *j;
         }
         // The model holds rows, but the view indexes them through m_visible.
         // Without this the table is permanently empty.
@@ -381,6 +380,44 @@ private:
             m_hosts.fromDraft(d);
         (void)markDirty; // fromDraft makes work differ from base => dirty
         rebuildVisible();
+    }
+
+    // Ask whether to restore the leftover draft. Yes applies it as unsaved
+    // edits; No deletes the file so it is not offered again.
+    void offerDraft()
+    {
+        if (m_pendingDraft.isNull())
+            return;
+        winshun::Json d = m_pendingDraft;
+        m_pendingDraft = winshun::Json();
+        std::size_t n = 0;
+        if (m_kind == "env") {
+            envh::edit::EnvModel probe = m_env;
+            probe.fromDraft(d);
+            n = probe.changeList().size();
+        } else {
+            envh::edit::HostsModel probe = m_hosts;
+            probe.fromDraft(d);
+            n = probe.changeList().size();
+        }
+        if (n == 0) {
+            clearDraft();
+            return;
+        }
+        const std::string msg = m_args.zh
+            ? "发现上次未保存的修改（" + std::to_string(n) + " 项）。\n\n是：恢复这些修改（仍需 Ctrl+S 保存）\n否：丢弃草稿"
+            : "Found " + std::to_string(n) + " unsaved change(s) from last time.\n\nYes: restore them (Ctrl+S still required)\nNo: discard the draft";
+        const int r = MessageBoxW(m_hwnd, wideFromUtf8(msg).c_str(),
+                                  wideFromUtf8(m_args.zh ? "恢复草稿" : "Restore draft").c_str(),
+                                  MB_YESNO | MB_ICONQUESTION);
+        if (r == IDYES) {
+            loadDraft(d, /*markDirty=*/true);
+            selectRow(0);
+            setStatus(m_args.zh ? "已恢复草稿，按 Ctrl+S 保存" : "Draft restored; Ctrl+S to save", 1);
+        } else {
+            clearDraft();
+        }
+        InvalidateRect(m_hwnd, nullptr, TRUE);
     }
 
     std::string readDraft()
@@ -595,7 +632,7 @@ private:
     {
         std::vector<HWND> chain;
         if (m_kind == "env")
-            chain = {m_nameEdit, m_typeEdit, m_delimCombo, m_valueEdit, m_partsList, m_partEdit};
+            chain = {m_nameEdit, m_typeEdit, m_delimEdit, m_valueEdit, m_partsList, m_partEdit};
         else
             chain = {m_enabledChk, m_ipEdit, m_hostEdit, m_commentEdit, m_rawEdit};
         std::vector<HWND> visibleFields;
@@ -751,18 +788,23 @@ private:
                                      reinterpret_cast<HMENU>(10), GetModuleHandleW(nullptr), nullptr);
         if (m_partsList && m_editFont)
             SendMessageW(m_partsList, WM_SETFONT, reinterpret_cast<WPARAM>(m_editFont), TRUE);
-        m_delimCombo = CreateWindowExW(WS_EX_CLIENTEDGE, L"COMBOBOX", L"",
-                                       es | CBS_DROPDOWN | CBS_AUTOHSCROLL | CBS_HASSTRINGS,
-                                       0, 0, 10, 240, m_hwnd,
-                                       reinterpret_cast<HMENU>(12), GetModuleHandleW(nullptr), nullptr);
-        if (m_delimCombo && m_editFont)
-            SendMessageW(m_delimCombo, WM_SETFONT, reinterpret_cast<WPARAM>(m_editFont), TRUE);
+        // The delimiter is a self-drawn dropdown button (painted like 应用 and
+        // the mode segment). This flat EDIT only appears for "自定义…".
+        m_delimEdit = CreateWindowExW(0, L"EDIT", L"", es | WS_BORDER | ES_AUTOHSCROLL,
+                                      0, 0, 10, 20, m_hwnd,
+                                      reinterpret_cast<HMENU>(12), GetModuleHandleW(nullptr), nullptr);
+        if (m_delimEdit && m_editFont)
+            SendMessageW(m_delimEdit, WM_SETFONT, reinterpret_cast<WPARAM>(m_editFont), TRUE);
+        subclassEdit(m_delimEdit);
         m_partEdit = makeEdit(es | ES_AUTOHSCROLL, 11);
         subclassEdit(m_partsList);
         // hosts detail
         m_enabledChk = CreateWindowExW(0, L"BUTTON", m_args.zh ? L"启用" : L"Enabled",
                                        WS_CHILD | WS_TABSTOP | BS_AUTOCHECKBOX, 0, 0, 16, 16,
                                        m_hwnd, reinterpret_cast<HMENU>(5), GetModuleHandleW(nullptr), nullptr);
+        // Without WM_SETFONT a BUTTON keeps the bold bitmap System font.
+        if (m_enabledChk && m_editFont)
+            SendMessageW(m_enabledChk, WM_SETFONT, reinterpret_cast<WPARAM>(m_editFont), TRUE);
         subclassEdit(m_enabledChk);
         m_ipEdit = makeEdit(es, 6);
         m_hostEdit = makeEdit(es, 7);
@@ -831,7 +873,7 @@ private:
         // visual band as the existing action buttons.
         const int lx = m_rcDetail.left + 4;
         const int modeH = 22;
-        const int modeTop = m_rcDetail.top + 40;
+        const int modeTop = m_rcDetail.top + 48; // below the name/type row (top+20..42)
         const int available = std::max(160, static_cast<int>(m_rcDetail.right) - lx - 208);
         const int modeW = std::max(132, std::min(180, available * 30 / 100));
         const int applyW = std::max(54, std::min(72, available * 14 / 100));
@@ -1010,9 +1052,26 @@ private:
         const bool raw = (m_kind == "hosts" && m_tab == 1);
         if (m_rawEdit) {
             ShowWindow(m_rawEdit, raw ? SW_SHOW : SW_HIDE);
-            if (raw)
+            if (raw) {
                 MoveWindow(m_rawEdit, m_rcTable.left, m_rcTable.top,
                            m_rcTable.right - m_rcTable.left, m_rcTable.bottom - m_rcTable.top, TRUE);
+                // Nothing filled this box before, so the Raw tab was always
+                // blank. Show the file as it would be written now (unsaved
+                // edits included); a multi-line EDIT needs CRLF to break lines.
+                std::string text = m_hasHosts ? m_hosts.serializeWork() : std::string {};
+                if (text.size() >= 3 && static_cast<unsigned char>(text[0]) == 0xEF)
+                    text.erase(0, 3);
+                std::string crlf;
+                crlf.reserve(text.size() + text.size() / 16);
+                for (std::size_t i = 0; i < text.size(); ++i) {
+                    if (text[i] == '\n' && (i == 0 || text[i - 1] != '\r'))
+                        crlf += '\r';
+                    crlf += text[i];
+                }
+                m_loading = true;
+                SetWindowTextW(m_rawEdit, wideFromUtf8(crlf).c_str());
+                m_loading = false;
+            }
         }
         if (m_partsList) {
             ShowWindow(m_partsList, SW_HIDE);
@@ -1021,8 +1080,8 @@ private:
         }
         if (m_partEdit)
             ShowWindow(m_partEdit, m_kind == "env" && m_listMode && showDetail && !raw ? SW_SHOW : SW_HIDE);
-        if (m_delimCombo)
-            ShowWindow(m_delimCombo, m_kind == "env" && showDetail && !raw ? SW_SHOW : SW_HIDE);
+        if (m_delimEdit)
+            ShowWindow(m_delimEdit, m_kind == "env" && showDetail && !raw && m_delimCustom ? SW_SHOW : SW_HIDE);
         if (!showDetail || raw) {
             if (m_partsList) ShowWindow(m_partsList, SW_HIDE);
             if (m_partEdit) ShowWindow(m_partEdit, SW_HIDE);
@@ -1031,24 +1090,28 @@ private:
                     ShowWindow(e, SW_HIDE);
             return;
         }
-        // Label row 1 is painted at top+2; editable controls live at top+20.
-        // The mode/delimiter toolbar is at top+40, labels at top+64 and the
-        // value/item area starts at top+78.
+        // Label row 1 is painted at top+2; editable controls live at top+20..42.
+        // The mode/delimiter toolbar is at top+48, labels at top+74 and the
+        // value/item area starts at top+90.
         const int lx = m_rcDetail.left + 4;
         const int top = m_rcDetail.top + 20;
-        const int valTop = m_rcDetail.top + 78;
+        const int valTop = m_rcDetail.top + 90;
         const int rowW = m_rcDetail.right - lx - 4 - 200; // reserve the action buttons
         const int valueW = m_rcDetail.right - lx - 4;
         const int valueH = std::max(60, static_cast<int>(m_rcDetail.bottom - valTop - 6));
         if (m_kind == "env") {
             show(m_nameEdit, lx, top, rowW / 2 - 6, 22);
             show(m_typeEdit, lx + rowW / 2 + 4, top, rowW / 2 - 6, 22);
-            if (m_delimCombo) {
-                ShowWindow(m_delimCombo, SW_SHOW);
-                MoveWindow(m_delimCombo, m_rcDelimiter.left, m_rcDelimiter.top,
-                           m_rcDelimiter.right - m_rcDelimiter.left,
-                           m_rcDelimiter.bottom - m_rcDelimiter.top + 220, TRUE);
-                EnableWindow(m_delimCombo, m_listMode && rowEditable(m_sel));
+            if (m_delimEdit) {
+                if (m_delimCustom && m_listMode && rowEditable(m_sel)) {
+                    ShowWindow(m_delimEdit, SW_SHOW);
+                    MoveWindow(m_delimEdit, m_rcDelimiter.left, m_rcDelimiter.top,
+                               m_rcDelimiter.right - m_rcDelimiter.left,
+                               m_rcDelimiter.bottom - m_rcDelimiter.top, TRUE);
+                } else {
+                    m_delimCustom = false;
+                    ShowWindow(m_delimEdit, SW_HIDE);
+                }
             }
             if (m_listMode) {
                 if (m_valueEdit)
@@ -1119,18 +1182,50 @@ private:
             {"|", L"竖线 (|)", L"Pipe (|)"}};
         return kPresets;
     }
-    void attachDelimiterCombo()
+    // Preset menu for the delimiter button. Picking a preset applies it at
+    // once (choosing from a menu is already explicit); 自定义… swaps the button
+    // for an edit box that is applied with Enter or 应用 and dropped with Esc.
+    static constexpr UINT kCmdDelimPreset = 200; // 200..204, then custom
+    static constexpr UINT kCmdDelimCustom = 205;
+    void showDelimiterMenu()
     {
-        if (!m_delimCombo)
+        HMENU m = CreatePopupMenu();
+        if (!m)
             return;
-        SendMessageW(m_delimCombo, CB_RESETCONTENT, 0, 0);
-        for (const auto& p : delimiterPresetItems())
-            SendMessageW(m_delimCombo, CB_ADDSTRING, 0, reinterpret_cast<LPARAM>(m_args.zh ? p.zhLabel : p.enLabel));
-        COMBOBOXINFO info {};
-        info.cbSize = sizeof(info);
-        if (SendMessageW(m_delimCombo, CB_GETCOMBOBOXINFO, 0, reinterpret_cast<LPARAM>(&info)) == TRUE) {
-            m_delimEdit = info.hwndItem;
-            subclassEdit(m_delimEdit);
+        const auto& ps = delimiterPresetItems();
+        for (std::size_t i = 0; i < ps.size(); ++i)
+            AppendMenuW(m, MF_STRING | (ps[i].value == m_listDelimiter ? MF_CHECKED : 0),
+                        kCmdDelimPreset + i, m_args.zh ? ps[i].zhLabel : ps[i].enLabel);
+        AppendMenuW(m, MF_SEPARATOR, 0, nullptr);
+        bool custom = true;
+        for (const auto& p : ps)
+            if (p.value == m_listDelimiter)
+                custom = false;
+        AppendMenuW(m, MF_STRING | (custom ? MF_CHECKED : 0), kCmdDelimCustom,
+                    m_args.zh ? L"自定义…" : L"Custom…");
+        POINT pt {m_rcDelimiter.left, m_rcDelimiter.bottom};
+        ClientToScreen(m_hwnd, &pt);
+        TrackPopupMenu(m, TPM_LEFTALIGN | TPM_TOPALIGN | TPM_LEFTBUTTON, pt.x, pt.y, 0, m_hwnd, nullptr);
+        DestroyMenu(m);
+    }
+    void onDelimiterCommand(UINT id)
+    {
+        const auto& ps = delimiterPresetItems();
+        if (id >= kCmdDelimPreset && id < kCmdDelimPreset + ps.size()) {
+            m_delimCustom = false;
+            m_pendingDelim = ps[id - kCmdDelimPreset].value;
+            applyDelimiter();
+            return;
+        }
+        if (id == kCmdDelimCustom) {
+            m_delimCustom = true;
+            applyLayout();
+            m_loading = true;
+            SetWindowTextW(m_delimEdit, wideFromUtf8(m_listDelimiter == "\t" ? std::string {} : m_listDelimiter).c_str());
+            m_loading = false;
+            SetFocus(m_delimEdit);
+            SendMessageW(m_delimEdit, EM_SETSEL, 0, -1);
+            InvalidateRect(m_hwnd, nullptr, TRUE);
         }
     }
     std::string delimiterValueForText(const std::string& text) const
@@ -1149,29 +1244,30 @@ private:
                 return m_args.zh ? p.zhLabel : p.enLabel;
         return wideFromUtf8(value);
     }
-    std::string currentDelimiterText() const
-    {
-        if (m_delimEdit)
-            return getEdit(m_delimEdit);
-        return {};
-    }
     std::string pendingDelimiterValue() const
     {
-        return delimiterValueForText(currentDelimiterText());
+        if (!m_pendingDelim.empty())
+            return m_pendingDelim;
+        if (m_delimCustom && m_delimEdit)
+            return delimiterValueForText(getEdit(m_delimEdit));
+        return m_listDelimiter;
     }
     bool delimiterApplyEnabled() const
     {
         const std::string next = pendingDelimiterValue();
         return m_kind == "env" && m_listMode && rowEditable(m_sel) && !next.empty() && next != m_listDelimiter;
     }
+    // Leave custom mode and show the applied delimiter on the button again.
     void syncDelimiterComboText()
     {
-        if (!m_delimCombo || !m_delimEdit)
-            return;
-        m_loading = true;
-        SendMessageW(m_delimCombo, CB_SETCURSEL, -1, 0);
-        SetWindowTextW(m_delimEdit, delimiterTextForValue(m_listDelimiter).c_str());
-        m_loading = false;
+        m_pendingDelim.clear();
+        if (m_delimCustom) {
+            m_delimCustom = false;
+            if (m_delimEdit)
+                ShowWindow(m_delimEdit, SW_HIDE);
+        }
+        if (m_hwnd)
+            InvalidateRect(m_hwnd, nullptr, FALSE);
     }
     std::string delimiterKey() const
     {
@@ -1445,6 +1541,10 @@ private:
             InvalidateRect(m_hwnd, nullptr, TRUE);
         }
         commitDetail();
+        if (m_delimCustom)
+            syncDelimiterComboText();
+        m_pendingDelim.clear();
+        SetFocus(m_hwnd);
         setStatus(m_args.zh ? "分隔符: " + delimiterLabel() : "delimiter: " + delimiterLabel(), 0);
     }
 
@@ -1660,23 +1760,25 @@ private:
             SetTextColor(mem, fg);
         }
 
-        // read-only / error banner
-        if ((m_kind == "hosts" && !m_args.writable) || !m_errorBanner().empty()) {
+        // error banner (hosts read-only is reported in the status line instead)
+        if (!m_errorBanner().empty()) {
             RECT b {0, 30, w, 50};
             HBRUSH bb = CreateSolidBrush(RGB(120, 60, 60));
             FillRect(mem, &b, bb);
             DeleteObject(bb);
             SetTextColor(mem, errFg);
-            std::wstring msg = wideFromUtf8(m_kind == "hosts" && !m_args.writable
-                                               ? (m_args.zh ? "只读：当前没有写权限，无法保存"
-                                                            : "Read-only: no write permission")
-                                               : m_errorBanner());
+            std::wstring msg = wideFromUtf8(m_errorBanner());
             RECT bt = b; bt.left += 10;
             DrawTextW(mem, msg.c_str(), -1, &bt, DT_LEFT | DT_VCENTER | DT_SINGLELINE);
         }
 
         // ---- table: header band, column separators, rows ----
         if (m_tab != 2) {
+            // The column header band was reserved (m_headerH) but never drawn,
+            // leaving an unexplained empty strip above the first row.
+            HGDIOBJ ohf = SelectObject(mem, smallFont);
+            drawHeader(mem, fg, dim);
+            SelectObject(mem, ohf);
             HGDIOBJ of = SelectObject(mem, monoFont);
             int y = m_rcTable.top + m_headerH;
             if (m_visible.empty()) {
@@ -1745,14 +1847,25 @@ private:
             if (m_kind == "env") {
                 RECT a {lx, m_rcDetail.top + 2, lx + dw / 2 - 6, m_rcDetail.top + 18};
                 RECT b {lx + dw / 2 + 4, a.top, m_rcDetail.right - 4, a.bottom};
-                RECT valueLabel {lx, m_rcDetail.top + 62, m_rcDetail.right - 4, m_rcDetail.top + 76};
+                RECT valueLabel {lx, m_rcDetail.top + 74, m_rcDetail.right - 4, m_rcDetail.top + 88};
                 DrawTextW(mem, m_args.zh ? L"名称" : L"Name", -1, &a, DT_LEFT | DT_SINGLELINE);
                 DrawTextW(mem, m_args.zh ? L"类型" : L"Type", -1, &b, DT_LEFT | DT_SINGLELINE);
-                DrawTextW(mem,
-                          m_listMode ? (m_args.zh ? L"分隔项 · Ins 增加 · Del 删除 · Alt+↑↓ 移动 · Ctrl+R 原文"
-                                                  : L"Items · Ins add · Del remove · Alt+Up/Down move · Ctrl+R raw")
-                                     : (m_args.zh ? L"原文 · Ctrl+R 分隔项" : L"Raw value · Ctrl+R items"),
-                          -1, &valueLabel, DT_LEFT | DT_SINGLELINE | DT_END_ELLIPSIS);
+                if (currentRowDeleted()) {
+                    // A deleted row is read-only until restored; say so instead
+                    // of leaving greyed controls unexplained.
+                    SetTextColor(mem, m_dark ? RGB(230, 130, 130) : RGB(170, 50, 50));
+                    DrawTextW(mem,
+                              m_args.zh ? L"已标记删除：保存时会从注册表移除 · 按 Del 恢复后才能编辑"
+                                        : L"Marked deleted: removed from the registry on save · press Del to restore and edit",
+                              -1, &valueLabel, DT_LEFT | DT_SINGLELINE | DT_END_ELLIPSIS);
+                    SetTextColor(mem, dim);
+                } else {
+                    DrawTextW(mem,
+                              m_listMode ? (m_args.zh ? L"分隔项 · Ins 增加 · Del 删除 · Alt+↑↓ 移动 · Ctrl+R 原文"
+                                                      : L"Items · Ins add · Del remove · Alt+Up/Down move · Ctrl+R raw")
+                                         : (m_args.zh ? L"原文 · Ctrl+R 分隔项" : L"Raw value · Ctrl+R items"),
+                              -1, &valueLabel, DT_LEFT | DT_SINGLELINE | DT_END_ELLIPSIS);
+                }
             } else {
                 SetTextColor(mem, fg);
                 RECT title = m_rcHostTitle;
@@ -1793,6 +1906,21 @@ private:
             drawModeSegment(mem, smallFont, fg, dim);
             const bool enabled = m_listMode && rowEditable(m_sel);
             const bool pending = enabled && delimiterApplyEnabled();
+            if (!m_delimCustom) {
+                // Same flat style as 应用 / the mode segment: label + caret.
+                const std::wstring label = delimiterTextForValue(m_listDelimiter);
+                drawFlatButton(mem, smallFont, m_rcDelimiter, L"", enabled, false, kFlatDelim, fg, dim);
+                RECT lt = m_rcDelimiter;
+                lt.left += 10;
+                lt.right -= 22;
+                SetTextColor(mem, enabled ? fg : dim);
+                HGDIOBJ odf = SelectObject(mem, smallFont);
+                DrawTextW(mem, label.c_str(), -1, &lt, DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_END_ELLIPSIS | DT_NOPREFIX);
+                RECT ct = m_rcDelimiter;
+                ct.left = ct.right - 22;
+                DrawTextW(mem, L"▾", -1, &ct, DT_CENTER | DT_VCENTER | DT_SINGLELINE);
+                SelectObject(mem, odf);
+            }
             drawFlatButton(mem, smallFont, m_rcApply,
                            m_args.zh ? L"应用" : L"Apply", enabled, pending, 30, fg, dim);
             RECT hint = m_rcItemHint;
@@ -1895,7 +2023,14 @@ private:
             s += zh ? " · 外部已修改" : " · external change";
         s += m_kind == "env"
                  ? (zh ? " · 用户可写 / 系统只读" : " · user writable / system read-only")
-                 : (m_args.writable ? (zh ? " · 可写" : " · writable") : (zh ? " · 只读" : " · read-only"));
+                 : (m_args.writable ? (zh ? " · 可写" : " · writable")
+                                    : (zh ? " · 只读（需管理员）" : " · read-only (needs admin)"));
+        if (m_kind == "hosts") {
+            const std::size_t dup = m_hosts.duplicateCount();
+            if (dup > 0)
+                s += zh ? " · " + std::to_string(dup) + " 行主机名重复（!）"
+                        : " · " + std::to_string(dup) + " duplicate host line(s) (!)";
+        }
         return s;
     }
 
@@ -1933,6 +2068,7 @@ private:
         kFlatModeRaw = 10,
         kFlatModeList = 11,
         kFlatApply = 30,
+        kFlatDelim = 31,
         kFlatPartUp = 41,
         kFlatPartDown = 42,
         kFlatPartInsert = 43,
@@ -1952,6 +2088,8 @@ private:
             return kFlatModeList;
         if (delimiterApplyEnabled() && rectHasPoint(m_rcApply, p))
             return kFlatApply;
+        if (!m_delimCustom && m_listMode && rowEditable(m_sel) && rectHasPoint(m_rcDelimiter, p))
+            return kFlatDelim;
         if (!m_listMode)
             return 0;
         if (rectHasPoint(m_rcPartUp, p) && rowEditable(m_sel) && m_partSel > 0)
@@ -1987,7 +2125,11 @@ private:
                                       ? (active ? accentEdge() : (m_dark ? RGB(90, 98, 110) : RGB(176, 188, 202)))
                                       : (m_dark ? RGB(60, 64, 70) : RGB(220, 222, 226)));
         HGDIOBJ old = SelectObject(dc, p);
+        // Rectangle() fills with the selected brush (white by default), which
+        // used to wipe the accent fill and leave white text on white.
+        HGDIOBJ oldBrush = SelectObject(dc, GetStockObject(NULL_BRUSH));
         Rectangle(dc, r.left, r.top, r.right, r.bottom);
+        SelectObject(dc, oldBrush);
         SelectObject(dc, old);
         DeleteObject(p);
         SetBkMode(dc, TRANSPARENT);
@@ -2128,7 +2270,13 @@ private:
                 DeleteObject(hb);
                 RECT sr {row.left + 8, row.top, row.right - 8, row.bottom};
                 SetTextColor(dc, m_dark ? RGB(130, 136, 144) : RGB(110, 110, 110));
-                DrawTextW(dc, wideFromUtf8(r.sectionText).c_str(), -1, &sr,
+                std::wstring text = wideFromUtf8(r.sectionText);
+                if (r.isHeader) {
+                    const std::string span = std::to_string(r.origin + 1) + "–" + std::to_string(m_hosts.headerEnd() + 1);
+                    text = wideFromUtf8(m_args.zh ? "▸ 文件头注释（第 " + span + " 行，完整内容见“原文”页）"
+                                                  : "▸ File header comments (lines " + span + "; see the Raw tab)");
+                }
+                DrawTextW(dc, text.c_str(), -1, &sr,
                           DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_END_ELLIPSIS | DT_NOPREFIX);
             } else {
                 drawCell(dc, r.commented ? "[ ]" : "[x]", 0, row, c);
@@ -2136,6 +2284,14 @@ private:
                 drawCell(dc, join(r.hostnames), 2, row, c);
                 drawCell(dc, r.comment, 3, row, c);
                 drawCell(dc, std::to_string(r.origin + 1), 4, row, c);
+                const auto dup = m_hosts.duplicateFlags();
+                if (static_cast<std::size_t>(m_visible[v]) < dup.size() && dup[m_visible[v]]) {
+                    // A later line for an already-mapped host name is ignored
+                    // by Windows; flag it at the right edge of the line column.
+                    RECT mr {m_colX[5] - 22, row.top, m_colX[5] - 6, row.bottom};
+                    SetTextColor(dc, removed);
+                    DrawTextW(dc, L"!", -1, &mr, DT_RIGHT | DT_VCENTER | DT_SINGLELINE);
+                }
             }
         }
     }
@@ -2568,8 +2724,19 @@ private:
         case WM_CTLCOLOREDIT:
         case WM_CTLCOLORLISTBOX:
         case WM_CTLCOLORBTN: {
-            if (!m_dark)
+            if (!m_dark) {
+                // The checkbox sits on the light-grey detail panel; the default
+                // brush painted a white/grey block behind "启用".
+                if (msg == WM_CTLCOLORSTATIC && reinterpret_cast<HWND>(lp) == m_enabledChk) {
+                    if (!m_lightPanelBrush)
+                        m_lightPanelBrush = CreateSolidBrush(RGB(246, 248, 251));
+                    HDC dc = reinterpret_cast<HDC>(wp);
+                    SetBkColor(dc, RGB(246, 248, 251));
+                    SetTextColor(dc, RGB(32, 39, 51));
+                    return reinterpret_cast<LRESULT>(m_lightPanelBrush);
+                }
                 return DefWindowProcW(m_hwnd, msg, wp, lp);
+            }
             HDC dc = reinterpret_cast<HDC>(wp);
             const HWND h = reinterpret_cast<HWND>(lp);
             const bool fieldLike = msg == WM_CTLCOLOREDIT || msg == WM_CTLCOLORLISTBOX || h == m_rawEdit;
@@ -2583,6 +2750,14 @@ private:
             return reinterpret_cast<LRESULT>(fieldLike ? m_darkFieldBrush : m_darkBgBrush);
         }
         case WM_COMMAND:
+            if (HIWORD(wp) == 0 && lp == 0 && LOWORD(wp) >= kCmdDelimPreset && LOWORD(wp) <= kCmdDelimCustom) {
+                onDelimiterCommand(LOWORD(wp));
+                return 0;
+            }
+            if (HIWORD(wp) == EN_CHANGE && reinterpret_cast<HWND>(lp) == m_delimEdit) {
+                InvalidateRect(m_hwnd, &m_rcApply, FALSE); // 应用 enables as you type
+                return 0;
+            }
             if (HIWORD(wp) == BN_CLICKED && reinterpret_cast<HWND>(lp) == m_enabledChk
                 && !m_loading && !m_visible.empty() && rowEditable(m_sel)) {
                 const int index = m_visible[m_sel];
@@ -2659,6 +2834,10 @@ private:
             }
             if (flat == kFlatApply) {
                 applyDelimiter();
+                return 0;
+            }
+            if (flat == kFlatDelim) {
+                showDelimiterMenu();
                 return 0;
             }
             if (flat == kFlatPartUp) {

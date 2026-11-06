@@ -30,6 +30,11 @@ single source of truth; release tags are `v<version>`.
   button that came with this is superseded by the combo above.)
 
 ### Changed
+- The delimiter is a self-drawn dropdown button with a preset menu instead of a
+  native combo; picking a preset applies it at once, and `自定义…` opens a text box
+  in its place that is applied with Enter / `应用`.
+- hosts read-only is reported only in the status bar (`只读（需管理员）`); the red
+  banner, which also covered the top of the table and the backup list, is gone.
 - The mode toggle, the delimiter combo and `应用` share one flat self-drawn style on
   one row and follow the dark theme; the env detail pane's minimum height is 200px.
 - An external user-scope change at save time now offers 中止 / 重试 / 忽略 (abort
@@ -44,6 +49,20 @@ single source of truth; release tags are `v<version>`.
   use Win顺's real English UI labels. No runtime change.
 
 ### Fixed
+- A leftover draft is no longer applied silently when the window opens. A draft
+  that had marked the user `Path` deleted made the row look locked: greyed fields,
+  no delimiter, no item buttons. The window now asks 恢复 / 丢弃, and a row marked
+  deleted shows a red notice in the detail pane.
+- hosts parsing: the leading comment block is folded into one header row, so the
+  Microsoft template's two sample lines are no longer counted as disabled entries;
+  section headings no longer report a bogus `enable line N` change; a later
+  enabled line for an already-mapped host name is flagged `!`.
+- The hosts 原文 tab was always empty; it now shows the file as it would be saved.
+- The column header band of both tables was reserved but never drawn.
+- The hosts 启用 checkbox used the bold bitmap System font on a grey block.
+- Flat buttons drew `Rectangle()` with the default white brush over their fill,
+  so the active 分隔项 cell showed white text on white.
+- The env mode/delimiter row overlapped the 名称/类型 fields by 2px.
 - Selecting or editing a delimited item no longer scrolls the item list back to its
   first row; the in-place update keeps both the selection and the viewport.
 - Saving no longer fails with a false `外部已修改，已取消保存`. The conflict check
