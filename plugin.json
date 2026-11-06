@@ -13,6 +13,7 @@
   },
   "author": "ra9fael",
   "license": "MIT",
+  "minWinShun": "0.19.0",
   "runtime": {
     "mode": "resident",
     "program": "envhosts.exe",
@@ -24,6 +25,7 @@
     "encoding": "utf-8"
   },
   "permissions": [
+    "elevated",
     "ui",
     "clipboard:write",
     {

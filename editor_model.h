@@ -237,12 +237,12 @@ public:
         return out;
     }
 
-    // Validation: any invalid name/value blocks save. System rows are read-only
-    // and ignored (cannot be edited in the window anyway).
-    bool hasInvalid() const
+    // Validation: any invalid name/value blocks save. System rows only count
+    // when this window can write them (the plugin runs elevated).
+    bool hasInvalid(bool systemWritable = false) const
     {
         for (const EnvVarRow& r : rows) {
-            if (r.deleted || r.scope == "system")
+            if (r.deleted || (r.scope == "system" && !systemWritable))
                 continue;
             if (r.name.empty() || !isValidEnvName(r.name))
                 return true;
@@ -252,39 +252,35 @@ public:
         return false;
     }
 
-    // Produce the user-scope delta a save would apply.
-    struct Delta {
-        std::vector<EnvVarRow> toWrite; // user scope only
-        std::vector<std::string> toDelete; // user-scope names
+    // Produce the delta a save would apply. User scope always; system scope
+    // only when `systemWritable` (otherwise its rows are read-only anyway).
+    struct Delete {
+        std::string scope;
+        std::string name;
     };
-    Delta delta() const
+    struct Delta {
+        std::vector<EnvVarRow> toWrite; // each row carries its own scope
+        std::vector<Delete> toDelete;
+    };
+    Delta delta(bool systemWritable = false) const
     {
         Delta d;
         for (const EnvVarRow& r : rows) {
-            if (r.scope != "user")
+            if (r.scope != "user" && !(systemWritable && r.scope == "system"))
                 continue;
             if (r.deleted) {
                 if (!r.isNew)
-                    d.toDelete.push_back(r.name);
+                    d.toDelete.push_back({r.scope, r.name});
                 continue;
             }
-            bool inBase = false;
+            const EnvVarRow* bptr = nullptr;
             for (const EnvVarRow& b : base)
-                if (toLower(r.name) == toLower(b.name) && b.scope == "user")
-                    inBase = true;
-            if (!inBase || r.isNew) {
+                if (toLower(r.name) == toLower(b.name) && b.scope == r.scope) {
+                    bptr = &b;
+                    break;
+                }
+            if (!bptr || r.isNew || bptr->value != r.value || bptr->type != r.type)
                 d.toWrite.push_back(r);
-            } else {
-                // only rewrite if actually changed
-                const EnvVarRow* bptr = nullptr;
-                for (const EnvVarRow& b : base)
-                    if (toLower(r.name) == toLower(b.name) && b.scope == "user") {
-                        bptr = &b;
-                        break;
-                    }
-                if (!bptr || bptr->value != r.value || bptr->type != r.type)
-                    d.toWrite.push_back(r);
-            }
         }
         return d;
     }

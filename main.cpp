@@ -356,6 +356,10 @@ struct EnvHosts : winshun::Plugin {
         envh::native::EnvStore store(testUserSubkey(), testSystemSubkey());
         const envh::native::EnvReadResult r = store.read(st.showSystem);
         const std::map<std::string, std::string> lookup = envh::envLookup(r.snap);
+        // Elevated plugin (Plan A): system-scope rows are writable too, so the
+        // per-row lock hint must follow a real probe, not the scope name.
+        std::string sysWerr;
+        const bool sysWritable = store.canWriteSystem(sysWerr);
 
         if (pq.kind == envh::CmdKind::EnvSet || pq.kind == envh::CmdKind::EnvNew) {
             const std::string name = pq.kind == envh::CmdKind::EnvNew ? "" : pq.name;
@@ -412,7 +416,7 @@ struct EnvHosts : winshun::Plugin {
             const std::string expanded = v.type == "REG_EXPAND_SZ"
                                              ? envh::expandEnvValue(v.value, lookup)
                                              : v.value;
-            items.push_back(envVarRow(v, expanded, /*writableScope=*/v.scope == "user", zh));
+            items.push_back(envVarRow(v, expanded, /*writableScope=*/v.scope == "user" || sysWritable, zh));
             if (static_cast<int>(items.size()) >= st.maxResults)
                 break;
         }
@@ -523,12 +527,18 @@ struct EnvHosts : winshun::Plugin {
             oa.select = data["select"].toString();
             oa.zh = chinese();
             oa.dark = (theme() == "dark");
+            oa.elevated = envh::native::processElevated();
             if (target == "hosts") {
                 envh::native::HostsStore hs(winshun::wide(testHostsPath(st)));
                 std::string werr;
                 oa.writable = hs.isWritable(werr);
             } else {
                 oa.writable = true;
+                // System scope is writable only with an elevated token (the
+                // plugin declares `elevated` and Win顺 runs as administrator).
+                envh::native::EnvStore es(oa.userSubkey, oa.sysSubkey);
+                std::string werr;
+                oa.systemWritable = st.showSystem && es.canWriteSystem(werr);
             }
             std::string err;
             const bool ok = editorwin::openEditor(oa, err);
@@ -550,10 +560,9 @@ struct EnvHosts : winshun::Plugin {
                 return {winshun::effect::copy(data["detail"].toString()),
                         notify(tr(zh, "已复制展开值", "Copied expanded")), winshun::effect::hide()};
             if (a.action == "delete") {
-                if (scope == "system")
-                    return {notify(tr(zh, "系统变量需要管理员权限，无法在此删除；可在列表中复制名称后用管理员 PowerShell 的 [Environment]::SetEnvironmentVariable 移除",
-                                        "System variables need administrator rights and cannot be deleted here")),
-                            winshun::effect::keep()};
+                // System scope is allowed through to the confirm row; the
+                // envDeleteConfirm handler below re-probes and refuses only
+                // when the write would actually fail.
                 const std::string target = scope + "/" + name;
                 const bool well = envh::isWellKnownName(name);
                 const std::string sub = tr(zh, "确认删除 ", "Confirm delete ") + target
@@ -599,17 +608,28 @@ struct EnvHosts : winshun::Plugin {
             if (a.action == "cancel")
                 return {winshun::effect::setQuery("env"), winshun::effect::keep()};
             const std::string target = data["target"].toString();
-            if (target.compare(0, 7, "system/") == 0)
-                return {notify(tr(zh, "系统变量需要管理员权限，无法在此删除",
-                                    "System variables need administrator rights and cannot be deleted here")),
-                        winshun::effect::keep()};
+            const bool isSystem = target.compare(0, 7, "system/") == 0;
             const std::string name = target.substr(target.find('/') + 1);
             envh::native::EnvStore store(testUserSubkey(), testSystemSubkey());
             envh::native::BackupStore backups(dataDir(), st.backupCount);
-            backups.saveEnv(store.read(false).snap);
-            if (!store.deleteVar(name)) {
-                winshun::debug("ra9fael.envhosts: deleteVar failed for " + name);
-                return {notify(tr(zh, "删除失败", "Delete failed")), winshun::effect::keep()};
+            if (isSystem) {
+                // Elevated plugin (Plan A): write HKLM when the probe passes.
+                std::string werr;
+                if (!store.canWriteSystem(werr))
+                    return {notify(tr(zh, "系统变量需要管理员权限：以管理员运行 Win顺 并在插件卡片点“确认”后重试（状态栏 ⓘ 有说明）",
+                                        "System variables need administrator rights: run Win顺 as admin and confirm the plugin card, then retry (see the status-bar ⓘ)")),
+                            winshun::effect::keep()};
+                backups.saveEnv(store.read(true).snap, true);
+                if (!store.deleteVar(name, "system")) {
+                    winshun::debug("ra9fael.envhosts: deleteVar failed for system/" + name);
+                    return {notify(tr(zh, "删除失败", "Delete failed")), winshun::effect::keep()};
+                }
+            } else {
+                backups.saveEnv(store.read(false).snap);
+                if (!store.deleteVar(name)) {
+                    winshun::debug("ra9fael.envhosts: deleteVar failed for " + name);
+                    return {notify(tr(zh, "删除失败", "Delete failed")), winshun::effect::keep()};
+                }
             }
             store.broadcastSettingsChange();
             editorwin::onExternalChange("env");

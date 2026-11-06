@@ -8,6 +8,14 @@ single source of truth; release tags are `v<version>`.
 ## [Unreleased]
 
 ### Added
+- The plugin declares the `elevated` permission (requires Win顺 ≥ 0.19.0, hence
+  the new `minWinShun`). When Win顺 runs as administrator and the user confirmed
+  the plugin card once, the plugin starts elevated: the 系统 tab edits system
+  variables (and the launcher's system-var delete works), save/backup/conflict
+  detection cover both scopes, and hosts writes succeed. There is still no UAC
+  prompt from the plugin — write access follows a real registry probe, never the
+  token alone. The ⓘ at the right end of the status bar opens a permission
+  explanation (what is writable now and the two steps to run elevated).
 - The hosts 原文 tab is editable when hosts is writable. The text is parsed back
   into the entries when you leave the tab, press Ctrl+S or close; one undo step
   reverts the whole raw edit. BOM, line endings and the final newline are kept,

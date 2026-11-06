@@ -238,8 +238,13 @@ D3 was revised from "read-only preview" to editable text with parse-back.
   returns `notify` + `keep`, so the launcher stays open and the existing rows
   below remain usable. `tests/integration.py` (P3) verifies the failure path
   returns `notify` + `keep`; on a real desktop the window opens normally.
-- **D2** → (a) read-only + banner. `elevated` is **not** requested; admin-only
-  targets keep the clear error from v0.1.
+- **D2** → revised in v0.4.2 to (b). The plugin declares `elevated` (needs
+  Win顺 ≥ 0.19.0 via `minWinShun`): when Win顺 runs as administrator and the user
+  confirmed the plugin card once, the plugin starts elevated and the 系统 tab,
+  the launcher's system-var delete and hosts writes all work. Write access still
+  follows a real probe (`canWriteSystem` / `isWritable`), never the token alone;
+  the plugin never shows UAC itself. The status bar's ⓘ explains the current
+  permissions and the two confirm steps.
 - **D3** → revised in v0.4.1 to (b). The hosts 原文 tab is editable when hosts is writable; the text is parsed back into the model when you leave the tab, press Ctrl+S or close. See "Editable raw tab" above.
 - **D4** → (a) `clipboard:write` is requested for Ctrl+C inside the window.
 
@@ -310,7 +315,8 @@ Shift+Enter are not bound on row 1.
 | `runtime.sandbox` | `normal` | `normal` (unchanged) | Medium integrity is needed for HKCU writes and hosts. It also avoids the open UIPI question binarylab has under `strict` (ROADMAP Q1). |
 | `version` | 0.1.0 | 0.2.0 | Permission change. The host asks the user to confirm the new permissions again. |
 
-`elevated` is **not** added by default. See decision D2 in section 9.
+`elevated` **is** declared as of v0.4.2 (revised decision D2 in section 9); it
+needs Win顺 ≥ 0.19.0, which `minWinShun` states.
 
 ### 2.2 Opening the window
 
@@ -398,7 +404,7 @@ table below is the authoritative description of each area.
 
 | Area | Behaviour |
 |---|---|
-| Tabs | 用户 (editable), 系统 (read-only unless D2 is taken; greyed editors), 备份 (list of `backups/env/*.json`, newest first). `showSystemVars=false` hides the 系统 tab. |
+| Tabs | 用户 (editable), 系统 (editable when the plugin runs elevated — i.e. `canWriteSystem` passes; otherwise greyed editors), 备份 (list of `backups/env/*.json`, newest first). `showSystemVars=false` hides the 系统 tab. |
 | Table | ListView report mode. Columns 名称 / 类型 / 值 (first line, truncated) / ● dirty marker. Sorted by name, case-insensitive. Filter matches name or value, the same rule as `envMatches`. |
 | Detail pane | Edits the selected row. **List mode** is entered explicitly with `Ctrl+R` or the `原文│分隔项` segment (the value is never split silently, so the raw text always stays reachable); the delimiter comes from a preset menu or a custom text box (see "v0.4.1 fix pass" below). `Path`-named rows default to the `;` delimiter. Otherwise a multi-line Edit. |
 | List mode items | One row per segment, in order, with the selected row and the viewport preserved across an in-place edit. `上移 / 下移 / 插入 / 删除` (or `Alt+↑↓`, `Ins`, `Del`) act on that segment only, and `当前项 n / m` reports the position. No expansion or existence marks — those were dropped as v0.1 sketch. |
@@ -422,7 +428,7 @@ and there is no **打开文件位置** button — see D2.
 | Area | Behaviour |
 |---|---|
 | Writability | Probed with the same write test as v0.1 when the window opens and again before each save, then reported in the status line as `· 可写` / `· 只读`. There is no path / encoding / line-ending header band. |
-| Read-only state | When the probe fails every edit control is disabled (`m_args.writable` gates the editors, the raw text box, 新增 and toggle) and the status line says `只读（需管理员）`. Navigation, filter, copy and the 原文 view keep working. No **打开文件位置** button, no UAC prompt — see D2. |
+| Read-only state | When the probe fails every edit control is disabled (`m_args.writable` gates the editors, the raw text box, 新增 and toggle) and the status line says `只读（需管理员）`. Navigation, filter, copy and the 原文 view keep working. No **打开文件位置** button, no UAC prompt — the elevated permission (D2) makes hosts writable when Win顺 runs as administrator with the card confirmed. |
 | UTF-16 file | Same as v0.1: `E_HOSTS_UTF16` banner, the whole window is read-only, no conversion offer. |
 | 条目 tab | One row per `HostsEntry`. Section dividers (comment-only lines) are shown as group headings, not as rows. Blank lines and free comments are not shown but are kept by line index, so saving reproduces them byte for byte. |
 | Columns | 启用 (checkbox = not commented), IP, 主机名, 注释 (trailing `#…`), 行 (1-based line number), ● dirty / ! invalid. In-place edit with F2 or double-click (ListView label edit for 主机名, an overlay Edit for other cells). |
@@ -557,7 +563,7 @@ All controls have accessible names so Narrator reads 名称, 值, 启用.
 | # | Question | Options | My recommendation |
 |---|---|---|---|
 | D1 | What does row 1 do when the window cannot open (old host, foreground fails)? | a) notify only; b) fall back to v0.1 inline list | a), plus the existing rows remain usable below it |
-| D2 | System env and protected hosts | a) read-only + banner (no new permission); b) add `elevated`: writable only when WinShun itself runs as admin, never a UAC prompt | a) for v0.2. b) widens the trust needed for the whole plugin; it can come later as a separate step. |
+| D2 | System env and protected hosts | a) read-only + banner (no new permission); b) add `elevated`: writable only when WinShun itself runs as admin, never a UAC prompt | b) since v0.4.2 — the permission is declared (`minWinShun` 0.19.0) and the write gate stays a real probe. The status bar's ⓘ explains the two-step confirmation. |
 | D3 | hosts 原文 tab editable? | a) read-only preview; b) full text editing with parse-back | a) in v0.2; b) since v0.4.1, with the `disk` / `base` split described under "Editable raw tab". |
 | D4 | Keep `clipboard:write`? | a) yes, Ctrl+C in window; b) no, copy only from launcher rows | a) — copying a value is the most common action |
 

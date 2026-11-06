@@ -56,6 +56,23 @@ struct EnvReadResult {
     std::string errMsg;
 };
 
+// Whether this process runs with an elevated (administrator) token. With the
+// `elevated` permission Win顺 starts the plugin elevated only when Win顺 itself
+// runs as administrator and the user confirmed the plugin card; it never shows
+// UAC for a plugin. Used for the status text, not as the write gate (the gate
+// is the real canWriteSystem / isWritable probe).
+inline bool processElevated()
+{
+    HANDLE token = nullptr;
+    if (!OpenProcessToken(GetCurrentProcess(), TOKEN_QUERY, &token))
+        return false;
+    TOKEN_ELEVATION e {};
+    DWORD got = 0;
+    const BOOL ok = GetTokenInformation(token, TokenElevation, &e, sizeof(e), &got);
+    CloseHandle(token);
+    return ok && e.TokenIsElevated != 0;
+}
+
 // The HKLM subkey holding the system-scope variables. Named so the test-only
 // override in main.cpp can fall back to exactly this path.
 inline std::wstring systemEnvSubkey()
@@ -148,10 +165,25 @@ public:
         return false;
     }
 
-    bool writeVar(const std::string& name, const std::string& value, const std::string& type)
+    // Writes go to the user key, or to the system key for scope "system".
+    // System writes only succeed when the process is elevated (the plugin
+    // declares `elevated` and Win顺 runs as administrator); the caller probes
+    // with canWriteSystem() first and the open below fails cleanly otherwise.
+    bool openForWrite(const std::string& scope, HKEY& h)
+    {
+        if (scope == "system") {
+            size_t skip = 0;
+            const HKEY root = systemEnvRoot(m_sys, skip);
+            return RegOpenKeyExW(root, m_sys.c_str() + skip, 0, KEY_SET_VALUE, &h) == ERROR_SUCCESS;
+        }
+        return RegOpenKeyExW(HKEY_CURRENT_USER, m_user.c_str(), 0, KEY_SET_VALUE, &h) == ERROR_SUCCESS;
+    }
+
+    bool writeVar(const std::string& name, const std::string& value, const std::string& type,
+                  const std::string& scope = "user")
     {
         HKEY h = nullptr;
-        if (RegOpenKeyExW(HKEY_CURRENT_USER, m_user.c_str(), 0, KEY_SET_VALUE, &h) != ERROR_SUCCESS)
+        if (!openForWrite(scope, h))
             return false;
         const std::wstring wname = toWide(name);
         const std::wstring wval = toWide(value);
@@ -181,10 +213,10 @@ public:
         return rc == ERROR_SUCCESS;
     }
 
-    bool deleteVar(const std::string& name)
+    bool deleteVar(const std::string& name, const std::string& scope = "user")
     {
         HKEY h = nullptr;
-        if (RegOpenKeyExW(HKEY_CURRENT_USER, m_user.c_str(), 0, KEY_SET_VALUE, &h) != ERROR_SUCCESS)
+        if (!openForWrite(scope, h))
             return false;
         const LONG rc = RegDeleteValueW(h, toWide(name).c_str());
         RegCloseKey(h);
@@ -361,13 +393,15 @@ public:
         ensureDir(m_dir + "/backups/hosts");
     }
 
-    std::string saveEnv(const EnvSnapshot& snap)
+    // System-scope values are included only when the caller is about to write
+    // that scope (elevated plugin), so a bad HKLM write can be undone too.
+    std::string saveEnv(const EnvSnapshot& snap, bool includeSystem = false)
     {
         const std::string id = stamp();
         winshun::Json::Object root;
         winshun::Json::Array vars;
         for (const EnvVar& v : snap.vars) {
-            if (v.scope != "user")
+            if (v.scope != "user" && !(includeSystem && v.scope == "system"))
                 continue;
             winshun::Json::Object o;
             o["name"] = v.name;

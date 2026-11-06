@@ -53,6 +53,8 @@ struct OpenArgs {
     bool zh = true;
     bool dark = false;
     bool writable = true; // hosts writability probe at open time
+    bool systemWritable = false; // env: HKLM writable (elevated plugin)
+    bool elevated = false; // the plugin process runs with an elevated token
 };
 
 constexpr UINT WM_APP_FOCUS = WM_APP + 1; // apply a new OpenArgs (keep edits)
@@ -167,15 +169,18 @@ public:
     }
 
     // Posted by the protocol thread after an inline write (and by any other
-    // writer). Only a change in the scope this window can actually write counts:
-    // a system-scope edit used to turn the bar yellow and block every Ctrl+S.
+    // writer). Only a change in a scope this window can actually write counts:
+    // user scope always; system scope additionally when the plugin runs
+    // elevated (systemWritable), matching the save-time conflict check.
     void externalChange()
     {
         if (m_kind == "env") {
             envh::native::EnvStore store(m_args.userSubkey, m_args.sysSubkey);
-            const envh::native::EnvReadResult r = store.read(false);
+            const bool sysW = m_args.systemWritable;
+            const envh::native::EnvReadResult r = store.read(sysW);
             if (!r.ok
-                || envh::edit::EnvModel::computeUserFingerprint(r.snap) == m_env.userFingerprint)
+                || (sysW ? envh::edit::EnvModel::computeFingerprint(r.snap) == m_env.fingerprint
+                         : envh::edit::EnvModel::computeUserFingerprint(r.snap) == m_env.userFingerprint))
                 return;
         } else {
             envh::native::HostsStore store(m_args.hostsPath);
@@ -274,6 +279,7 @@ private:
     RECT m_rcHostEnabled = {}, m_rcHostIp = {}, m_rcHostName = {}, m_rcHostComment = {};
     RECT m_rcStatus = {};
     RECT m_rcStatusRow1 = {}, m_rcStatusRow2 = {};
+    RECT m_rcInfo = {}; // "ⓘ" permission hint, right end of status row 1
     RECT m_rcAddBtn = {}, m_rcDelBtn = {}, m_rcUndoBtn = {}, m_rcRedoBtn = {};
     struct Chip { int id; RECT rc; };
     std::vector<Chip> m_chips;
@@ -1603,7 +1609,7 @@ private:
                 name = r.name;
                 type = r.type;
                 value = r.value;
-                ro = (r.scope == "system");
+                ro = (r.scope == "system" && !m_args.systemWritable);
             }
             setEdit(m_nameEdit, name, ro);
             setEdit(m_typeEdit, type, ro);
@@ -2016,7 +2022,8 @@ private:
             return false;
         const int i = m_visible[v];
         if (m_kind == "env")
-            return m_env.rows[i].scope == "user" && !m_env.rows[i].deleted;
+            return (m_env.rows[i].scope == "user" || (m_env.rows[i].scope == "system" && m_args.systemWritable))
+                   && !m_env.rows[i].deleted;
         if (m_tab == 1 || !m_args.writable)
             return false;
         return !m_hosts.rows[i].isSection && !m_hosts.rows[i].deleted;
@@ -2026,7 +2033,7 @@ private:
         if (m_tab == 2)
             return false;
         if (m_kind == "env")
-            return m_tab == 0;
+            return m_tab == 0 || (m_tab == 1 && m_args.systemWritable);
         return m_tab == 0 && m_args.writable;
     }
 
@@ -2073,7 +2080,8 @@ private:
         if (m_extChanged)
             s += zh ? " · 外部已修改" : " · external change";
         s += m_kind == "env"
-                 ? (zh ? " · 用户可写 / 系统只读" : " · user writable / system read-only")
+                 ? (m_args.systemWritable ? (zh ? " · 管理员：用户 / 系统均可写" : " · admin: user and system writable")
+                                          : (zh ? " · 用户可写 / 系统只读" : " · user writable / system read-only"))
                  : (m_args.writable ? (zh ? " · 可写" : " · writable")
                                     : (zh ? " · 只读（需管理员）" : " · read-only (needs admin)"));
         if (m_kind == "hosts") {
@@ -2083,6 +2091,30 @@ private:
                         : " · " + std::to_string(dup) + " duplicate host line(s) (!)";
         }
         return s;
+    }
+
+    // The "ⓘ" click on status row 1: explains where the plugin's write
+    // permissions come from and how to get administrator rights (Plan A: the
+    // `elevated` permission follows the host; the host never shows UAC for a
+    // plugin, so the two steps below are the only way up).
+    void showPermissionHelp()
+    {
+        const bool zh = m_args.zh;
+        const bool writable = m_kind == "env" ? m_args.systemWritable : m_args.writable;
+        std::string body;
+        if (writable) {
+            body = zh
+                       ? "当前以管理员权限运行：本窗口内的目标（" + std::string(m_kind == "env" ? "用户 / 系统环境变量" : "hosts") + "）均可编辑并保存。\n\n这份权限来自 Win顺 的 elevated 插件机制，不是本插件弹出的 UAC。"
+                       : "The plugin currently runs elevated: everything in this window (" + std::string(m_kind == "env" ? "user and system variables" : "hosts") + ") can be edited and saved.\n\nThis comes from WinShun's elevated-plugin mechanism, not a UAC prompt from this plugin.";
+        } else {
+            body = zh
+                       ? std::string("当前为受限权限：") + (m_kind == "env" ? "只能修改用户环境变量，系统变量只读。" : "hosts 为只读。")
+                             + "\n\n要以管理员权限编辑：\n  1. 以管理员身份运行 Win顺；\n  2. 在 设置 → 插件 的 envhosts 卡片上点一次“确认”，插件会以管理员权限重新启动。\n\n说明：Win顺 从不为插件弹 UAC；插件文件被改动后需要重新确认；提权后的插件不响应 AI / 命令行调用。"
+                       : std::string("Restricted permissions right now: ") + (m_kind == "env" ? "only user variables are writable, system variables are read-only." : "hosts is read-only.")
+                             + "\n\nTo edit with administrator rights:\n  1. Run WinShun as administrator;\n  2. click \"Confirm\" once on the envhosts card in Settings → Plugins; the plugin restarts elevated.\n\nNotes: WinShun never shows UAC for a plugin; the confirmation must be repeated after the plugin files change; an elevated plugin ignores AI / command-line calls.";
+        }
+        MessageBoxW(m_hwnd, wideFromUtf8(body).c_str(),
+                    wideFromUtf8(zh ? "权限说明" : "Permissions").c_str(), MB_OK);
     }
 
     const wchar_t* chipLabel(int id) const
@@ -2248,8 +2280,16 @@ private:
         RECT r1 = m_rcStatusRow1;
         r1.left += 8;
         r1.right -= 8;
+        // The "ⓘ" permission entry lives at the right end of row 1; reserve room
+        // for it so the text never runs underneath.
+        const RECT ri {m_rcStatusRow1.right - 30, m_rcStatusRow1.top,
+                       m_rcStatusRow1.right - 8, m_rcStatusRow1.bottom};
+        m_rcInfo = ri;
+        r1.right = ri.left;
         DrawTextW(dc, wideFromUtf8(statusRow1Text()).c_str(), -1, &r1,
                   DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_END_ELLIPSIS);
+        SetTextColor(dc, flash ? t1 : (m_dark ? RGB(120, 170, 230) : RGB(16, 92, 168)));
+        DrawTextW(dc, L"ⓘ", -1, &m_rcInfo, DT_CENTER | DT_VCENTER | DT_SINGLELINE);
         for (Chip c : m_chips) {
             const bool en = chipEnabled(c.id);
             HBRUSH cb = CreateSolidBrush(en ? (m_dark ? RGB(48, 52, 58) : RGB(255, 255, 255))
@@ -2390,7 +2430,7 @@ private:
             setStatus(m_args.zh ? "没有改动" : "No changes");
             return;
         }
-        if (m_kind == "env" && m_env.hasInvalid()) {
+        if (m_kind == "env" && m_env.hasInvalid(m_args.systemWritable)) {
             setStatus(m_args.zh ? "有无效项，无法保存（检查名称/值）" : "Invalid entries; cannot save", 2);
             return;
         }
@@ -2420,24 +2460,28 @@ private:
 
         std::unique_lock<std::mutex> lock(envh::native::g_writeLock);
         if (m_kind == "env") {
+            const bool sysW = m_args.systemWritable;
             envh::native::EnvStore store(m_args.userSubkey, m_args.sysSubkey);
-            const envh::native::EnvReadResult liveUser = store.read(false);
+            // With an elevated plugin the system scope is written too, so a
+            // change there is a conflict as well; otherwise only HKCU counts.
+            const envh::native::EnvReadResult liveUser = store.read(sysW);
             if (!liveUser.ok) {
                 setStatus(m_args.zh ? ("读取失败：" + liveUser.errMsg) : ("Read failed: " + liveUser.errMsg), 2);
                 return;
             }
-            // Only the user scope is writable from this window, so only a change
-            // there is a conflict. Comparing the full system+user snapshot made an
-            // unrelated HKLM edit cancel every save.
-            const std::string fpNow = envh::edit::EnvModel::computeUserFingerprint(liveUser.snap);
-            if (fpNow != m_env.userFingerprint) {
+            // Only the scopes this window can write count as a conflict.
+            // Comparing the full system+user snapshot while HKLM is read-only
+            // made an unrelated HKLM edit cancel every save.
+            const std::string fpNow = sysW ? envh::edit::EnvModel::computeFingerprint(liveUser.snap)
+                                           : envh::edit::EnvModel::computeUserFingerprint(liveUser.snap);
+            if (fpNow != (sysW ? m_env.fingerprint : m_env.userFingerprint)) {
                 // Ask with the shared lock released: the dialog can stay open for
                 // minutes, and holding g_writeLock would block the protocol thread.
                 lock.unlock();
                 const std::string body = m_args.zh
-                    ? std::string("用户环境变量在编辑器打开后被外部修改。\n\n")
+                    ? std::string(sysW ? "环境变量" : "用户环境变量") + "在编辑器打开后被外部修改。\n\n"
                       + "中止：取消本次保存\n重试：重新载入最新值（丢弃未保存的修改）\n忽略：用当前编辑强制覆盖"
-                    : std::string("The user environment changed while this window was open.\n\n")
+                    : std::string(sysW ? "The environment" : "The user environment") + " changed while this window was open.\n\n"
                       + "Abort: cancel this save\nRetry: reload the latest values (discards unsaved edits)\n"
                       + "Ignore: overwrite with the current edits";
                 const int answer = MessageBoxW(m_hwnd, wideFromUtf8(body).c_str(),
@@ -2455,22 +2499,22 @@ private:
                 }
             }
             envh::native::BackupStore backups(m_args.dataDir, m_args.backupCount);
-            backups.saveEnv(liveUser.snap);
+            backups.saveEnv(liveUser.snap, sysW);
             const std::string ref = currentRowRef();
-            const auto d = m_env.delta();
+            const auto d = m_env.delta(sysW);
             int ok = 0;
             std::vector<std::string> failed;
             for (const auto& r : d.toWrite) {
-                if (store.writeVar(r.name, r.value, r.type))
+                if (store.writeVar(r.name, r.value, r.type, r.scope))
                     ++ok;
                 else
-                    failed.push_back(r.name);
+                    failed.push_back(r.scope + "/" + r.name);
             }
-            for (const auto& name : d.toDelete) {
-                if (store.deleteVar(name))
+            for (const auto& del : d.toDelete) {
+                if (store.deleteVar(del.name, del.scope))
                     ++ok;
                 else
-                    failed.push_back(name);
+                    failed.push_back(del.scope + "/" + del.name);
             }
             store.broadcastSettingsChange();
             // Re-read with the scope this window shows. A user-only snapshot used
@@ -2551,16 +2595,55 @@ private:
             const auto j = winshun::Json::parse(text);
             if (!j)
                 return;
+            // The backup is the target state for the scopes it holds; scopes it
+            // does not hold (system, in a user-only backup) come from a live
+            // read, so loading it never marks them deleted.
+            envh::native::EnvStore store(m_args.userSubkey, m_args.sysSubkey);
+            const envh::EnvSnapshot live = store.read(m_args.showSystem).snap;
             envh::EnvSnapshot snap;
+            bool hasSystem = false;
             for (const winshun::Json& v : (*j)["vars"].toArray()) {
                 envh::EnvVar e;
                 e.scope = v["scope"].toString();
                 e.name = v["name"].toString();
                 e.type = v["type"].toString();
                 e.value = v["value"].toString();
+                hasSystem = hasSystem || e.scope == "system";
                 snap.vars.push_back(std::move(e));
             }
-            m_env = envh::edit::EnvModel::fromSnapshot(snap); // becomes dirty vs live base
+            for (const envh::EnvVar& v : live.vars)
+                if (v.scope == "system" && !hasSystem)
+                    snap.vars.push_back(v);
+            const envh::edit::EnvModel liveModel = envh::edit::EnvModel::fromSnapshot(live);
+            m_env = liveModel;
+            // Turn the backup into edits on top of the live base: dirty vs disk.
+            std::vector<envh::edit::EnvVarRow> rows;
+            for (const envh::EnvVar& v : snap.vars) {
+                envh::edit::EnvVarRow r;
+                r.scope = v.scope;
+                r.name = v.name;
+                r.type = v.type;
+                r.value = v.value;
+                r.inBase = false;
+                for (const auto& b : liveModel.base)
+                    if (b.scope == r.scope && envh::toLower(b.name) == envh::toLower(r.name))
+                        r.inBase = true;
+                r.isNew = !r.inBase;
+                rows.push_back(r);
+            }
+            for (const auto& b : liveModel.base) {
+                bool kept = false;
+                for (const auto& r : rows)
+                    if (r.scope == b.scope && envh::toLower(r.name) == envh::toLower(b.name))
+                        kept = true;
+                if (!kept) {
+                    envh::edit::EnvVarRow r = b;
+                    r.deleted = true;
+                    rows.push_back(r);
+                }
+            }
+            m_env.pushUndo();
+            m_env.rows = std::move(rows);
         } else {
             const std::string path = m_args.dataDir + "/backups/hosts/" + id + ".hosts";
             std::ifstream in(path, std::ios::binary);
@@ -2595,7 +2678,7 @@ private:
             return false;
         const int i = m_visible[m_sel];
         if (m_kind == "env")
-            return m_env.rows[i].scope == "user";
+            return m_env.rows[i].scope == "user" || (m_env.rows[i].scope == "system" && m_args.systemWritable);
         return m_tab == 0 && m_args.writable && !m_hosts.rows[i].isSection;
     }
     void clearFilter()
@@ -2618,7 +2701,7 @@ private:
         clearFilter(); // a new empty row would not match an active filter
         int idx = -1;
         if (m_kind == "env") {
-            idx = static_cast<int>(m_env.addNew("user"));
+            idx = static_cast<int>(m_env.addNew(m_tab == 1 ? "system" : "user"));
         } else {
             const int after = !m_visible.empty() ? m_hosts.rows[m_visible[m_sel]].origin : -1;
             idx = static_cast<int>(m_hosts.addNew(after));
@@ -2992,6 +3075,10 @@ private:
                 SetCapture(m_hwnd);
                 return 0;
             }
+            if (inRect(m_rcInfo, x, y)) {
+                showPermissionHelp();
+                return 0;
+            }
             for (Chip c : m_chips)
                 if (inRect(c.rc, x, y)) {
                     if (chipEnabled(c.id))
@@ -3064,16 +3151,20 @@ private:
             m_dragSplitter = false;
             return 0;
         case WM_SETCURSOR:
-            if (m_kind == "env" && m_tab != 2) {
-                POINT pt {};
-                GetCursorPos(&pt);
-                ScreenToClient(m_hwnd, &pt);
-                if (inRect(m_rcSplitter, pt.x, pt.y)) {
-                    SetCursor(LoadCursorW(nullptr, IDC_SIZENS));
-                    return TRUE;
-                }
+        {
+            POINT pt {};
+            GetCursorPos(&pt);
+            ScreenToClient(m_hwnd, &pt);
+            if (inRect(m_rcInfo, pt.x, pt.y)) {
+                SetCursor(LoadCursorW(nullptr, IDC_HAND));
+                return TRUE;
+            }
+            if (m_kind == "env" && m_tab != 2 && inRect(m_rcSplitter, pt.x, pt.y)) {
+                SetCursor(LoadCursorW(nullptr, IDC_SIZENS));
+                return TRUE;
             }
             return DefWindowProcW(m_hwnd, msg, wp, lp);
+        }
         case WM_KEYDOWN:
             return onKey(wp);
         case WM_CLOSE:

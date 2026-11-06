@@ -98,16 +98,22 @@ open hosts file in the default editor).
   environment variables live in `HKCU\Environment`; reading and writing them is
   done directly via `RegSetValueExW` (never `setx`, which silently truncates at
   1024 characters). This is declared honestly here rather than hidden.
-- No `processes` or `elevated` permission. Admin-only targets remain read-only
-  with a clear error in v0.2; `elevated` is deferred.
+- No `processes` permission. The `elevated` permission **is** requested (needs
+  Win顺 ≥ 0.19.0): when Win顺 itself runs as administrator and you have clicked
+  "Confirm" once on the envhosts card in Settings → Plugins, the plugin starts
+  elevated and both system variables and hosts become writable. WinShun never
+  shows UAC for a plugin; the confirmation must be repeated after the plugin
+  files change; an elevated plugin ignores AI / command-line calls. The ⓘ at the
+  right end of the editor's status bar always explains the current permissions
+  and the two steps to get administrator rights.
 
 ## What is editable vs read-only
 
 | Target | Read | Write |
 |---|---|---|
 | User env vars (`HKCU\Environment`) | yes | yes |
-| System env vars (`HKLM\...\Session Manager\Environment`) | optional | **no** — delete/edit refuse with a clear message |
-| hosts file | yes | only if the file is writable (probe first, never a blind write) |
+| System env vars (`HKLM\...\Session Manager\Environment`) | optional | writable when elevated; otherwise delete/edit refuse with a clear message |
+| hosts file | yes | only if the file is writable (probe first, never a blind write); always writable when elevated |
 
 Env writes preserve the existing value type (`REG_SZ` / `REG_EXPAND_SZ` /
 `REG_MULTI_SZ`) and broadcast `WM_SETTINGCHANGE` so new processes pick up the

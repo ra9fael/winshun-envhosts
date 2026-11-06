@@ -387,7 +387,8 @@ def main():
             conf = d.find_item(rep["items"], kind="envDeleteConfirm")
             res = parse(d.action("env", "confirm", conf))
             note = next((e for e in res["result"]["effects"] if e.get("type") == "notify"), {})
-            check("失败" in note.get("text", "") or "denied" in note.get("text", "").lower(),
+            check("失败" in note.get("text", "") or "denied" in note.get("text", "").lower()
+                  or "管理员" in note.get("text", "") or "admin" in note.get("text", "").lower(),
                   "system var delete is refused (needs elevated)", note.get("text", ""))
     else:
         check(True, "no system var row to test (acceptable)")

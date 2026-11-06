@@ -87,16 +87,19 @@ python tools/package.py                    # dist/ra9fael.envhosts-<version>.wsp
 - **注册表访问在 Win顺 权限系统里没有对应名称。** 用户环境变量位于
   `HKCU\Environment`；读写直接调用 `RegSetValueExW`（绝不用 `setx`，它会在
   1024 字符处静默截断）。这里如实声明，而不是藏起来。
-- 不申请 `processes`、`elevated`。仅管理员可改的目标在 v0.2 中保持只读并给出
-  明确错误；`elevated` 留待以后。
+- 不申请 `processes`。申请 `elevated`（需 Win顺 ≥ 0.19.0）：当 Win顺 自身以管理员
+  运行、且你在设置 → 插件的 envhosts 卡片上点过一次「确认」后，插件会以管理员权限
+  启动，此时系统环境变量与 hosts 均可写。Win顺 从不为插件弹 UAC；插件文件被改动后
+  需要重新确认；提权后的插件不响应 AI / 命令行调用。编辑窗口状态栏右端的 ⓘ 随时
+  说明当前权限与获取管理员权限的两步操作。
 
 ## 可编辑范围
 
 | 目标 | 读 | 写 |
 |---|---|---|
 | 用户环境变量（`HKCU\Environment`） | 是 | 是 |
-| 系统环境变量（`HKLM\...\Session Manager\Environment`） | 可选 | **否** —— 删除 / 编辑都会给出明确拒绝信息 |
-| hosts 文件 | 是 | 仅当文件可写（先探测，绝不盲写） |
+| 系统环境变量（`HKLM\...\Session Manager\Environment`） | 可选 | 提权后可写；否则删除 / 编辑给出明确拒绝信息 |
+| hosts 文件 | 是 | 仅当文件可写（先探测，绝不盲写）；提权后必然可写 |
 
 环境变量写入会保留原有的值类型（`REG_SZ` / `REG_EXPAND_SZ` / `REG_MULTI_SZ`），
 并广播 `WM_SETTINGCHANGE`，让新进程能读到改动。已经在运行的进程（包括 Win顺 自己）
