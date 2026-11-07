@@ -1,4 +1,4 @@
-#!/usr/bin/env pwsh
+﻿#!/usr/bin/env pwsh
 # deploy_qml.ps1 - assemble the self-contained Qt runtime for the QML editor build.
 #
 # Decision (see QML_MIGRATION_PHASE0.md §11): the plugin ships its own Qt 6
