@@ -129,10 +129,15 @@ The version in `plugin.json` is the single source of truth. Versions follow
    ```powershell
    cmake --build build --config Release
    ctest --test-dir build -C Release --output-on-failure
+   python tests/integration.py
+   python tests/gui_preview.py
    python tools/package.py --tag vx.y.z
    ```
-   then install `dist/ra9fael.envhosts-x.y.z.wsplugin` into Win顺 from the archive
-   and try it.
+   Then verify the **package**, not the working tree: a development junction
+   makes the host load `envhosts.exe` straight from this clone, so it cannot
+   catch a missing or stale file in the archive. Remove the junction, unpack the
+   `.wsplugin` into `%LOCALAPPDATA%\WinShun\plugins\ra9fael.envhosts`, and run
+   `python tests/verify_install.py` (see "Release verification" below).
 4. Commit (`chore(release): vx.y.z`), tag and push:
    ```powershell
    git tag -a vx.y.z -m "vx.y.z"
@@ -140,7 +145,34 @@ The version in `plugin.json` is the single source of truth. Versions follow
    ```
 5. The `release` workflow builds with MSVC, runs the unit tests, checks that the
    tag matches `plugin.json` and that the CHANGELOG has the section, and
-   publishes a GitHub Release with the `.wsplugin` and its `.sha256`.
+   publishes a GitHub Release with the `.wsplugin` and its `.sha256`. Confirm the
+   release is neither draft nor prerelease and that GitHub's asset digest equals
+   the local `.sha256` file.
+6. Offline registry pre-check (before opening the PR):
+   ```powershell
+   python -c "import sys; sys.path.insert(0, r'<WinShun-plugins>\tools'); import check; \
+   d=open(r'dist\ra9fael.envhosts-x.y.z.wsplugin','rb').read(); \
+   p=check.check_package(d,'ra9fael.envhosts','x.y.z','package.wsplugin',unreviewed_native=True); \
+   print(p.errors, p.warnings)"
+   ```
+   A plain `check.py <folder>` is the script-package checker and will reject the
+   exe; `unreviewed_native=True` is required.
+7. Submit the registry entry from a `WinShun-plugins` branch/worktree:
+   ```powershell
+   python tools/entry.py <release-asset-url> --unreviewed-native --print
+   ```
+   Commit only `plugins/ra9fael.envhosts.json` and open a PR against
+   `LingCore/WinShun-plugins`. The review marker is permanent; every install and
+   every update requires a separate confirmation in Win顺.
+
+### Release verification
+
+`tests/verify_install.py` drives the real user-install path. It refuses to run
+while the target is a junction, verifies the unpacked manifest and executable,
+then runs the JSON-RPC handshake and the GUI assertions against the installed
+copy. It never writes to the repository. To remove a development junction, use
+`cmd /c rmdir` on the link only — uninstalling a linked plugin from the settings
+page deletes the clone recursively.
 
 A tag that does not match `plugin.json` fails the workflow before anything is
 published. To redo a failed release, delete the tag locally and remotely, fix,

@@ -19,12 +19,18 @@ import tempfile
 import threading
 import time
 import winreg
+import zlib
 from ctypes import wintypes
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(HERE)
-OUTDIR = os.path.join(HERE, "fixtures")
-EXE = os.path.join(ROOT, "envhosts.exe")
+# A real-install run (tests/verify_install.py) points these at the installed
+# plugin folder and a scratch output folder; the defaults keep the normal
+# development preview unchanged.
+EXE = os.environ.get("WS_ENVHOSTS_EXE") or os.path.join(ROOT, "envhosts.exe")
+PLUGIN_DIR = os.environ.get("WS_ENVHOSTS_PLUGIN_DIR") or ROOT
+OUTDIR = os.environ.get("WS_ENVHOSTS_OUTDIR") or os.path.join(HERE, "fixtures")
+os.makedirs(OUTDIR, exist_ok=True)
 DATA = tempfile.mkdtemp(prefix="ws-envhosts-preview-")
 SUBKEY = r"Software\WinShunTest\EnvHosts"
 # The system scope is redirected too: without this the 系统 tab would screenshot
@@ -85,7 +91,7 @@ env["WS_ENVHOSTS_TEST_HOSTS"] = HOSTS
 LOG = os.path.join(DATA, "plugin.log")
 proc = subprocess.Popen([EXE], stdin=subprocess.PIPE, stdout=subprocess.PIPE,
                         stderr=open(LOG, "w", encoding="utf-8", errors="replace"),
-                        env=env, text=True, bufsize=1,
+                        env=env, text=True, bufsize=1, cwd=os.path.dirname(os.path.abspath(EXE)),
                         encoding="utf-8", errors="replace")
 buf = []
 lock = threading.Lock()
@@ -140,7 +146,7 @@ def log(*args):
 
 
 _, init = call("initialize", {"settings": {}, "locale": "zh", "theme": "light",
-                              "pluginDir": ROOT, "dataDir": DATA})
+                              "pluginDir": PLUGIN_DIR, "dataDir": DATA})
 log("INIT", (init or "").strip()[:300])
 
 for kind in ("env", "hosts"):
@@ -285,11 +291,49 @@ def focus_row(hwnd, ref):
                  "filter": ""}}})
 
 
+def bmp_to_png(bmp_path, png_path):
+    """Encode the 32-bit top-down BGRA DIB from capture() without ffmpeg.
+
+    The GDI DIB leaves the alpha byte undefined, so it is forced to 0xff;
+    otherwise every PNG would come out fully transparent.
+    """
+    with open(bmp_path, "rb") as f:
+        data = f.read()
+    off = struct.unpack_from("<I", data, 10)[0]
+    w = struct.unpack_from("<i", data, 18)[0]
+    h = abs(struct.unpack_from("<i", data, 22)[0])
+    if struct.unpack_from("<H", data, 28)[0] != 32:
+        raise ValueError("capture() must produce a 32-bit DIB")
+    stride = w * 4
+    pixels = data[off:off + stride * h]
+    scanlines = bytearray()
+    opaque = b"\xff" * w
+    for y in range(h):
+        row = bytearray(pixels[y * stride:(y + 1) * stride])
+        blue = row[0::4]
+        row[0::4] = row[2::4]  # BGR(A) -> RGB(A)
+        row[2::4] = blue
+        row[3::4] = opaque
+        scanlines.append(0)    # PNG filter type: None
+        scanlines.extend(row)
+
+    def chunk(tag, payload):
+        return (struct.pack(">I", len(payload)) + tag + payload
+                + struct.pack(">I", zlib.crc32(tag + payload) & 0xffffffff))
+
+    ihdr = struct.pack(">IIBBBBB", w, h, 8, 6, 0, 0, 0)  # 8-bit RGBA
+    with open(png_path, "wb") as f:
+        f.write(b"\x89PNG\r\n\x1a\n"
+                + chunk(b"IHDR", ihdr)
+                + chunk(b"IDAT", zlib.compress(bytes(scanlines), 6))
+                + chunk(b"IEND", b""))
+
+
 def shot(hwnd, name):
     bmp = os.path.join(OUTDIR, "_%s.bmp" % name)
     png = os.path.join(OUTDIR, "editor_%s.png" % name)
     size = capture(hwnd, bmp)
-    subprocess.run(["ffmpeg", "-v", "error", "-y", "-i", bmp, png], check=False)
+    bmp_to_png(bmp, png)
     os.remove(bmp)
     log("CAPTURE", name, size, png)
 
@@ -681,6 +725,36 @@ if env_hwnd:
     count = send(parts, LB_GETCOUNT)
     check(count == len(PATH_SEGS), "every segment becomes an item", f"{count} != {len(PATH_SEGS)}")
     shot(env_hwnd, "env_list_mode")
+
+    # ---- vertical splitter between the item list and the action pane --------
+    # The grip is a 7px band starting 4px right of the LISTBOX's right edge.
+    prc0 = child_client_rect(env_hwnd, 10)[1]
+    erc0 = child_client_rect(env_hwnd, 11)[1]
+    sx, sy = prc0[2] + 7, (prc0[1] + prc0[3]) // 2
+    user32.PostMessageW(env_hwnd, WM_LBUTTONDOWN, MK_LBUTTON, lparam(sx, sy))
+    for dx in (40, 80, 120):
+        user32.PostMessageW(env_hwnd, WM_MOUSEMOVE, MK_LBUTTON, lparam(sx + dx, sy))
+        time.sleep(0.05)
+    user32.PostMessageW(env_hwnd, WM_LBUTTONUP, 0, lparam(sx + 120, sy))
+    time.sleep(0.4)
+    prc1 = child_client_rect(env_hwnd, 10)[1]
+    erc1 = child_client_rect(env_hwnd, 11)[1]
+    check(prc1[2] - prc1[0] > prc0[2] - prc0[0] + 60,
+          "dragging the vertical splitter widens the item list",
+          f"{prc0} -> {prc1}")
+    check(erc1[0] >= prc1[2] + 8 and erc1[2] - erc1[0] < erc0[2] - erc0[0],
+          "action pane follows the split and stays clear of the list",
+          f"{erc0} -> {erc1}")
+    shot(env_hwnd, "env_parts_splitter_dragged")
+    # Restore the default proportions so the later assertions keep their
+    # mirrored layout coordinates.
+    sx1 = prc1[2] + 7
+    user32.PostMessageW(env_hwnd, WM_LBUTTONDOWN, MK_LBUTTON, lparam(sx1, sy))
+    for dx in (-40, -80, -120):
+        user32.PostMessageW(env_hwnd, WM_MOUSEMOVE, MK_LBUTTON, lparam(sx1 + dx, sy))
+        time.sleep(0.05)
+    user32.PostMessageW(env_hwnd, WM_LBUTTONUP, 0, lparam(sx1 - 120, sy))
+    time.sleep(0.4)
 
     # ---- selection must stay where it is scrolled to ------------------------
     top0 = 8

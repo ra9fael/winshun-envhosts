@@ -7,6 +7,8 @@ single source of truth; release tags are `v<version>`.
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-11-07
+
 ### Added
 - Qt Quick editor prototype (opt-in, `-DENVHOSTS_QML_EDITOR=ON`, qml branch).
   A read-only env/hosts window built with Qt Quick replaces the GDI window in
@@ -22,8 +24,9 @@ single source of truth; release tags are `v<version>`.
   package never mixes the GDI binary with the Qt runtime. Switching the default
   to QML requires `runtime.memoryMB: 512` (measured 253 MB with one window,
   268 MB with both).
-- The plugin declares the `elevated` permission (requires Win顺 ≥ 0.19.0, hence
-  the new `minWinShun`). When Win顺 runs as administrator and the user confirmed
+- The plugin declares the `elevated` permission (available from Win顺 0.19.0;
+  the manifest floor is 0.22.0 because the plugin is distributed as an
+  unreviewed-native package). When Win顺 runs as administrator and the user confirmed
   the plugin card once, the plugin starts elevated: the 系统 tab edits system
   variables (and the launcher's system-var delete works), save/backup/conflict
   detection cover both scopes, and hosts writes succeed. There is still no UAC
@@ -56,8 +59,23 @@ single source of truth; release tags are `v<version>`.
   value into items, then `Ins` / `Del` / `Alt+↑↓` / the item box edit one segment
   and rejoin it into the value. `Path` is pinned to `;`. (The cycling delimiter
   button that came with this is superseded by the combo above.)
+- In env list mode, the item list and its action pane are separated by a
+  draggable vertical splitter (minimum 180px / 200px). Drag the grip, or use
+  `Ctrl+Shift+Left/Right` from the table to move the split by 5%. The ratio is
+  preserved across window resizes; the cursor changes to a horizontal resize
+  arrow over the grip.
 
 ### Changed
+- `winshun.h` is now the host's 0.22.0 SDK (`WinShun/src/plugins-sdk/winshun.h`,
+  the same file already used by bosskey / volume / findmouse). It adds `details`
+  and `appearance` dispatch, the `winshun/refresh` notification, `toast`, query
+  `filters`, action `files` triggers, five new item fields, the `reveal` effect,
+  lifecycle hooks, UTF-8-safe JSON quoting and mutex-protected sends. Every
+  existing override and helper still compiles unchanged. `minWinShun` is
+  `0.22.0`: WinShun-plugins requires that floor for an unreviewed-native
+  package, so installation shows the native-plugin risk confirmation. The
+  0.22.0 `runtime.qt: "host"` contract cannot be used here because it is
+  mutually exclusive with `elevated`; the QML prototype ships its own Qt.
 - The delimiter is a self-drawn dropdown button with a preset menu instead of a
   native combo; picking a preset applies it at once, and `自定义…` opens a text box
   in its place that is applied with Enter / `应用`.
@@ -75,8 +93,17 @@ single source of truth; release tags are `v<version>`.
 - `README.md` is now the Chinese (default) documentation; `README.en.md` holds
   the full English text. Both link to each other. The English install steps now
   use Win顺's real English UI labels. No runtime change.
+- `tests/gui_preview.py` no longer shells out to `ffmpeg` (which is not on this
+  machine's PATH). It encodes the captured 32-bit BGRA DIB as PNG with the
+  standard library (`zlib` + `struct`), forcing the undefined GDI alpha byte to
+  opaque. All preview fixtures were regenerated with the new encoder.
+  The suite now also drags the new vertical splitter and asserts that the item
+  list grows while the action pane stays clear of it.
 
 ### Fixed
+- `LoadCursorW` calls no longer depend on the `UNICODE` build macro. The `IDC_*`
+  resource ids are cast explicitly, so a plain `g++` build compiles exactly like
+  the CMake build (which defines `UNICODE`).
 - Moving or picking a 分隔项 now updates the "当前项 N/M" counter and the
   Up/Down enable states immediately (they were painted in the window buffer and
   only refreshed on the next unrelated repaint).
@@ -125,5 +152,6 @@ First public release.
 - A backup before every write, with a configurable `backupCount`.
 - Byte-exact hosts round trip (UTF-8 BOM, CRLF, section comments preserved).
 
-[Unreleased]: https://github.com/ra9fael/winshun-envhosts/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/ra9fael/winshun-envhosts/compare/v0.4.0...HEAD
+[0.4.0]: https://github.com/ra9fael/winshun-envhosts/releases/tag/v0.4.0
 [0.1.0]: https://github.com/ra9fael/winshun-envhosts/releases/tag/v0.1.0

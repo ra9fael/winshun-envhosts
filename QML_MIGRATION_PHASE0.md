@@ -5,7 +5,7 @@
 ## 1. 插件身份与运行约束
 
 - [ ] 固定插件身份：`ra9fael.envhosts`；迁移期间保持 ID 不变，更新时沿用现有插件数据目录。
-- [ ] 记录当前 manifest：`manifest: 1`、`version: 0.4.0`、`minWinShun: 0.19.0`。
+- [ ] 记录当前 manifest：`manifest: 1`、`version: 0.4.0`、`minWinShun: 0.22.0`（未审核原生插件的收录下限）。
 - [ ] 保持 `runtime.mode: resident`、`start: lazy`、`idleExitSec: 0`、UTF-8 标准输入输出及 x64 限制，除非另行验证宿主兼容性。
 - [ ] 记录现有运行限制：`timeoutMs: 1500`、`memoryMB: 64`；确认 QML 原型是否仍能满足，若要调整需单独评估宿主行为与部署成本。
 - [ ] 冻结权限声明：`elevated`、`ui`、`clipboard:write`、hosts 路径的 `files:read` / `files:write`；确认实际操作只使用所声明的能力。
@@ -46,7 +46,7 @@
 
 - [ ] 页面/窗口类型：env 与 hosts 分别有条目视图、详情编辑、备份视图；hosts 另有可编辑原文页；记录各视图间切换与选择保留规则。
 - [ ] 打开/重开：首开显示窗口；重复打开按新筛选与选择更新；最小化时恢复；尝试前台激活失败时有非抢焦点兜底；不永久置顶。
-- [ ] 键盘：冻结当前快捷键表，包括 Tab/Shift+Tab、Ctrl+Tab、Ctrl+F、上下键、Enter/F2、Space、Ins、Del、Alt+Up/Down、Ctrl+R、Ctrl+C、Ctrl+Z/Y、Ctrl+S、F5、Esc；明确控件焦点下的优先级。
+- [ ] 键盘：冻结当前快捷键表，包括 Tab/Shift+Tab、Ctrl+Tab、Ctrl+F、上下键、Enter/F2、Space、Ins、Del、Alt+Up/Down、Ctrl+R、Ctrl+Shift+Left/Right（分隔项列表/操作区分栏）、Ctrl+C、Ctrl+Z/Y、Ctrl+S、F5、Esc；明确控件焦点下的优先级。
 - [ ] 编辑粒度：同一次编辑会话的 undo 合并规则、撤销/重做上限、删除标记与恢复、新增行删除语义保持一致。
 - [ ] 过滤与滚动：过滤更新、空结果、分页/滚动、选中项可见、编辑过程中不跳回首行；状态栏行范围和总数准确。
 - [ ] PATH 分隔项：仅显式进入拆分模式；`Path` 固定 `;`；引号中的分隔符不拆；保留空段；切换原文/列表和自定义分隔符往返无损。

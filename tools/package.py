@@ -36,7 +36,8 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 FIXED_TIME = (2020, 1, 1, 0, 0, 0)
 VERSION_RE = re.compile(r"^\d+\.\d+\.\d+$")
-MAX_BYTES = 256 << 20  # WinShun's archive limit (src/plugin/Install.h)
+MAX_UNPACKED = 256 << 20  # WinShun Install.h kMaxArchiveBytes (unpacked)
+MAX_PACKAGE = 64 << 20    # WinShun Gallery.h kMaxPackageBytes (the archive)
 
 
 def fail(msg: str) -> int:
@@ -109,9 +110,12 @@ def main() -> int:
             info.create_system = 3
             info.external_attr = 0o100644 << 16
             z.writestr(info, data)
-    if total > MAX_BYTES or target.stat().st_size > MAX_BYTES:
+    package_size = target.stat().st_size
+    if total > MAX_UNPACKED or package_size > MAX_PACKAGE:
         target.unlink()
-        return fail(f"package exceeds WinShun's {MAX_BYTES >> 20} MB limit")
+        return fail(f"package exceeds WinShun's limits "
+                    f"({total >> 20} MiB unpacked / {package_size >> 20} MiB archive; "
+                    f"max {MAX_UNPACKED >> 20} / {MAX_PACKAGE >> 20} MiB)")
 
     digest = hashlib.sha256(target.read_bytes()).hexdigest()
     (out / f"{target.name}.sha256").write_text(f"{digest}  {target.name}\n", encoding="ascii")

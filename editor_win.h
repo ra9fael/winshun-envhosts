@@ -245,6 +245,13 @@ private:
     };
     int m_splitterY = 0;
     bool m_dragSplitter = false;
+    // PATH item list / action pane split, as a percent of the value area width.
+    // A ratio (not pixels) keeps the split sane when the window is resized.
+    static constexpr int kPartsSplitDefaultPct = 42;
+    static constexpr int kPartsSplitMinPct = 20;
+    static constexpr int kPartsSplitMaxPct = 80;
+    int m_partsSplitPct = kPartsSplitDefaultPct;
+    bool m_dragPartsSplitter = false;
     bool m_extChanged = false;
     bool m_dark = false;
     bool m_loading = false; // suppress EN_CHANGE while refreshDetail fills controls
@@ -280,6 +287,7 @@ private:
     RECT m_rcTable = {};
     RECT m_rcDetail = {};
     RECT m_rcSplitter = {};
+    RECT m_rcPartsSplitter = {}; // vertical: PATH item list | action pane
     RECT m_rcModeRaw = {}, m_rcModeList = {}, m_rcDelimiter = {}, m_rcApply = {}, m_rcItemHint = {};
     RECT m_rcPartUp = {}, m_rcPartDown = {}, m_rcPartInsert = {}, m_rcPartDelete = {};
     RECT m_rcHostTitle = {}, m_rcHostEnabledLabel = {}, m_rcHostIpLabel = {};
@@ -1104,6 +1112,9 @@ private:
 
     void applyLayout()
     {
+        // The vertical splitter exists only in the env PATH item mode. Clear it
+        // first so switching kind/tab/mode cannot leave a stale hit target.
+        SetRectEmpty(&m_rcPartsSplitter);
         // Keep the two detail groups mutually exclusive. The other kind's
         // controls would otherwise stay at (0,0) as empty framed boxes.
         if (m_kind == "env") {
@@ -1173,9 +1184,20 @@ private:
             if (m_listMode) {
                 if (m_valueEdit)
                     ShowWindow(m_valueEdit, SW_HIDE);
-                const int listW = std::max(180, valueW * 42 / 100);
-                const int rightX = lx + listW + 8;
-                const int rightW = std::max(150, valueW - listW - 8);
+                // Draggable vertical splitter. The list keeps >= 180px and the
+                // action pane >= 200px, so neither side can be collapsed.
+                constexpr int splitW = 7, gapPx = 8;
+                constexpr int minListW = 180, minRightW = 200;
+                const int maxListW = std::max(minListW, valueW - splitW - 2 * gapPx - minRightW);
+                const int listW = std::max(minListW,
+                                           std::min(maxListW, valueW * m_partsSplitPct / 100));
+                const int splitX = lx + listW + gapPx / 2;
+                // The backup tab and hosts raw tab have no item pane: do not
+                // leave a hit target or a painted grip in their fixed strip.
+                if (showDetail && !raw)
+                    m_rcPartsSplitter = {splitX, valTop, splitX + splitW, valTop + valueH};
+                const int rightX = splitX + splitW + gapPx;
+                const int rightW = std::max(120, lx + valueW - rightX);
                 show(m_partsList, lx, valTop, listW, valueH);
                 show(m_partEdit, rightX, valTop, rightW, 24);
                 const int buttonY = valTop + 30;
@@ -1971,6 +1993,23 @@ private:
             }
             SelectObject(mem, ogp);
             DeleteObject(gp);
+        }
+
+        // ---- draggable splitter between the PATH item list and its action pane ----
+        if (m_rcPartsSplitter.right > m_rcPartsSplitter.left) {
+            HBRUSH vb = CreateSolidBrush(m_dark ? RGB(38, 41, 46) : RGB(236, 239, 244));
+            FillRect(mem, &m_rcPartsSplitter, vb);
+            DeleteObject(vb);
+            HPEN vg = CreatePen(PS_SOLID, 1, m_dark ? RGB(96, 104, 116) : RGB(160, 168, 180));
+            HGDIOBJ ovg = SelectObject(mem, vg);
+            const int cx = (m_rcPartsSplitter.left + m_rcPartsSplitter.right) / 2;
+            const int cy = (m_rcPartsSplitter.top + m_rcPartsSplitter.bottom) / 2;
+            for (int d = -14; d <= 14; d += 7) {
+                MoveToEx(mem, cx, cy + d - 2, nullptr);
+                LineTo(mem, cx, cy + d + 2);
+            }
+            SelectObject(mem, ovg);
+            DeleteObject(vg);
         }
 
         // ---- detail action buttons + two-row status bar ----
@@ -3112,6 +3151,11 @@ private:
                 SetCapture(m_hwnd);
                 return 0;
             }
+            if (inRect(m_rcPartsSplitter, x, y)) {
+                m_dragPartsSplitter = true;
+                SetCapture(m_hwnd);
+                return 0;
+            }
             if (inRect(m_rcInfo, x, y)) {
                 showPermissionHelp();
                 return 0;
@@ -3156,6 +3200,17 @@ private:
                 InvalidateRect(m_hwnd, nullptr, TRUE);
                 return 0;
             }
+            if (m_dragPartsSplitter) {
+                const int x = static_cast<int>(LOWORD(lp));
+                const int lx = m_rcDetail.left + 4;
+                const int valueW = m_rcDetail.right - lx - 4;
+                const int pct = valueW > 0 ? (x - lx) * 100 / valueW : kPartsSplitDefaultPct;
+                m_partsSplitPct = std::max(kPartsSplitMinPct,
+                                           std::min(kPartsSplitMaxPct, pct));
+                applyLayout();
+                InvalidateRect(m_hwnd, nullptr, TRUE);
+                return 0;
+            }
             {
                 const POINT pt {static_cast<int>(LOWORD(lp)), static_cast<int>(HIWORD(lp))};
                 const int old = m_hover;
@@ -3178,26 +3233,35 @@ private:
             }
             return 0;
         case WM_LBUTTONUP:
-            if (m_dragSplitter) {
+            if (m_dragSplitter || m_dragPartsSplitter) {
                 m_dragSplitter = false;
+                m_dragPartsSplitter = false;
                 ReleaseCapture();
                 return 0;
             }
             return 0;
         case WM_CAPTURECHANGED:
             m_dragSplitter = false;
+            m_dragPartsSplitter = false;
             return 0;
         case WM_SETCURSOR:
         {
             POINT pt {};
             GetCursorPos(&pt);
             ScreenToClient(m_hwnd, &pt);
+            // IDC_* are MAKEINTRESOURCE ids whose pointer type follows UNICODE.
+            // LoadCursorW always wants a wide id: cast explicitly so this file
+            // builds with or without the macro set.
             if (inRect(m_rcInfo, pt.x, pt.y)) {
-                SetCursor(LoadCursorW(nullptr, IDC_HAND));
+                SetCursor(LoadCursorW(nullptr, reinterpret_cast<LPCWSTR>(IDC_HAND)));
                 return TRUE;
             }
             if (m_kind == "env" && m_tab != 2 && inRect(m_rcSplitter, pt.x, pt.y)) {
-                SetCursor(LoadCursorW(nullptr, IDC_SIZENS));
+                SetCursor(LoadCursorW(nullptr, reinterpret_cast<LPCWSTR>(IDC_SIZENS)));
+                return TRUE;
+            }
+            if (inRect(m_rcPartsSplitter, pt.x, pt.y)) {
+                SetCursor(LoadCursorW(nullptr, reinterpret_cast<LPCWSTR>(IDC_SIZEWE)));
                 return TRUE;
             }
             return DefWindowProcW(m_hwnd, msg, wp, lp);
@@ -3268,6 +3332,16 @@ private:
                 // tab being left may hide that field, so the table keeps focus.
                 switchTab((m_tab + ((GetKeyState(VK_SHIFT) & 0x8000) != 0 ? 2 : 1)) % 3);
                 SetFocus(m_hwnd);
+                return 0;
+            }
+            if (m_listMode && (wp == VK_LEFT || wp == VK_RIGHT)
+                && (GetKeyState(VK_SHIFT) & 0x8000) != 0) {
+                // Keyboard equivalent of dragging the PATH item/action splitter.
+                const int delta = wp == VK_LEFT ? -5 : 5;
+                m_partsSplitPct = std::max(kPartsSplitMinPct,
+                                           std::min(kPartsSplitMaxPct, m_partsSplitPct + delta));
+                applyLayout();
+                InvalidateRect(m_hwnd, nullptr, TRUE);
                 return 0;
             }
             return 0;

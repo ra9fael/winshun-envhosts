@@ -40,9 +40,16 @@ asks before replacing the old version, and keeps the plugin's data folder.
 **Uninstall:** remove it from **Settings → Plugins → Installed**
 (**设置 → 插件 → 已安装** in the Chinese UI).
 
-This plugin is a native exe, so it is not listed in Win顺's in-app plugin
-library (the community index accepts script plugins only). The releases of this
-repository are the only distribution channel.
+This plugin is a native exe. It is listed in Win顺's in-app **plugin library**
+as an *unreviewed native* package (the entry is maintained in
+[LingCore/WinShun-plugins](https://github.com/LingCore/WinShun-plugins) and
+requires a maintainer to merge the PR), and its `.wsplugin` can also be
+installed manually from this repository's releases. Win顺 0.22.0 or newer is
+required: earlier hosts do not show the native-package risk confirmation. Both
+the first install and **every update** need a separate confirmation, and these
+packages are excluded from "Update all". "Unreviewed" means no code security
+review was performed — it is not a certification. Never replace a published
+package; publish a new version instead.
 
 ## Build from source
 
@@ -98,8 +105,8 @@ open hosts file in the default editor).
   environment variables live in `HKCU\Environment`; reading and writing them is
   done directly via `RegSetValueExW` (never `setx`, which silently truncates at
   1024 characters). This is declared honestly here rather than hidden.
-- No `processes` permission. The `elevated` permission **is** requested (needs
-  Win顺 ≥ 0.19.0): when Win顺 itself runs as administrator and you have clicked
+- No `processes` permission. The `elevated` permission **is** requested (this
+  package requires Win顺 ≥ 0.22.0): when Win顺 itself runs as administrator and you have clicked
   "Confirm" once on the envhosts card in Settings → Plugins, the plugin starts
   elevated and both system variables and hosts become writable. WinShun never
   shows UAC for a plugin; the confirmation must be repeated after the plugin
@@ -195,6 +202,10 @@ All data stays local under `WS_DATA_DIR`:
   back to the first row. `Path` is pinned to `;`. `Ctrl+R` again returns to raw text,
   showing the rejoined string. Splitting is always explicit, so the raw value never
   becomes unreachable.
+- **Resizable item pane**: a draggable vertical splitter separates the item list
+  from the action pane (minimum 180px / 200px). Hover shows a horizontal resize
+  cursor; drag to resize, or use `Ctrl+Shift+Left/Right` with the table focused to
+  move the split by 5%. The ratio survives a window resize.
 - **Delimiter**: a self-drawn dropdown button next to the mode button (e.g.
   `Semicolon (;) ▾`). Its menu offers `semicolon / comma / colon / Tab / pipe`,
   applied as soon as you pick one. `Custom…` swaps the button for a text box that

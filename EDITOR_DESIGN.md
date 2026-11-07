@@ -238,8 +238,8 @@ D3 was revised from "read-only preview" to editable text with parse-back.
   returns `notify` + `keep`, so the launcher stays open and the existing rows
   below remain usable. `tests/integration.py` (P3) verifies the failure path
   returns `notify` + `keep`; on a real desktop the window opens normally.
-- **D2** → revised in v0.4.2 to (b). The plugin declares `elevated` (needs
-  Win顺 ≥ 0.19.0 via `minWinShun`): when Win顺 runs as administrator and the user
+- **D2** → revised in v0.4.2 to (b). The plugin declares `elevated` (requires
+  Win顺 ≥ 0.22.0 via `minWinShun`, the unreviewed-native floor): when Win顺 runs as administrator and the user
   confirmed the plugin card once, the plugin starts elevated and the 系统 tab,
   the launcher's system-var delete and hosts writes all work. Write access still
   follows a real probe (`canWriteSystem` / `isWritable`), never the token alone;
@@ -316,7 +316,7 @@ Shift+Enter are not bound on row 1.
 | `version` | 0.1.0 | 0.2.0 | Permission change. The host asks the user to confirm the new permissions again. |
 
 `elevated` **is** declared as of v0.4.2 (revised decision D2 in section 9); it
-needs Win顺 ≥ 0.19.0, which `minWinShun` states.
+needs Win顺 ≥ 0.22.0, which `minWinShun` states.
 
 ### 2.2 Opening the window
 
@@ -407,7 +407,7 @@ table below is the authoritative description of each area.
 | Tabs | 用户 (editable), 系统 (editable when the plugin runs elevated — i.e. `canWriteSystem` passes; otherwise greyed editors), 备份 (list of `backups/env/*.json`, newest first). `showSystemVars=false` hides the 系统 tab. |
 | Table | ListView report mode. Columns 名称 / 类型 / 值 (first line, truncated) / ● dirty marker. Sorted by name, case-insensitive. Filter matches name or value, the same rule as `envMatches`. |
 | Detail pane | Edits the selected row. **List mode** is entered explicitly with `Ctrl+R` or the `原文│分隔项` segment (the value is never split silently, so the raw text always stays reachable); the delimiter comes from a preset menu or a custom text box (see "v0.4.1 fix pass" below). `Path`-named rows default to the `;` delimiter. Otherwise a multi-line Edit. |
-| List mode items | One row per segment, in order, with the selected row and the viewport preserved across an in-place edit. `上移 / 下移 / 插入 / 删除` (or `Alt+↑↓`, `Ins`, `Del`) act on that segment only, and `当前项 n / m` reports the position. No expansion or existence marks — those were dropped as v0.1 sketch. |
+| List mode items | One row per segment, in order, with the selected row and the viewport preserved across an in-place edit. `上移 / 下移 / 插入 / 删除` (or `Alt+↑↓`, `Ins`, `Del`) act on that segment only, and `当前项 n / m` reports the position. A draggable vertical splitter (7px grip, `IDC_SIZEWE`) sits between the list and the action pane; the split is stored as a percent (default 42, clamp 20–80) with hard minimums of 180px / 200px, so resizing the window keeps the ratio and neither side can collapse. `Ctrl+Shift+←/→` is the keyboard equivalent. No expansion or existence marks — those were dropped as v0.1 sketch. |
 | 类型 | REG_SZ / REG_EXPAND_SZ. Auto-switches to EXPAND when `%X%` is typed (same as `envTypeForValue`), but the user can override. REG_MULTI_SZ rows are shown read-only (v0.1 also does not edit them). |
 | Validation | Live, from `isValidEnvName` / `isValidEnvValue`: red border and status text. Save is disabled while any row is invalid. Length counter turns amber above 1024 (a later `setx` by any other tool truncates there) and red above 32767 (the Windows limit for one variable). |
 | New / delete | Ins adds a blank row with the name focused. Del marks the row deleted (red text, `Del 恢复` chip, a red notice in the detail pane); the row stays read-only until Del is pressed again. An unsaved new row is removed outright. Nothing reaches the registry until `Ctrl+S`. |
@@ -525,6 +525,7 @@ direct "restore" for the window path. The launcher path stays as it is.
 | Space | hosts table | Toggle 启用 |
 | Ins / Del | table | Add a row / toggle the deleted marker (Del again restores); an unsaved new row is removed outright |
 | Alt+↑ / Alt+↓ | env list mode | Move a PATH segment |
+| Ctrl+Shift+← / → | env list mode | Move the item list / action pane splitter by 5% (mouse: drag the vertical grip) |
 | Ctrl+R | env detail | List mode ↔ raw text |
 | Ctrl+C | table | Copy the value (env) or the full line (hosts) |
 | Ctrl+Shift+C | env table | Copy the expanded value |
@@ -563,7 +564,7 @@ All controls have accessible names so Narrator reads 名称, 值, 启用.
 | # | Question | Options | My recommendation |
 |---|---|---|---|
 | D1 | What does row 1 do when the window cannot open (old host, foreground fails)? | a) notify only; b) fall back to v0.1 inline list | a), plus the existing rows remain usable below it |
-| D2 | System env and protected hosts | a) read-only + banner (no new permission); b) add `elevated`: writable only when WinShun itself runs as admin, never a UAC prompt | b) since v0.4.2 — the permission is declared (`minWinShun` 0.19.0) and the write gate stays a real probe. The status bar's ⓘ explains the two-step confirmation. |
+| D2 | System env and protected hosts | a) read-only + banner (no new permission); b) add `elevated`: writable only when WinShun itself runs as admin, never a UAC prompt | b) since v0.4.2 — the permission is declared (`minWinShun` 0.22.0) and the write gate stays a real probe. The status bar's ⓘ explains the two-step confirmation. |
 | D3 | hosts 原文 tab editable? | a) read-only preview; b) full text editing with parse-back | a) in v0.2; b) since v0.4.1, with the `disk` / `base` split described under "Editable raw tab". |
 | D4 | Keep `clipboard:write`? | a) yes, Ctrl+C in window; b) no, copy only from launcher rows | a) — copying a value is the most common action |
 
