@@ -148,15 +148,14 @@ The version in `plugin.json` is the single source of truth. Versions follow
    publishes a GitHub Release with the `.wsplugin` and its `.sha256`. Confirm the
    release is neither draft nor prerelease and that GitHub's asset digest equals
    the local `.sha256` file.
-6. Offline registry pre-check (before opening the PR):
+6. Offline registry pre-check (before opening the PR). Set `REG` to the folder
+   holding `WinShun-plugins/tools`, then run this as a single PowerShell line:
    ```powershell
-   python -c "import sys; sys.path.insert(0, r'<WinShun-plugins>\tools'); import check; \
-   d=open(r'dist\ra9fael.envhosts-x.y.z.wsplugin','rb').read(); \
-   p=check.check_package(d,'ra9fael.envhosts','x.y.z','package.wsplugin',unreviewed_native=True); \
-   print(p.errors, p.warnings)"
+   $env:REG='D:\dev\github\winshun-dev\WinShun-plugins\tools'; python -c "import sys,os,json; sys.path.insert(0,os.environ['REG']); import check; m=json.load(open('plugin.json',encoding='utf-8')); v=m['version']; f='dist/'+m['id']+'-'+v+'.wsplugin'; p=check.check_package(open(f,'rb').read(),m['id'],v,f,unreviewed_native=True); print('errors',p.errors); print('warnings',p.warnings); print('sha256',p.fields.get('sha256'))"
    ```
    A plain `check.py <folder>` is the script-package checker and will reject the
-   exe; `unreviewed_native=True` is required.
+   exe; `unreviewed_native=True` is required. `tests/verify_install.py` also
+   checks the archive limits and installed files.
 7. Submit the registry entry from a `WinShun-plugins` branch/worktree:
    ```powershell
    python tools/entry.py <release-asset-url> --unreviewed-native --print
