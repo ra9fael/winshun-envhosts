@@ -7,6 +7,10 @@ single source of truth; release tags are `v<version>`.
 
 ## [Unreleased]
 
+## [0.7.4] - 2026-11-08
+
+本地标签测试版，未公开发布。Local tagged test build; not publicly published.
+
 ### Fixed / 修复
 
 - 分隔项“上移 / 下移”按钮统一放入底部“分隔项”操作组，显示 Alt+↑/↓，首尾和
@@ -426,7 +430,8 @@ First public release.
 - A backup before every write, with a configurable `backupCount`.
 - Byte-exact hosts round trip (UTF-8 BOM, CRLF, section comments preserved).
 
-[Unreleased]: https://github.com/ra9fael/winshun-envhosts/compare/v0.7.3...HEAD
+[Unreleased]: https://github.com/ra9fael/winshun-envhosts/compare/v0.7.4...HEAD
+[0.7.4]: https://github.com/ra9fael/winshun-envhosts/releases/tag/v0.7.4
 [0.7.3]: https://github.com/ra9fael/winshun-envhosts/releases/tag/v0.7.3
 [0.7.2]: https://github.com/ra9fael/winshun-envhosts/releases/tag/v0.7.2
 [0.7.1]: https://github.com/ra9fael/winshun-envhosts/releases/tag/v0.7.1
