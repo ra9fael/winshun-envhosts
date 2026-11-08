@@ -7,6 +7,8 @@ single source of truth; release tags are `v<version>`.
 
 ## [Unreleased]
 
+## [0.7.3] - 2026-11-08
+
 ### Fixed / 修复
 
 - **恢复草稿弹窗按钮被截断。** 无明细区的弹窗现在也按实际正文高度计算窗口与
@@ -30,6 +32,15 @@ single source of truth; release tags are `v<version>`.
   100/150/200% font-size layout regressions.
   GUI/协议测试使用每次运行独立的临时注册表键，GUI 异常退出也清理进程和数据；
   新增分隔项状态、恢复弹窗及 100/150/200% 字体尺寸的布局回归。
+
+### Known limitations / 已知验证边界
+
+- 150%/200% coverage measures font layout; physical multi-monitor DPI
+  transitions and dialogs taller than the screen have not been verified.
+  150%/200% 仅覆盖字体布局测量，未验证实机跨显示器 DPI 切换和高于屏幕的超长弹窗。
+- Elevated writes to the real system environment and hosts file were not
+  exercised; write/restore checks use isolated test data.
+  未实测提权后写入真实系统环境变量和 hosts 文件，写入/恢复使用隔离测试数据。
 
 ## [0.7.2] - 2026-11-08
 
@@ -392,7 +403,8 @@ First public release.
 - A backup before every write, with a configurable `backupCount`.
 - Byte-exact hosts round trip (UTF-8 BOM, CRLF, section comments preserved).
 
-[Unreleased]: https://github.com/ra9fael/winshun-envhosts/compare/v0.7.2...HEAD
+[Unreleased]: https://github.com/ra9fael/winshun-envhosts/compare/v0.7.3...HEAD
+[0.7.3]: https://github.com/ra9fael/winshun-envhosts/releases/tag/v0.7.3
 [0.7.2]: https://github.com/ra9fael/winshun-envhosts/releases/tag/v0.7.2
 [0.7.1]: https://github.com/ra9fael/winshun-envhosts/releases/tag/v0.7.1
 [0.7.0]: https://github.com/ra9fael/winshun-envhosts/releases/tag/v0.7.0
