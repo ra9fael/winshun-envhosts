@@ -10,6 +10,8 @@ Browse, filter and edit **user environment variables** and **hosts file entries*
 directly from the WinShun launcher. Every write is backed up first; admin-only
 targets degrade honestly instead of pretending to succeed.
 
+This branch maintains the **QML edition**. Features and shortcuts follow each edition’s documentation.
+
 ## Purpose
 
 - `env` — list user (and optionally system) environment variables, filter by
@@ -18,54 +20,50 @@ targets degrade honestly instead of pretending to succeed.
 - `hosts` — list hosts entries, filter, toggle comments on/off, copy lines,
   delete lines (double-Enter confirm), add entries, restore backups.
 - **Interactive editor window** — the first result for `env` and `hosts` is always
-  "进入交互式编辑界面" (Enter opens a standalone GDI window): full keyboard control,
+  "进入交互式编辑界面" (Enter opens the installed edition’s editor): full keyboard control,
   undo/redo, conflict detection, and auto-saved drafts under `WS_DATA_DIR/drafts/`.
 
 ## Install
 
-1. Download `ra9fael.envhosts-<version>.wsplugin` from the
-   [latest release](https://github.com/ra9fael/winshun-envhosts/releases/latest).
-   Optionally compare its SHA-256 with the `.sha256` file next to it
-   (`Get-FileHash <file> -Algorithm SHA256`).
-2. In Win顺 open **Settings → Plugins → Installed → Add plugin →
-   Archive (.zip / .wsplugin)** and pick the file. In the Chinese UI the same
-   path reads **设置 → 插件 → 已安装 → 添加插件 → 压缩包（.zip / .wsplugin）**.
-3. A plugin installed from a local package is **not enabled automatically**.
-   Turn it on in the list; enabling it is how you confirm its permissions
-   (see [Permissions](#permissions-and-why)).
+Both editions are maintained and published. Choose the interface you prefer:
 
-**Update:** install the newer `.wsplugin` the same way. Win顺 sees the same id,
-asks before replacing the old version, and keeps the plugin's data folder.
+| Edition | Download | Branch |
+|---|---|---|
+| Native GDI interface | [GDI 0.7.5](https://github.com/ra9fael/winshun-envhosts/releases/tag/gdi%2Fv0.7.5) | `gdi` |
+| QML interface | [QML 0.8.0](https://github.com/ra9fael/winshun-envhosts/releases/tag/qml%2Fv0.8.0) | `qml` |
 
-**Uninstall:** remove it from **Settings → Plugins → Installed**
-(**设置 → 插件 → 已安装** in the Chinese UI).
+1. Download its `.wsplugin`; optionally verify the accompanying `.sha256`.
+2. Open **Settings → Plugins → Installed → Add plugin → Archive (.zip / .wsplugin)**.
+3. Confirm installation and permissions, then enable it as needed.
 
-This plugin is a native exe. It is listed in Win顺's in-app **plugin library**
-as an *unreviewed native* package (the entry is maintained in
-[LingCore/WinShun-plugins](https://github.com/LingCore/WinShun-plugins) and
-requires a maintainer to merge the PR), and its `.wsplugin` can also be
-installed manually from this repository's releases. Win顺 0.22.0 or newer is
-required: earlier hosts do not show the native-package risk confirmation. Both
-the first install and **every update** need a separate confirmation, and these
-packages are excluded from "Update all". "Unreviewed" means no code security
-review was performed — it is not a certification. Never replace a published
-package; publish a new version instead.
+**Mutually exclusive installation:** both packages use `ra9fael.envhosts`.
+Installing the other edition replaces the current one. No uninstall is needed.
+Save or close editor windows first. Switching to a lower version may show a
+downgrade confirmation. Settings/backups remain; drafts are separate per backend.
+
+**Updates:** install updates from the release page for your chosen edition.
+The current plugin library has one backend URL per ID. Accepting its GDI update
+may switch QML back to GDI; use QML releases to stay on QML. Listing this newly
+created repository in the library requires a separate submission; a GitHub
+release alone does not add it. WinShun 0.22.0+ is required, with host confirmation
+for native-plugin installs and updates.
+
+See [edition switching, migration and acceptance](docs/DUAL_EDITIONS.md).
 
 ## Build from source
 
-Requirements: Windows 10/11 x64, CMake 3.21+, and either Visual Studio 2022 or
-later (MSVC) or MinGW-w64 GCC 13+. Python 3.10+ for packaging and the
-integration tests.
+Windows 10/11 x64, CMake 3.21+, MSVC 2022+ and Python 3.10+.
+Check out `gdi` or `qml`; `edition.json` selects the backend automatically.
+QML also needs Qt 6.8.3 on `CMAKE_PREFIX_PATH`.
 
 ```powershell
-cmake -S . -B build -A x64                 # MSVC; for MinGW use -G "MinGW Makefiles"
-cmake --build build --config Release       # writes envhosts.exe next to plugin.json
-ctest --test-dir build -C Release --output-on-failure
-python tools/package.py                    # dist/ra9fael.envhosts-<version>.wsplugin
+cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
+cmake --build build
+ctest --test-dir build --output-on-failure
 ```
 
-To run a local build inside Win顺 without packaging, and for tests and the
-release process, see [CONTRIBUTING.md](CONTRIBUTING.md).
+GDI uses `python tools/package.py`. Deploy Qt before packaging QML.
+See [edition instructions](docs/DUAL_EDITIONS.md) and [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## Keywords and examples
 
@@ -89,7 +87,7 @@ open hosts file in the default editor).
 
 - Windows 10/11, x64 (a 32-bit build is rejected at compile time: the Wow64
   file-system redirector would otherwise edit `SysWOW64\drivers\etc\hosts`).
-- Ships as a statically linked `envhosts.exe`; no runtime libraries needed.
+- GDI is statically linked; QML bundles Qt 6.8.3 and the VC runtime.
 - Resident plugin (`mode: resident`), lazy start, `idleExitSec: 0` — it stays
   resident until WinShun exits so an open editor window is never killed by idle.
 
@@ -135,7 +133,7 @@ All data stays local under `WS_DATA_DIR`:
   env write and delete (kept: `backupCount`, default 10).
 - `backups/hosts/<timestamp>.hosts` — verbatim hosts bytes taken before every
   hosts write (kept: `backupCount`).
-- `drafts/env.json` / `drafts/hosts.json` — unsaved edits in the interactive editor
+- `drafts/<gdi|qml>/env.json` / `drafts/<gdi|qml>/hosts.json` — unsaved edits in the interactive editor
   window, written automatically every 30 s and on shutdown/close. Reopening the
   editor asks Restore / Discard: Restore shows them as unsaved edits (Ctrl+S is
   still required), Discard deletes the draft file. Only the editor writes drafts;
@@ -171,7 +169,7 @@ All data stays local under `WS_DATA_DIR`:
 - The editor writes nothing until you press **Ctrl+S**: it re-reads the target,
   compares a content fingerprint, and aborts with a conflict note if the underlying
   env/hosts changed since the window opened. The pre-write backup is the recovery
-  path. Unsaved edits are flushed to `drafts/env.json` / `drafts/hosts.json`
+  path. Unsaved edits are flushed to `drafts/<gdi|qml>/env.json` / `drafts/<gdi|qml>/hosts.json`
   every 30 s and on close.
 - The window runs on its own GUI thread; launcher writes to the same target
   `PostMessage` a reload (so an open window reflects external edits). They are

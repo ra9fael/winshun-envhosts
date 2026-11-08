@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'none'; base-uri 'none'; form-action 'none'">
+  <title>EnvHosts · 交互原型</title>
+  <link rel="stylesheet" href="tokens.css">
+  <link rel="stylesheet" href="prototype.css">
+  <script src="prototype.js" defer></script>
+</head>
+<body>
+  <header class="review-header">
+    <div><span class="eyebrow">ENVHOSTS / DESIGN REVIEW 02</span><h1>少一步操作，多一分确定。</h1><p>编辑自动暂存，保存之前可以自由切换和撤销。</p></div>
+    <div class="review-tools"><span class="prototype-label">交互原型 · 合成数据 · 不写系统</span><div><a href="../design/index.html">SVG 图集</a><button id="theme">切换暗色</button><button id="reset">重置演示</button></div></div>
+  </header>
+  <div class="review-layout">
+    <aside aria-label="评审任务">
+      <h2>体验三个任务</h2><p class="muted">任务按钮只切换视图，不清空编辑。</p>
+      <button class="task active" data-task="path"><span class="task-number">01</span><strong>给 PATH 加一个目录</strong><span>添加 C:\SDK\bin，核对后保存。</span><em id="task-path">等待完成</em></button>
+      <button class="task" data-task="hosts"><span class="task-number">02</span><strong>临时停用本地映射</strong><span>关闭 api.test，验证可以撤销。</span><em id="task-hosts">等待完成</em></button>
+      <button class="task" data-task="restore"><span class="task-number">03</span><strong>从备份恢复变量</strong><span>预览差异，恢复 OLD_SDK 并保存。</span><em id="task-restore">等待完成</em></button>
+      <details class="review-scenarios"><summary>评审情境</summary><p>以下按钮只改变演示内存。</p><button id="external">模拟外部改动</button><button id="fail-next">下一次保存失败</button><button id="readonly">切换目标只读</button></details>
+      <p class="review-note">当前原型验证三条任务、撤销、冲突和失败反馈。原文编码、权限与实际写入需后续 QML 验收。</p>
+    </aside>
+    <main class="app" aria-label="EnvHosts 编辑器原型">
+      <div class="titlebar"><span class="logo">eh</span><span>EnvHosts</span><span class="muted">交互评审</span></div>
+      <div class="app-heading"><div><h2 id="target-title">环境变量</h2><span id="dirty-badge" class="badge clean">已同步</span></div><div class="actions"><button id="undo" title="Ctrl+Z">撤销</button><button id="redo" title="Ctrl+Y">重做</button><button id="reload">重新载入</button><button id="save" class="primary">保存到系统 <kbd>Ctrl S</kbd></button></div></div>
+      <nav class="tabs" aria-label="当前目标页面"><button data-page="env" aria-current="page">变量</button><button data-page="hosts" hidden>条目</button><button data-page="backup">备份</button></nav>
+      <div id="banner" class="banner" hidden></div>
+      <section id="content" aria-label="编辑区域"></section>
+      <footer><div><span id="status" role="status" aria-live="polite">已与演示目标同步</span><span id="capability">用户范围可写 · 系统范围只读</span></div><div class="shortcuts"><span><kbd>Ctrl F</kbd> 筛选</span><span><kbd>Ctrl Z / Y</kbd> 撤销 / 重做</span><span><kbd>Alt ↑ / ↓</kbd> 移动分隔项</span><span><kbd>Esc</kbd> 取消输入 / 关闭弹窗</span></div></footer>
+    </main>
+  </div>
+  <dialog id="modal" aria-labelledby="modal-title"><div id="modal-body"></div><div id="modal-actions" class="dialog-actions"></div></dialog>
+  <p class="review-bottom">此页面的“保存”只更新演示内存；刷新页面会重置。没有网络请求、持久化存储或 Win顺 插件调用。</p>
+</body>
+</html>

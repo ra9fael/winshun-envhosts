@@ -1,0 +1,37 @@
+{
+  "schemaVersion": 1,
+  "revision": "repair-1-compact",
+  "colors": {
+    "light": {
+      "bg": "#edf1f5", "panel": "#ffffff", "field": "#f8fafc",
+      "ink": "#16273b", "muted": "#536578", "line": "#cbd5e1",
+      "control": "#7b8b9e", "accent": "#185abd", "onAccent": "#ffffff",
+      "accentHover": "#104b9f", "soft": "#e9f1ff",
+      "green": "#16734a", "greenbg": "#e7f5ed",
+      "amber": "#8c5408", "amberbg": "#fff3d9",
+      "red": "#b52d3b", "redbg": "#ffedf0"
+    },
+    "dark": {
+      "bg": "#121a26", "panel": "#1c2838", "field": "#172231",
+      "ink": "#f0f5fc", "muted": "#b3c2d5", "line": "#42536b",
+      "control": "#8093ae", "accent": "#9ac4ff", "onAccent": "#121a26",
+      "accentHover": "#b9d6ff", "soft": "#293f5c",
+      "green": "#85ddb0", "greenbg": "#203e35",
+      "amber": "#f2c57e", "amberbg": "#443820",
+      "red": "#ff9caa", "redbg": "#482a35"
+    }
+  },
+  "metrics": {
+    "windowWidth": 1120, "windowHeight": 760,
+    "minimumWidth": 900, "minimumHeight": 640,
+    "pageMargin": 12, "spacingUnit": 6, "controlMinHeight": 26,
+    "rowHeight": 28, "inputHeight": 28, "headerHeight": 28, "checkSize": 14, "selectionWidth": 32,
+    "focusWidth": 2, "controlRadius": 3,
+    "listMinHeight": 160, "detailMinHeight": 240,
+    "bodyFontSize": 13, "secondaryFontSize": 12, "headingFontSize": 18
+  },
+  "fonts": {
+    "ui": ["Segoe UI", "Microsoft YaHei UI", "Microsoft YaHei"],
+    "value": ["Cascadia Code", "Consolas"]
+  }
+}

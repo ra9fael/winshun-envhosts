@@ -1,216 +1,119 @@
-// Main.qml - root of the Qt Quick editor prototype (read-only slice).
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
+import "controls"
+import "pages"
+import "dialogs"
 
-Window {
+ApplicationWindow {
     id: root
-
-    property var bridge: null
-
-    readonly property bool dark: bridge ? bridge.dark : false
-    readonly property color bgColor: dark ? "#1f1f1f" : "#f6f6f6"
-    readonly property color panelColor: dark ? "#2a2a2a" : "#ffffff"
-    readonly property color inkColor: dark ? "#eaeaea" : "#1f1f1f"
-    readonly property color dimColor: dark ? "#a0a0a0" : "#6b6b6b"
-    readonly property color ruleColor: dark ? "#3c3c3c" : "#dcdcdc"
-    readonly property color accentColor: dark ? "#7fb6ef" : "#0c447c"
-    readonly property color hoverColor: dark ? "#333333" : "#eef3fa"
-    readonly property int primaryWidth: bridge ? bridge.primaryWidth : 260
-
-    width: 940
-    height: 620
+    objectName: "editorWindow"
+    required property var bridge
+    readonly property var s: bridge.state
+    DesignTokens { id: tokens; dark: s.dark }
+    width: tokens.windowWidth
+    height: tokens.windowHeight
+    minimumWidth: tokens.minimumWidth
+    minimumHeight: tokens.minimumHeight
+    title: (s.dirty ? "● " : "") + s.title + " · EnvHosts"
     visible: false
-    title: bridge ? bridge.title : ""
-    color: bgColor
-
-    ColumnLayout {
+    color: tokens.bg
+    font.family: s.zh ? "Microsoft YaHei UI" : "Segoe UI"
+    font.pixelSize: tokens.bodyFontSize
+    palette.window: tokens.bg
+    palette.windowText: tokens.ink
+    palette.base: tokens.field
+    palette.text: tokens.ink
+    palette.button: tokens.panel
+    palette.buttonText: tokens.ink
+    palette.highlight: tokens.accent
+    palette.highlightedText: tokens.onAccent
+    palette.placeholderText: tokens.muted
+    palette.mid: tokens.control
+    palette.dark: tokens.control
+    palette.light: tokens.panel
+    palette.brightText: tokens.ink
+    onClosing: close => { close.accepted = bridge.requestClose() }
+    onActiveChanged: bridge.setActive(active)
+    function composing() { return !!(activeFocusItem && activeFocusItem.inputMethodComposing) }
+    Shortcut { sequence: "Ctrl+S"; enabled: !root.composing() && !s.busy && !s.dialog; onActivated: bridge.requestSave() }
+    Shortcut { sequence: "Ctrl+F"; enabled: !root.composing() && !s.dialog; onActivated: { if (pageLoader.item && pageLoader.item.focusFilter) pageLoader.item.focusFilter() } }
+    Shortcut { sequence: "F5"; enabled: !root.composing() && !s.busy && !s.dialog; onActivated: bridge.requestReload() }
+    FocusScope {
         anchors.fill: parent
-        spacing: 0
-
-        Rectangle {
-            Layout.fillWidth: true
-            implicitHeight: 46
-            color: root.panelColor
-
+        focus: true
+        Keys.onPressed: event => {
+            if (root.composing()) return
+            if ((event.key === Qt.Key_Z || event.key === Qt.Key_Y) && (event.modifiers & Qt.ControlModifier)) { bridge.history(event.key === Qt.Key_Y || !!(event.modifiers & Qt.ShiftModifier)); event.accepted = true }
+        }
+        ColumnLayout {
+            anchors.fill: parent
+            anchors.margins: tokens.pageMargin
+            spacing: tokens.spacingUnit
             RowLayout {
-                anchors.fill: parent
-                anchors.leftMargin: 12
-                anchors.rightMargin: 12
-
-                Text {
-                    text: root.bridge ? root.bridge.title : ""
-                    color: root.inkColor
-                    font.pixelSize: 15
-                    font.bold: true
-                    Layout.fillWidth: true
+                Layout.fillWidth: true
+                ColumnLayout {
+                    Label { text: s.title; font.pixelSize: tokens.headingFontSize; font.bold: true; color: tokens.ink }
+                    Label { text: s.pending ? bridge.trText(bridge.state.zh, "输入尚未暂存", "Input pending") : s.dirty ? bridge.trText(bridge.state.zh, "工作副本有未保存修改", "Working copy has unsaved changes") : bridge.trText(bridge.state.zh, "与目标一致", "In sync with target"); color: s.dirty ? tokens.amber : tokens.muted }
                 }
-
-                TextField {
-                    Layout.preferredWidth: 260
-                    placeholderText: qsTr("筛选")
-                    text: root.bridge ? root.bridge.filter : ""
-                    onTextEdited: {
-                        if (root.bridge)
-                            root.bridge.filter = text
-                    }
-                }
+                Item { Layout.fillWidth: true }
+                CommandButton { objectName: "undoButton"; theme: tokens; text: bridge.trText(bridge.state.zh, "撤销", "Undo"); enabled: s.canUndo && !s.busy && !s.pending; onClicked: bridge.history() }
+                CommandButton { theme: tokens; text: bridge.trText(bridge.state.zh, "重做", "Redo"); enabled: s.canRedo && !s.busy && !s.pending; onClicked: bridge.history(true) }
+                CommandButton { theme: tokens; text: bridge.trText(bridge.state.zh, "重新载入", "Reload"); enabled: !s.busy; onClicked: bridge.requestReload() }
+                CommandButton { objectName: "saveButton"; theme: tokens; primary: true; text: s.writing ? bridge.trText(bridge.state.zh, "正在保存…", "Saving…") : bridge.trText(bridge.state.zh, "保存全部修改", "Save all changes"); enabled: s.ready && s.dirty && !s.busy; onClicked: bridge.requestSave() }
             }
-        }
-
-        Rectangle {
-            Layout.fillWidth: true
-            implicitHeight: 1
-            color: root.ruleColor
-        }
-
-        Rectangle {
-            Layout.fillWidth: true
-            implicitHeight: 30
-            color: root.panelColor
-
             RowLayout {
-                anchors.fill: parent
-                anchors.leftMargin: 12
-                anchors.rightMargin: 12
-                spacing: 10
-
-                Repeater {
-                    model: root.bridge ? root.bridge.columns : []
-
-                    Text {
-                        text: modelData
-                        color: root.dimColor
-                        font.pixelSize: 12
-                        elide: Text.ElideRight
-                        Layout.preferredWidth: index === 0 ? root.primaryWidth : -1
-                        Layout.fillWidth: index > 0
-                        Layout.preferredHeight: 30
-                        verticalAlignment: Text.AlignVCenter
-                    }
-                }
+                CommandButton { theme: tokens; primary: s.page === s.kind; text: s.kind === "env" ? bridge.trText(bridge.state.zh, "变量", "Variables") : bridge.trText(bridge.state.zh, "条目", "Entries"); enabled: !s.busy; onClicked: bridge.navigate(s.kind) }
+                CommandButton { theme: tokens; visible: s.kind === "hosts"; primary: s.page === "raw"; text: bridge.trText(bridge.state.zh, "完整原文", "Full text"); enabled: !s.busy; onClicked: bridge.navigate("raw") }
+                CommandButton { theme: tokens; primary: s.page === "backup"; text: bridge.trText(bridge.state.zh, "备份", "Backups"); enabled: !s.busy; onClicked: bridge.navigate("backup") }
+                Item { Layout.fillWidth: true }
+                BusyIndicator { running: s.busy; visible: running; implicitWidth: 24; implicitHeight: 24 }
+                Label { text: bridge.trText(bridge.state.zh, "%1 项变更", "%1 changes").arg(s.changeCount); color: tokens.muted }
             }
-        }
-
-        Rectangle {
-            Layout.fillWidth: true
-            implicitHeight: 1
-            color: root.ruleColor
-        }
-
-        ListView {
-            id: list
-            Layout.fillWidth: true
-            Layout.fillHeight: true
-            clip: true
-            model: root.bridge ? root.bridge.rows : null
-            ScrollBar.vertical: ScrollBar {}
-
-            delegate: RowDelegate {
-                width: list.width
-                bridge: root.bridge
-                primaryWidth: root.primaryWidth
-                inkColor: root.inkColor
-                dimColor: root.dimColor
-                accentColor: root.accentColor
-                hoverColor: root.hoverColor
+            StatusBanner { theme: tokens; visible: !!s.error; error: true; text: s.error }
+            StatusBanner { theme: tokens; visible: s.conflict; text: bridge.trText(bridge.state.zh, "目标已被外部修改；保存时需核对冲突。", "The target changed externally. Review conflicts before saving.") }
+            StatusBanner { theme: tokens; visible: s.warnings.length > 0; text: s.warnings.join(" · ") }
+            Loader {
+                id: pageLoader
+                Layout.fillWidth: true
+                Layout.fillHeight: true
+                sourceComponent: s.page === "env" ? environment : s.page === "hosts" ? hosts : s.page === "raw" ? raw : backups
             }
-
-            Text {
-                anchors.centerIn: parent
-                width: parent.width - 40
-                horizontalAlignment: Text.AlignHCenter
-                wrapMode: Text.WordWrap
-                visible: list.count === 0
-                color: root.bridge && root.bridge.errorText !== "" ? "#c0392b" : root.dimColor
-                text: root.bridge && root.bridge.errorText !== "" ? root.bridge.errorText
-                                                                 : qsTr("没有匹配的行")
-            }
+            Label { objectName: "windowStatus"; text: s.notice || bridge.trText(bridge.state.zh, "修改自动暂存到工作副本 · 保存前可撤销", "Edits stage in the working copy · Undo before saving"); Layout.fillWidth: true; wrapMode: Text.Wrap; color: tokens.muted; font.pixelSize: tokens.secondaryFontSize }
         }
-
-        Connections {
-            target: root.bridge
-
-            function onCurrentRowChanged() {
-                list.currentIndex = root.bridge ? root.bridge.currentIndex : -1
-            }
-        }
-
-        Rectangle {
-            Layout.fillWidth: true
-            implicitHeight: 1
-            color: root.ruleColor
-        }
-
-        Rectangle {
-            Layout.fillWidth: true
-            Layout.preferredHeight: 190
-            color: root.panelColor
-
-            ColumnLayout {
-                anchors.fill: parent
-                anchors.margins: 12
-                spacing: 6
-
-                Text {
-                    text: root.bridge ? root.bridge.detailTitle : ""
-                    color: root.accentColor
-                    font.pixelSize: 13
-                    font.bold: true
-                    elide: Text.ElideRight
-                    Layout.fillWidth: true
-                }
-
-                Repeater {
-                    model: root.bridge ? root.bridge.detailFields : []
-
-                    RowLayout {
-                        Layout.fillWidth: true
-                        spacing: 10
-
-                        Text {
-                            text: modelData.label
-                            color: root.dimColor
-                            font.pixelSize: 12
-                            Layout.preferredWidth: 72
-                        }
-
-                        Text {
-                            text: modelData.value
-                            color: root.inkColor
-                            font.pixelSize: 12
-                            elide: Text.ElideRight
-                            Layout.fillWidth: true
-                        }
-                    }
-                }
-
-                Item {
-                    Layout.fillHeight: true
-                }
-            }
-        }
-
-        Rectangle {
-            Layout.fillWidth: true
-            implicitHeight: 1
-            color: root.ruleColor
-        }
-
-        Rectangle {
-            Layout.fillWidth: true
-            implicitHeight: 26
-            color: root.panelColor
-
-            Text {
-                anchors.fill: parent
-                anchors.leftMargin: 12
-                anchors.rightMargin: 12
-                text: root.bridge ? root.bridge.statusLine : ""
-                color: root.dimColor
-                font.pixelSize: 12
-                elide: Text.ElideRight
-                verticalAlignment: Text.AlignVCenter
+    }
+    Component { id: environment; EnvironmentPage { bridge: root.bridge; theme: tokens } }
+    Component { id: hosts; HostsEntriesPage { bridge: root.bridge; theme: tokens } }
+    Component { id: raw; HostsRawPage { bridge: root.bridge; theme: tokens } }
+    Component { id: backups; BackupsPage { bridge: root.bridge; theme: tokens } }
+    Dialog {
+        id: modal
+        objectName: "stateDialog"
+        parent: Overlay.overlay
+        anchors.centerIn: parent
+        width: Math.min(root.width - 64, 930)
+        height: Math.min(root.height - 64, s.dialog === "review" || s.dialog === "conflict" ? 580 : 290)
+        modal: true
+        visible: !!s.dialog
+        title: s.dialogTitle
+        closePolicy: Popup.NoAutoClose
+        contentItem: ColumnLayout {
+            Keys.onEscapePressed: bridge.respond("cancel")
+            Label { text: s.dialogText; wrapMode: Text.Wrap; Layout.fillWidth: true; color: tokens.ink }
+            SaveReview { bridge: root.bridge; theme: tokens; visible: s.dialog === "review"; Layout.fillWidth: true; Layout.fillHeight: true }
+            ConflictReview { bridge: root.bridge; theme: tokens; visible: s.dialog === "conflict"; Layout.fillWidth: true; Layout.fillHeight: true }
+            Item { Layout.fillHeight: true; visible: s.dialog !== "review" && s.dialog !== "conflict" }
+            RowLayout {
+                Layout.fillWidth: true
+                DraftRecovery { bridge: root.bridge; theme: tokens; visible: s.dialog === "draft" }
+                CommandButton { theme: tokens; visible: s.dialog === "conflict"; text: bridge.trText(bridge.state.zh, "重新载入", "Reload"); onClicked: bridge.respond("reload") }
+                CommandButton { theme: tokens; danger: true; visible: s.dialog === "conflict"; text: bridge.trText(bridge.state.zh, "覆盖并复核", "Overwrite and review"); onClicked: bridge.respond("overwrite") }
+                CommandButton { theme: tokens; visible: s.dialog === "close"; primary: true; text: bridge.trText(bridge.state.zh, "保存", "Save"); onClicked: bridge.respond("save") }
+                CommandButton { theme: tokens; visible: s.dialog === "close"; text: bridge.trText(bridge.state.zh, "保留草稿并关闭", "Keep draft and close"); onClicked: bridge.respond("draft") }
+                CommandButton { theme: tokens; danger: true; visible: s.dialog === "close"; text: bridge.trText(bridge.state.zh, "丢弃修改", "Discard edits"); onClicked: bridge.respond("discard") }
+                Item { Layout.fillWidth: true }
+                CommandButton { objectName: "dialogCancel"; theme: tokens; text: s.dialog === "info" ? bridge.trText(bridge.state.zh,"关闭","Close") : bridge.trText(bridge.state.zh, "取消", "Cancel"); onClicked: bridge.respond("cancel") }
+                CommandButton { objectName: "dialogConfirm"; theme: tokens; primary: true; visible: ["review", "normalize", "restore", "reload", "discardClose", "deleteBackup"].indexOf(s.dialog) >= 0; text: s.dialog === "review" ? bridge.trText(bridge.state.zh, "确认保存", "Confirm save") : bridge.trText(bridge.state.zh, "确认", "Confirm"); onClicked: bridge.respond("confirm") }
             }
         }
     }

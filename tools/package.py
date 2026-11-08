@@ -1,29 +1,11 @@
 #!/usr/bin/env python3
-"""Package this plugin as dist/<id>-<version>.wsplugin.
+"""Build a checked GDI/QML wsplugin without changing its installation identity.
 
-Usage:
-  python tools/package.py              # package the committed files + the built exe
-  python tools/package.py --tag v1.2.3 # also require the tag to match plugin.json
-  python tools/package.py --runtime-dir build-qml/deploy  # QML build: bundle Qt runtime
-
-What goes in: every file tracked by git (``git ls-files``), except paths that
-start with a dot (.github, .gitignore, ...), plus ``runtime.program`` from
-plugin.json (the built exe, which is not committed). With ``--runtime-dir``,
-every file under that folder is added at its plugin-root-relative path and its
-copy of ``runtime.program`` replaces the in-tree build, so a QML package always
-carries the matching exe and Qt runtime. The zip is deterministic
-(sorted names, fixed timestamps, stored, not compressed), so the same inputs
-always give the same sha256. plugin.json sits at the archive root, which is
-what WinShun's "install from archive" expects.
-
-Outputs in dist/: <id>-<version>.wsplugin, its .sha256, and release-notes.md
-(the matching '## [version]' section of CHANGELOG.md plus the checksum). With
---tag, a missing CHANGELOG section is an error.
-
-Standard library only, Python 3.10+.
+GDI: python tools/package.py --tag gdi/v0.7.5
+QML: python tools/package.py --runtime-dir build-qml/deploy --tag qml/v0.8.0
+Versions come only from plugin.json; edition.json chooses the backend.
 """
 from __future__ import annotations
-
 import argparse
 import hashlib
 import json
@@ -34,123 +16,102 @@ import zipfile
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
+MAX_UNPACKED = 256 << 20
+MAX_PACKAGE = 64 << 20
 FIXED_TIME = (2020, 1, 1, 0, 0, 0)
-VERSION_RE = re.compile(r"^\d+\.\d+\.\d+$")
-MAX_UNPACKED = 256 << 20  # WinShun Install.h kMaxArchiveBytes (unpacked)
-MAX_PACKAGE = 64 << 20    # WinShun Gallery.h kMaxPackageBytes (the archive)
 
 
-def fail(msg: str) -> int:
-    print(f"error: {msg}", file=sys.stderr)
-    return 1
-
-
-def tracked_files() -> list[str]:
-    out = subprocess.run(["git", "ls-files", "-z"], cwd=ROOT, check=True,
-                         capture_output=True).stdout.decode("utf-8")
-    names = [n for n in out.split("\0") if n]
-    return [n for n in names if not any(part.startswith(".") for part in n.split("/"))]
+def changelog_section(version: str) -> str:
+    text = (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
+    match = re.search(r"^## \[" + re.escape(version) + r"\][^\n]*\n(.*?)(?=^## |\Z)", text, re.M | re.S)
+    if not match:
+        raise ValueError(f"CHANGELOG.md has no [{version}] entry")
+    return match[1].strip()
 
 
 def main() -> int:
-    ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("--tag", help="release tag; must be v<version from plugin.json>")
-    ap.add_argument("--out", default=str(ROOT / "dist"), help="output folder (default: dist/)")
-    ap.add_argument("--runtime-dir",
-                    help="folder with extra runtime files (Qt DLLs/QML modules) laid out "
-                         "relative to the plugin root; used by the QML build")
-    args = ap.parse_args()
-
-    manifest = json.loads((ROOT / "plugin.json").read_text(encoding="utf-8"))
-    pid, version = manifest.get("id", ""), manifest.get("version", "")
-    if not VERSION_RE.fullmatch(version):
-        return fail(f"plugin.json version {version!r} must be three numbers like 1.2.3")
-    if ROOT.name != pid:
-        print(f"note: folder name {ROOT.name!r} differs from id {pid!r} (fine for a clone; "
-              f"the installed folder is named after the id)")
-    if args.tag is not None and args.tag != f"v{version}":
-        return fail(f"tag {args.tag!r} does not match plugin.json version {version!r} (expected v{version})")
-
-    program = str(manifest.get("runtime", {}).get("program", ""))
-    if not program.lower().endswith(".exe"):
-        return fail(f"runtime.program {program!r} is not an exe; this script packages native plugins")
-    if not (ROOT / program).is_file():
-        return fail(f"{program} not found; build first (cmake -B build && cmake --build build)")
-
-    files = sorted(set(tracked_files()) | {program})
-    if "plugin.json" not in files:
-        return fail("plugin.json is not committed")
-    missing = [f for f in files if not (ROOT / f).is_file()]
-    if missing:
-        return fail(f"tracked but missing on disk: {missing}")
-
-    # QML build: extra runtime files (Qt DLLs, platform plugins, QML modules) live
-    # outside git, produced by tools/deploy_qml.ps1. Names are plugin-root relative.
-    # The runtime copy of runtime.program wins over the in-tree build, so a QML
-    # package never mixes the GDI exe with the Qt runtime.
-    paths: dict[str, Path] = {name: ROOT / name for name in files}
-    if args.runtime_dir:
-        runtime = Path(args.runtime_dir)
-        if not runtime.is_dir():
-            return fail(f"runtime dir {runtime} does not exist")
-        for p in sorted(runtime.rglob("*")):
-            if p.is_file():
-                paths[p.relative_to(runtime).as_posix()] = p
-
-    out = Path(args.out)
-    out.mkdir(parents=True, exist_ok=True)
-    target = out / f"{pid}-{version}.wsplugin"
-    total = 0
-    with zipfile.ZipFile(target, "w", zipfile.ZIP_STORED) as z:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--tag")
+    parser.add_argument("--out", type=Path, default=ROOT / "dist")
+    parser.add_argument("--runtime-dir", type=Path)
+    parser.add_argument("--exe", type=Path)
+    args = parser.parse_args()
+    manifest = json.loads((ROOT / "plugin.json").read_text(encoding="utf-8-sig"))
+    edition = json.loads((ROOT / "edition.json").read_text(encoding="utf-8"))
+    backend, version, pid = edition["backend"], manifest["version"], manifest["id"]
+    if backend not in ("gdi", "qml") or pid != "ra9fael.envhosts" or not re.fullmatch(r"\d+\.\d+\.\d+", version):
+        raise ValueError("Invalid edition, shared plugin ID or three-part version")
+    if args.tag and args.tag != f"{backend}/v{version}":
+        raise ValueError(f"Expected tag {backend}/v{version}")
+    notes = changelog_section(version)
+    program = manifest["runtime"]["program"]
+    if program != "envhosts.exe":
+        raise ValueError("Unexpected runtime.program")
+    paths = {name: ROOT / name for name in ("plugin.json", "edition.json", "LICENSE", "README.md", "README.en.md")}
+    paths["DUAL_EDITIONS.md"] = ROOT / "docs/DUAL_EDITIONS.md"
+    if backend == "qml":
+        if not args.runtime_dir or args.exe:
+            raise ValueError("QML requires --runtime-dir containing the matching exe and Qt DLLs")
+        runtime = args.runtime_dir.resolve(strict=True)
+        required = (program, "Qt6Core.dll", "Qt6Qml.dll", "Qt6Quick.dll", "platforms/qwindows.dll",
+                    "qml/QtQuick/Controls/Basic/qmldir", "licenses/qt/LICENSE")
+        for name in required:
+            if not (runtime / name).is_file():
+                raise ValueError(f"Missing QML runtime file: {name}")
+        for path in runtime.rglob("*"):
+            if path.is_symlink():
+                raise ValueError("Runtime must contain real files, not symbolic links")
+            if path.is_file():
+                name = path.relative_to(runtime).as_posix()
+                if name not in paths:
+                    paths[name] = path
+        exe = runtime / program
+    else:
+        if args.runtime_dir:
+            raise ValueError("GDI packages must not bundle Qt runtime files")
+        exe = (args.exe or ROOT / program).resolve(strict=True)
+        paths[program] = exe
+    # This is our own built binary. No host, GUI, registry or protocol is started.
+    result = subprocess.run([str(exe), "--build-info"], cwd=exe.parent, check=True,
+                            capture_output=True, text=True, timeout=15)
+    identity = json.loads(result.stdout)
+    if identity != {"id": pid, "version": version, "backend": backend}:
+        raise ValueError(f"Executable does not match manifest/edition: {identity}")
+    name = f"{pid}{'-qml' if backend == 'qml' else ''}-{version}.wsplugin"
+    target = args.out / name
+    if target.exists() or target.with_suffix(target.suffix + ".sha256").exists():
+        raise ValueError("Published packages are immutable; use a new output directory or version")
+    sizes = sum(path.stat().st_size for path in paths.values())
+    if sizes > MAX_UNPACKED:
+        raise ValueError("Unpacked package exceeds 256 MiB")
+    args.out.mkdir(parents=True, exist_ok=True)
+    with zipfile.ZipFile(target, "x", compression=zipfile.ZIP_DEFLATED, compresslevel=9) as archive:
         for name in sorted(paths):
-            data = paths[name].read_bytes()
-            total += len(data)
             info = zipfile.ZipInfo(name, FIXED_TIME)
-            info.compress_type = zipfile.ZIP_STORED
+            info.compress_type = zipfile.ZIP_DEFLATED
             info.create_system = 3
             info.external_attr = 0o100644 << 16
-            z.writestr(info, data)
-    package_size = target.stat().st_size
-    if total > MAX_UNPACKED or package_size > MAX_PACKAGE:
+            archive.writestr(info, paths[name].read_bytes(), compresslevel=9)
+    if target.stat().st_size > MAX_PACKAGE:
         target.unlink()
-        return fail(f"package exceeds WinShun's limits "
-                    f"({total >> 20} MiB unpacked / {package_size >> 20} MiB archive; "
-                    f"max {MAX_UNPACKED >> 20} / {MAX_PACKAGE >> 20} MiB)")
-
-    digest = hashlib.sha256(target.read_bytes()).hexdigest()
-    (out / f"{target.name}.sha256").write_text(f"{digest}  {target.name}\n", encoding="ascii")
-    print(f"{target.name}: {len(paths)} files, "
-          f"{target.stat().st_size} bytes, sha256 {digest}")
-
-    notes = changelog_section(version)
-    if notes is None:
-        if args.tag is not None:
-            return fail(f"CHANGELOG.md has no '## [{version}]' section; add one before tagging")
-        print(f"note: CHANGELOG.md has no '## [{version}]' section yet")
-    else:
-        notes += f"\n\n**sha256** `{digest}`  `{target.name}`\n"
-        (out / "release-notes.md").write_text(notes, encoding="utf-8")
+        raise ValueError("Package exceeds 64 MiB")
+    checksum = hashlib.sha256(target.read_bytes()).hexdigest()
+    target.with_suffix(target.suffix + ".sha256").write_text(f"{checksum}  {target.name}\n", encoding="ascii")
+    notice = (f"# {backend.upper()} {version}\n\n"
+              "同一个插件 ID；安装另一版会替换当前版，设置和备份保留，草稿按版本类型隔离。\n"
+              "Both editions share one plugin ID. Installing the other replaces this edition. "
+              "Settings/backups are retained; drafts are stored separately per backend.\n\n"
+              "下载 / Downloads: [GDI](https://github.com/ra9fael/winshun-envhosts/releases/latest) · "
+              "[QML](https://github.com/ra9fael/winshun-envhosts/tree/qml#安装)\n\n"
+              "插件库目前不区分后端；QML 请从 QML 发布页更新。\n"
+              "The plugin library does not track backends; update QML from its release page.\n\n")
+    (args.out / "release-notes.md").write_text(notice + notes + f"\n\nSHA-256 `{checksum}`\n", encoding="utf-8")
+    print(f"{target}\nbackend={backend} version={version} size={target.stat().st_size} sha256={checksum}")
     return 0
 
 
-def changelog_section(version: str) -> str | None:
-    """Return the body of '## [version] ...' in CHANGELOG.md, or None."""
-    path = ROOT / "CHANGELOG.md"
-    if not path.is_file():
-        return None
-    body: list[str] = []
-    inside = False
-    for line in path.read_text(encoding="utf-8").splitlines():
-        if line.startswith("## "):
-            if inside:
-                break
-            inside = line.startswith(f"## [{version}]")
-            continue
-        if inside:
-            body.append(line)
-    text = "\n".join(body).strip()
-    return text if inside and text else None
-
-
 if __name__ == "__main__":
-    sys.exit(main())
+    try:
+        sys.exit(main())
+    except (OSError, ValueError, KeyError, subprocess.SubprocessError) as error:
+        sys.exit(f"error: {error}")

@@ -1,0 +1,80 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1440" height="1040" viewBox="0 0 1440 1040" role="img" aria-labelledby="title desc">
+<title id="title">P00 · EnvHosts QML · 页面地图与写入边界</title>
+<desc id="desc">目标：保留原生编辑器的完整能力，采用一致的 QML 页面、状态和命令模型。。QML 目标设计示意，并非运行截图，数据均为虚构。</desc>
+<defs><filter id="shadow" x="-10%" y="-10%" width="120%" height="135%"><feDropShadow dx="0" dy="8" stdDeviation="12" flood-color="#12233a" flood-opacity=".08"/></filter></defs>
+<rect x="0" y="0" width="1440" height="1040" rx="0" fill="#edf1f5" />
+<text x="40" y="39" font-family="Segoe UI,Microsoft YaHei UI,Microsoft YaHei,sans-serif" font-size="13" font-weight="700" text-anchor="start" fill="#185abd">ENVHOSTS  /  QML DESIGN</text>
+<text x="1400" y="39" font-family="Segoe UI,Microsoft YaHei UI,Microsoft YaHei,sans-serif" font-size="13" font-weight="400" text-anchor="end" fill="#536578">P00   ·   2026.11.08</text>
+<text x="40" y="82" font-family="Segoe UI,Microsoft YaHei UI,Microsoft YaHei,sans-serif" font-size="30" font-weight="700" text-anchor="start" fill="#16273b">EnvHosts QML · 页面地图与写入边界</text>
+<text x="40" y="112" font-family="Segoe UI,Microsoft YaHei UI,Microsoft YaHei,sans-serif" font-size="15" font-weight="400" text-anchor="start" fill="#536578">目标：保留原生编辑器的完整能力，采用一致的 QML 页面、状态和命令模型。</text>
+<rect x="40" y="151" width="1360" height="88" rx="12" fill="#ffffff" stroke="#cbd5e1" />
+<text x="64" y="187" font-family="Segoe UI,Microsoft YaHei UI,Microsoft YaHei,sans-serif" font-size="22" font-weight="700" text-anchor="start" fill="#16273b">Win顺 启动器</text>
+<text x="64" y="217" font-family="Segoe UI,Microsoft YaHei UI,Microsoft YaHei,sans-serif" font-size="15" font-weight="400" text-anchor="start" fill="#536578">env / hosts → 首条“进入交互式编辑界面”</text>
+<text x="1374" y="191" font-family="Segoe UI,Microsoft YaHei UI,Microsoft YaHei,sans-serif" font-size="18" font-weight="600" text-anchor="end" fill="#185abd">各目标复用一个独立窗口</text>
+<text x="1374" y="218" font-family="Segoe UI,Microsoft YaHei UI,Microsoft YaHei,sans-serif" font-size="14" font-weight="400" text-anchor="end" fill="#536578">resident 协议 → C++ bridge → QML 页面</text>
+<rect x="40" y="268" width="440" height="166" rx="10" fill="#ffffff" stroke="#cbd5e1" />
+<text x="62" y="298" font-family="Segoe UI,Microsoft YaHei UI,Microsoft YaHei,sans-serif" font-size="13" font-weight="700" text-anchor="start" fill="#185abd">P01 / P08</text>
+<text x="62" y="335" font-family="Segoe UI,Microsoft YaHei UI,Microsoft YaHei,sans-serif" font-size="22" font-weight="700" text-anchor="start" fill="#16273b">环境变量</text>
+<text x="62" y="367" font-family="Segoe UI,Microsoft YaHei UI,Microsoft YaHei,sans-serif" font-size="14" font-weight="400" text-anchor="start" fill="#536578">列表 · 原值 · 范围 · 明暗主题</text>
+<text x="62" y="409" font-family="Segoe UI,Microsoft YaHei UI,Microsoft YaHei,sans-serif" font-size="13" font-weight="400" text-anchor="start" fill="#185abd">F02–F04 / F07</text>
+<rect x="500" y="268" width="440" height="166" rx="10" fill="#ffffff" stroke="#cbd5e1" />
+<text x="522" y="298" font-family="Segoe UI,Microsoft YaHei UI,Microsoft YaHei,sans-serif" font-size="13" font-weight="700" text-anchor="start" fill="#185abd">P02</text>
+<text x="522" y="335" font-family="Segoe UI,Microsoft YaHei UI,Microsoft YaHei,sans-serif" font-size="22" font-weight="700" text-anchor="start" fill="#16273b">分隔项编辑</text>
+<text x="522" y="367" font-family="Segoe UI,Microsoft YaHei UI,Microsoft YaHei,sans-serif" font-size="14" font-weight="400" text-anchor="start" fill="#536578">排序 · 多选 · 待删除 · 自动暂存</text>
+<text x="522" y="409" font-family="Segoe UI,Microsoft YaHei UI,Microsoft YaHei,sans-serif" font-size="13" font-weight="400" text-anchor="start" fill="#185abd">F05–F06</text>
+<rect x="960" y="268" width="440" height="166" rx="10" fill="#ffffff" stroke="#cbd5e1" />
+<text x="982" y="298" font-family="Segoe UI,Microsoft YaHei UI,Microsoft YaHei,sans-serif" font-size="13" font-weight="700" text-anchor="start" fill="#185abd">P03 / P04</text>
+<text x="982" y="335" font-family="Segoe UI,Microsoft YaHei UI,Microsoft YaHei,sans-serif" font-size="22" font-weight="700" text-anchor="start" fill="#16273b">hosts</text>
+<text x="982" y="367" font-family="Segoe UI,Microsoft YaHei UI,Microsoft YaHei,sans-serif" font-size="14" font-weight="400" text-anchor="start" fill="#536578">映射条目 · 完整原文 · 格式保真</text>
+<text x="982" y="409" font-family="Segoe UI,Microsoft YaHei UI,Microsoft YaHei,sans-serif" font-size="13" font-weight="400" text-anchor="start" fill="#185abd">F08–F10</text>
+<rect x="40" y="458" width="440" height="166" rx="10" fill="#ffffff" stroke="#cbd5e1" />
+<text x="62" y="488" font-family="Segoe UI,Microsoft YaHei UI,Microsoft YaHei,sans-serif" font-size="13" font-weight="700" text-anchor="start" fill="#185abd">P05</text>
+<text x="62" y="525" font-family="Segoe UI,Microsoft YaHei UI,Microsoft YaHei,sans-serif" font-size="22" font-weight="700" text-anchor="start" fill="#16273b">备份</text>
+<text x="62" y="557" font-family="Segoe UI,Microsoft YaHei UI,Microsoft YaHei,sans-serif" font-size="14" font-weight="400" text-anchor="start" fill="#536578">按范围预览差异 · 恢复工作副本</text>
+<text x="62" y="599" font-family="Segoe UI,Microsoft YaHei UI,Microsoft YaHei,sans-serif" font-size="13" font-weight="400" text-anchor="start" fill="#185abd">F14</text>
+<rect x="500" y="458" width="440" height="166" rx="10" fill="#ffffff" stroke="#cbd5e1" />
+<text x="522" y="488" font-family="Segoe UI,Microsoft YaHei UI,Microsoft YaHei,sans-serif" font-size="13" font-weight="700" text-anchor="start" fill="#185abd">P06</text>
+<text x="522" y="525" font-family="Segoe UI,Microsoft YaHei UI,Microsoft YaHei,sans-serif" font-size="22" font-weight="700" text-anchor="start" fill="#16273b">保存 / 冲突</text>
+<text x="522" y="557" font-family="Segoe UI,Microsoft YaHei UI,Microsoft YaHei,sans-serif" font-size="14" font-weight="400" text-anchor="start" fill="#536578">变更确认 · 三快照差异 · 失败结果</text>
+<text x="522" y="599" font-family="Segoe UI,Microsoft YaHei UI,Microsoft YaHei,sans-serif" font-size="13" font-weight="400" text-anchor="start" fill="#185abd">F11–F12</text>
+<rect x="960" y="458" width="440" height="166" rx="10" fill="#ffffff" stroke="#cbd5e1" />
+<text x="982" y="488" font-family="Segoe UI,Microsoft YaHei UI,Microsoft YaHei,sans-serif" font-size="13" font-weight="700" text-anchor="start" fill="#185abd">P07</text>
+<text x="982" y="525" font-family="Segoe UI,Microsoft YaHei UI,Microsoft YaHei,sans-serif" font-size="22" font-weight="700" text-anchor="start" fill="#16273b">状态 / 恢复</text>
+<text x="982" y="557" font-family="Segoe UI,Microsoft YaHei UI,Microsoft YaHei,sans-serif" font-size="14" font-weight="400" text-anchor="start" fill="#536578">空结果 · 只读 · 草稿 · 错误</text>
+<text x="982" y="599" font-family="Segoe UI,Microsoft YaHei UI,Microsoft YaHei,sans-serif" font-size="13" font-weight="400" text-anchor="start" fill="#185abd">F13 / F16</text>
+<text x="40" y="677" font-family="Segoe UI,Microsoft YaHei UI,Microsoft YaHei,sans-serif" font-size="22" font-weight="700" text-anchor="start" fill="#16273b">统一保存状态流</text>
+<rect x="40" y="702" width="256" height="118" rx="9" fill="#e9f1ff" stroke="#cbd5e1" />
+<text x="56" y="730" font-family="Segoe UI,Microsoft YaHei UI,Microsoft YaHei,sans-serif" font-size="13" font-weight="700" text-anchor="start" fill="#185abd">01</text>
+<text x="56" y="764" font-family="Segoe UI,Microsoft YaHei UI,Microsoft YaHei,sans-serif" font-size="19" font-weight="600" text-anchor="start" fill="#16273b">编辑 / 自动暂存</text>
+<text x="56" y="796" font-family="Segoe UI,Microsoft YaHei UI,Microsoft YaHei,sans-serif" font-size="13" font-weight="400" text-anchor="start" fill="#536578">只改内存工作副本</text>
+<text x="300" y="767" font-family="Segoe UI,Microsoft YaHei UI,Microsoft YaHei,sans-serif" font-size="16" font-weight="400" text-anchor="start" fill="#185abd">→</text>
+<rect x="316" y="702" width="256" height="118" rx="9" fill="#e9f1ff" stroke="#cbd5e1" />
+<text x="332" y="730" font-family="Segoe UI,Microsoft YaHei UI,Microsoft YaHei,sans-serif" font-size="13" font-weight="700" text-anchor="start" fill="#185abd">02</text>
+<text x="332" y="764" font-family="Segoe UI,Microsoft YaHei UI,Microsoft YaHei,sans-serif" font-size="19" font-weight="600" text-anchor="start" fill="#16273b">验证 / 确认</text>
+<text x="332" y="796" font-family="Segoe UI,Microsoft YaHei UI,Microsoft YaHei,sans-serif" font-size="13" font-weight="400" text-anchor="start" fill="#536578">展示目标与增改删</text>
+<text x="576" y="767" font-family="Segoe UI,Microsoft YaHei UI,Microsoft YaHei,sans-serif" font-size="16" font-weight="400" text-anchor="start" fill="#185abd">→</text>
+<rect x="592" y="702" width="256" height="118" rx="9" fill="#e9f1ff" stroke="#cbd5e1" />
+<text x="608" y="730" font-family="Segoe UI,Microsoft YaHei UI,Microsoft YaHei,sans-serif" font-size="13" font-weight="700" text-anchor="start" fill="#185abd">03</text>
+<text x="608" y="764" font-family="Segoe UI,Microsoft YaHei UI,Microsoft YaHei,sans-serif" font-size="19" font-weight="600" text-anchor="start" fill="#16273b">重读 / 比较</text>
+<text x="608" y="796" font-family="Segoe UI,Microsoft YaHei UI,Microsoft YaHei,sans-serif" font-size="13" font-weight="400" text-anchor="start" fill="#536578">变化则返回差异</text>
+<text x="852" y="767" font-family="Segoe UI,Microsoft YaHei UI,Microsoft YaHei,sans-serif" font-size="16" font-weight="400" text-anchor="start" fill="#185abd">→</text>
+<rect x="868" y="702" width="256" height="118" rx="9" fill="#ffffff" stroke="#cbd5e1" />
+<text x="884" y="730" font-family="Segoe UI,Microsoft YaHei UI,Microsoft YaHei,sans-serif" font-size="13" font-weight="700" text-anchor="start" fill="#185abd">04</text>
+<text x="884" y="764" font-family="Segoe UI,Microsoft YaHei UI,Microsoft YaHei,sans-serif" font-size="19" font-weight="600" text-anchor="start" fill="#16273b">备份 / 写入</text>
+<text x="884" y="796" font-family="Segoe UI,Microsoft YaHei UI,Microsoft YaHei,sans-serif" font-size="13" font-weight="400" text-anchor="start" fill="#536578">串行执行并读回</text>
+<text x="1128" y="767" font-family="Segoe UI,Microsoft YaHei UI,Microsoft YaHei,sans-serif" font-size="16" font-weight="400" text-anchor="start" fill="#185abd">→</text>
+<rect x="1144" y="702" width="256" height="118" rx="9" fill="#ffffff" stroke="#cbd5e1" />
+<text x="1160" y="730" font-family="Segoe UI,Microsoft YaHei UI,Microsoft YaHei,sans-serif" font-size="13" font-weight="700" text-anchor="start" fill="#185abd">05</text>
+<text x="1160" y="764" font-family="Segoe UI,Microsoft YaHei UI,Microsoft YaHei,sans-serif" font-size="19" font-weight="600" text-anchor="start" fill="#16273b">结果 / 草稿</text>
+<text x="1160" y="796" font-family="Segoe UI,Microsoft YaHei UI,Microsoft YaHei,sans-serif" font-size="13" font-weight="400" text-anchor="start" fill="#536578">失败保留恢复信息</text>
+<rect x="40" y="842" width="1360" height="60" rx="10" fill="#fff3d9" />
+<text x="62" y="879" font-family="Segoe UI,Microsoft YaHei UI,Microsoft YaHei,sans-serif" font-size="17" font-weight="600" text-anchor="start" fill="#8c5408">所有目标写入只从 F11 保存事务进入；草稿、导出和备份只写插件数据目录。测试默认使用隔离数据。</text>
+<text x="40" y="955" font-family="Segoe UI,Microsoft YaHei UI,Microsoft YaHei,sans-serif" font-size="15" font-weight="700" text-anchor="start" fill="#185abd">图 → 功能 → 测试</text>
+<text x="40" y="982" font-family="Segoe UI,Microsoft YaHei UI,Microsoft YaHei,sans-serif" font-size="13" font-weight="400" text-anchor="start" fill="#536578">P 页面编号 / F 功能要求 / T 验收用例双向追踪。</text>
+<text x="500" y="955" font-family="Segoe UI,Microsoft YaHei UI,Microsoft YaHei,sans-serif" font-size="15" font-weight="700" text-anchor="start" fill="#185abd">本轮交付范围</text>
+<text x="500" y="982" font-family="Segoe UI,Microsoft YaHei UI,Microsoft YaHei,sans-serif" font-size="13" font-weight="400" text-anchor="start" fill="#536578">QML 核心编辑与紧凑修复已实现，验收见实现记录。</text>
+<text x="960" y="955" font-family="Segoe UI,Microsoft YaHei UI,Microsoft YaHei,sans-serif" font-size="15" font-weight="700" text-anchor="start" fill="#185abd">后续开发顺序</text>
+<text x="960" y="982" font-family="Segoe UI,Microsoft YaHei UI,Microsoft YaHei,sans-serif" font-size="13" font-weight="400" text-anchor="start" fill="#536578">命令模型 → 编辑 → 保存恢复 → QML 交互 → 集成。</text>
+<text x="40" y="1020" font-family="Segoe UI,Microsoft YaHei UI,Microsoft YaHei,sans-serif" font-size="12" font-weight="400" text-anchor="start" fill="#536578">设计示意 · 合成数据 · 实际实现和验证范围见 IMPLEMENTATION.md</text>
+<text x="1400" y="1020" font-family="Segoe UI,Microsoft YaHei UI,Microsoft YaHei,sans-serif" font-size="12" font-weight="400" text-anchor="end" fill="#536578">P00</text>
+</svg>

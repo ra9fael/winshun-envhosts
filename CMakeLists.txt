@@ -32,13 +32,30 @@ endif()
 # GDI window and its GUI regression suite keep working while slices land on the
 # qml branch. Qt DLLs are built with the dynamic CRT, so this build must use it
 # too; the static-CRT rule above does not apply here.
-option(ENVHOSTS_QML_EDITOR "Build the Qt Quick editor prototype instead of the Win32 GDI window" OFF)
+file(READ "${CMAKE_SOURCE_DIR}/plugin.json" ENVHOSTS_MANIFEST)
+string(JSON ENVHOSTS_VERSION GET "${ENVHOSTS_MANIFEST}" version)
+file(READ "${CMAKE_SOURCE_DIR}/edition.json" ENVHOSTS_EDITION)
+string(JSON ENVHOSTS_BACKEND GET "${ENVHOSTS_EDITION}" backend)
+set(ENVHOSTS_DEFAULT_QML OFF)
+if(ENVHOSTS_BACKEND STREQUAL "qml")
+    set(ENVHOSTS_DEFAULT_QML ON)
+endif()
+option(ENVHOSTS_QML_EDITOR "Build the Qt Quick editor" ${ENVHOSTS_DEFAULT_QML})
+if((ENVHOSTS_QML_EDITOR AND NOT ENVHOSTS_BACKEND STREQUAL "qml") OR
+   (NOT ENVHOSTS_QML_EDITOR AND NOT ENVHOSTS_BACKEND STREQUAL "gdi"))
+    message(FATAL_ERROR "Build the backend selected by edition.json; use the other branch for the other edition")
+endif()
+configure_file(build_info.h.in build_info.h @ONLY)
+target_include_directories(envhosts PRIVATE "${CMAKE_BINARY_DIR}")
 if(ENVHOSTS_QML_EDITOR)
-    find_package(Qt6 6.5 REQUIRED COMPONENTS Core Gui Qml Quick QuickControls2)
+    find_package(Qt6 6.5 REQUIRED COMPONENTS Core Gui Qml Quick QuickControls2 Concurrent Network Test)
     qt_standard_project_setup()
     # New resource prefix: QML files land under /qt/qml/<URI>/, matching the URL
     # the C++ side loads (qrc:/qt/qml/EnvHosts/Editor/Main.qml).
     qt_policy(SET QTP0001 NEW)
+    if(Qt6_VERSION VERSION_GREATER_EQUAL 6.8)
+        qt_policy(SET QTP0004 NEW)
+    endif()
     # envhosts already exists, so the global AUTOMOC that qt_standard_project_setup
     # enables does not reach it; QML type registration needs it on the target.
     set_target_properties(envhosts PROPERTIES AUTOMOC ON)
@@ -47,14 +64,40 @@ if(ENVHOSTS_QML_EDITOR)
             MSVC_RUNTIME_LIBRARY "MultiThreadedDLL$<$<CONFIG:Debug>:MultiThreadedDebugDLL>")
     endif()
     target_compile_definitions(envhosts PRIVATE ENVHOSTS_QML_EDITOR)
-    target_sources(envhosts PRIVATE qt/qt_editor.cpp qt/qt_editor.h)
-    target_link_libraries(envhosts PRIVATE Qt6::Core Qt6::Gui Qt6::Qml Qt6::Quick Qt6::QuickControls2)
+    add_library(envhosts_qml STATIC qt/editor_types.h qt/editor_session.h qt/editor_session.cpp
+        qt/editor_models.h qt/editor_models.cpp qt/write_service.h qt/write_service.cpp qt/qt_editor.h qt/qt_editor.cpp)
+    target_include_directories(envhosts_qml PUBLIC "${CMAKE_SOURCE_DIR}" "${CMAKE_SOURCE_DIR}/qt")
+    target_compile_definitions(envhosts_qml PUBLIC UNICODE _UNICODE NOMINMAX WIN32_LEAN_AND_MEAN)
+    target_link_libraries(envhosts_qml PUBLIC Qt6::Core Qt6::Gui Qt6::Qml Qt6::Quick Qt6::QuickControls2 Qt6::Concurrent Qt6::Network advapi32 user32)
+    if(MSVC)
+        target_compile_options(envhosts_qml PRIVATE /utf-8 /W4 /permissive-)
+    endif()
+    target_link_libraries(envhosts PRIVATE envhosts_qml)
     qt_add_qml_module(envhosts
         URI EnvHosts.Editor
         VERSION 1.0
         QML_FILES
             qt/qml/Main.qml
             qt/qml/RowDelegate.qml
+            qt/qml/DesignTokens.qml
+            qt/qml/controls/CommandButton.qml
+            qt/qml/controls/CompactCheckBox.qml
+            qt/qml/controls/CompactTextField.qml
+            qt/qml/controls/CompactComboBox.qml
+            qt/qml/controls/ListSurface.qml
+            qt/qml/controls/RowSurface.qml
+            qt/qml/controls/ColumnHeader.qml
+            qt/qml/controls/EditField.qml
+            qt/qml/controls/EntryList.qml
+            qt/qml/controls/StatusBanner.qml
+            qt/qml/pages/EnvironmentPage.qml
+            qt/qml/pages/PartsEditor.qml
+            qt/qml/pages/HostsEntriesPage.qml
+            qt/qml/pages/HostsRawPage.qml
+            qt/qml/pages/BackupsPage.qml
+            qt/qml/dialogs/SaveReview.qml
+            qt/qml/dialogs/ConflictReview.qml
+            qt/qml/dialogs/DraftRecovery.qml
     )
 endif()
 
@@ -107,3 +150,21 @@ endforeach()
 enable_testing()
 add_test(NAME envhosts_logic COMMAND envhosts_tests)
 add_test(NAME editor_model COMMAND editor_model_tests)
+if(ENVHOSTS_QML_EDITOR)
+    add_executable(qml_editor_tests tests/test_qml_editor.cpp)
+    target_link_libraries(qml_editor_tests PRIVATE envhosts_qml Qt6::Test)
+    target_compile_definitions(qml_editor_tests PRIVATE ENVHOSTS_SOURCE_DIR="${CMAKE_SOURCE_DIR}")
+    if(MSVC)
+        target_compile_options(qml_editor_tests PRIVATE /utf-8 /W4 /permissive-)
+    endif()
+    add_test(NAME qml_editor COMMAND qml_editor_tests -o "${CMAKE_BINARY_DIR}/qml-editor-results.txt,txt")
+    set_tests_properties(qml_editor PROPERTIES ENVIRONMENT "QT_QUICK_BACKEND=software")
+endif()
+
+add_executable(edition_storage_tests tests/test_edition_storage.cpp)
+target_include_directories(edition_storage_tests PRIVATE "${CMAKE_SOURCE_DIR}")
+target_compile_definitions(edition_storage_tests PRIVATE NOMINMAX WIN32_LEAN_AND_MEAN)
+if(MSVC)
+    target_compile_options(edition_storage_tests PRIVATE /utf-8 /W4 /permissive-)
+endif()
+add_test(NAME edition_storage COMMAND edition_storage_tests)

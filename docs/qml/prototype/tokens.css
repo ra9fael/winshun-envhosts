@@ -1,0 +1,3 @@
+/* Generated from ../design-tokens.json; edit the source, not this file. */
+:root{color-scheme:light;--bg:#edf1f5;--panel:#ffffff;--field:#f8fafc;--text:#16273b;--muted:#536578;--line:#cbd5e1;--control:#7b8b9e;--accent:#185abd;--on-accent:#ffffff;--accent-hover:#104b9f;--soft:#e9f1ff;--green:#16734a;--green-bg:#e7f5ed;--amber:#8c5408;--amber-bg:#fff3d9;--red:#b52d3b;--red-bg:#ffedf0}
+body.dark{color-scheme:dark;--bg:#121a26;--panel:#1c2838;--field:#172231;--text:#f0f5fc;--muted:#b3c2d5;--line:#42536b;--control:#8093ae;--accent:#9ac4ff;--on-accent:#121a26;--accent-hover:#b9d6ff;--soft:#293f5c;--green:#85ddb0;--green-bg:#203e35;--amber:#f2c57e;--amber-bg:#443820;--red:#ff9caa;--red-bg:#482a35}

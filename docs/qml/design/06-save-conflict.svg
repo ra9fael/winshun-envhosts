@@ -1,0 +1,69 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1440" height="1040" viewBox="0 0 1440 1040" role="img" aria-labelledby="title desc">
+<title id="title">P06 · 保存与冲突 · 明确展示将发生什么</title>
+<desc id="desc">确认内容绑定工作副本版本与目标指纹；任何变化都必须重新审阅。。QML 目标设计示意，并非运行截图，数据均为虚构。</desc>
+<defs><filter id="shadow" x="-10%" y="-10%" width="120%" height="135%"><feDropShadow dx="0" dy="8" stdDeviation="12" flood-color="#12233a" flood-opacity=".08"/></filter></defs>
+<rect x="0" y="0" width="1440" height="1040" rx="0" fill="#edf1f5" />
+<text x="40" y="39" font-family="Segoe UI,Microsoft YaHei UI,Microsoft YaHei,sans-serif" font-size="13" font-weight="700" text-anchor="start" fill="#185abd">ENVHOSTS  /  QML DESIGN</text>
+<text x="1400" y="39" font-family="Segoe UI,Microsoft YaHei UI,Microsoft YaHei,sans-serif" font-size="13" font-weight="400" text-anchor="end" fill="#536578">P06   ·   2026.11.08</text>
+<text x="40" y="82" font-family="Segoe UI,Microsoft YaHei UI,Microsoft YaHei,sans-serif" font-size="30" font-weight="700" text-anchor="start" fill="#16273b">保存与冲突 · 明确展示将发生什么</text>
+<text x="40" y="112" font-family="Segoe UI,Microsoft YaHei UI,Microsoft YaHei,sans-serif" font-size="15" font-weight="400" text-anchor="start" fill="#536578">确认内容绑定工作副本版本与目标指纹；任何变化都必须重新审阅。</text>
+<rect x="40" y="155" width="660" height="741" rx="12" fill="#ffffff" stroke="#cbd5e1" />
+<rect x="724" y="155" width="676" height="741" rx="12" fill="#ffffff" stroke="#cbd5e1" />
+<rect x="64" y="177" width="162" height="26" rx="6" fill="#e9f1ff" />
+<text x="74" y="195" font-family="Segoe UI,Microsoft YaHei UI,Microsoft YaHei,sans-serif" font-size="13" font-weight="600" text-anchor="start" fill="#185abd">D01 · 保存确认</text>
+<text x="64" y="243" font-family="Segoe UI,Microsoft YaHei UI,Microsoft YaHei,sans-serif" font-size="24" font-weight="700" text-anchor="start" fill="#16273b">保存 3 项环境变量变更</text>
+<text x="64" y="275" font-family="Segoe UI,Microsoft YaHei UI,Microsoft YaHei,sans-serif" font-size="15" font-weight="400" text-anchor="start" fill="#536578">目标：用户范围  ·  写入前创建备份</text>
+<rect x="64" y="312" width="612" height="76" rx="7" fill="#f8fafc" stroke="#cbd5e1" />
+<text x="80" y="341" font-family="Segoe UI,Microsoft YaHei UI,Microsoft YaHei,sans-serif" font-size="20" font-weight="700" text-anchor="start" fill="#16734a">+</text>
+<text x="116" y="341" font-family="Segoe UI,Microsoft YaHei UI,Microsoft YaHei,sans-serif" font-size="16" font-weight="600" text-anchor="start" fill="#16273b">DEV_MODE</text>
+<text x="116" y="369" font-family="Segoe UI,Microsoft YaHei UI,Microsoft YaHei,sans-serif" font-size="14" font-weight="400" text-anchor="start" fill="#16734a">新增：local</text>
+<rect x="64" y="402" width="612" height="76" rx="7" fill="#f8fafc" stroke="#cbd5e1" />
+<text x="80" y="431" font-family="Segoe UI,Microsoft YaHei UI,Microsoft YaHei,sans-serif" font-size="20" font-weight="700" text-anchor="start" fill="#8c5408">~</text>
+<text x="116" y="431" font-family="Segoe UI,Microsoft YaHei UI,Microsoft YaHei,sans-serif" font-size="16" font-weight="600" text-anchor="start" fill="#16273b">Path</text>
+<text x="116" y="459" font-family="Segoe UI,Microsoft YaHei UI,Microsoft YaHei,sans-serif" font-size="14" font-weight="400" text-anchor="start" fill="#8c5408">更新：2 个分隔项 → 3 个分隔项</text>
+<rect x="64" y="492" width="612" height="76" rx="7" fill="#f8fafc" stroke="#cbd5e1" />
+<text x="80" y="521" font-family="Segoe UI,Microsoft YaHei UI,Microsoft YaHei,sans-serif" font-size="20" font-weight="700" text-anchor="start" fill="#b52d3b">−</text>
+<text x="116" y="521" font-family="Segoe UI,Microsoft YaHei UI,Microsoft YaHei,sans-serif" font-size="16" font-weight="600" text-anchor="start" fill="#16273b">OLD_SDK</text>
+<text x="116" y="549" font-family="Segoe UI,Microsoft YaHei UI,Microsoft YaHei,sans-serif" font-size="14" font-weight="400" text-anchor="start" fill="#b52d3b">将删除整个变量</text>
+<rect x="64" y="593" width="612" height="76" rx="8" fill="#fff3d9" />
+<text x="80" y="621" font-family="Segoe UI,Microsoft YaHei UI,Microsoft YaHei,sans-serif" font-size="15" font-weight="700" text-anchor="start" fill="#b52d3b">删除 1 个变量：OLD_SDK</text>
+<text x="80" y="647" font-family="Segoe UI,Microsoft YaHei UI,Microsoft YaHei,sans-serif" font-size="13" font-weight="400" text-anchor="start" fill="#8c5408">需要展开原值时可逐条查看；取消会保留编辑。</text>
+<text x="64" y="708" font-family="Segoe UI,Microsoft YaHei UI,Microsoft YaHei,sans-serif" font-size="14" font-weight="400" text-anchor="start" fill="#536578">保存期间显示进度并禁用重复提交。</text>
+<text x="64" y="736" font-family="Segoe UI,Microsoft YaHei UI,Microsoft YaHei,sans-serif" font-size="14" font-weight="400" text-anchor="start" fill="#536578">备份失败或校验失败：不开始目标写入。</text>
+<rect x="286" y="817" width="150" height="36" rx="7" fill="#f8fafc" stroke="#7b8b9e" />
+<text x="361.0" y="840.0" font-family="Segoe UI,Microsoft YaHei UI,Microsoft YaHei,sans-serif" font-size="14" font-weight="600" text-anchor="middle" fill="#16273b">返回编辑</text>
+<rect x="446" y="817" width="230" height="36" rx="7" fill="#185abd" />
+<text x="561.0" y="840.0" font-family="Segoe UI,Microsoft YaHei UI,Microsoft YaHei,sans-serif" font-size="14" font-weight="600" text-anchor="middle" fill="#ffffff">确认保存 3 项</text>
+<rect x="748" y="177" width="174" height="26" rx="6" fill="#fff3d9" />
+<text x="758" y="195" font-family="Segoe UI,Microsoft YaHei UI,Microsoft YaHei,sans-serif" font-size="13" font-weight="600" text-anchor="start" fill="#8c5408">D02 · 外部冲突</text>
+<text x="748" y="243" font-family="Segoe UI,Microsoft YaHei UI,Microsoft YaHei,sans-serif" font-size="24" font-weight="700" text-anchor="start" fill="#16273b">目标已被外部修改</text>
+<text x="748" y="275" font-family="Segoe UI,Microsoft YaHei UI,Microsoft YaHei,sans-serif" font-size="15" font-weight="400" text-anchor="start" fill="#536578">基线 / 我的修改 / 当前系统  ·  只读对比</text>
+<rect x="748" y="312" width="628" height="48" rx="7" fill="#fff3d9" />
+<text x="764" y="343" font-family="Segoe UI,Microsoft YaHei UI,Microsoft YaHei,sans-serif" font-size="16" font-weight="600" text-anchor="start" fill="#8c5408">Path  ·  冲突：双方改动且结果不同</text>
+<text x="748" y="393" font-family="Segoe UI,Microsoft YaHei UI,Microsoft YaHei,sans-serif" font-size="13" font-weight="400" text-anchor="start" fill="#536578">基线</text>
+<rect x="748" y="403" width="628" height="40" rx="6" fill="#f8fafc" stroke="#7b8b9e" />
+<text x="760" y="429" font-family="Cascadia Code,Consolas,Microsoft YaHei UI,monospace" font-size="14" font-weight="400" text-anchor="start" fill="#16273b">C:\Tools\bin</text>
+<text x="748" y="488" font-family="Segoe UI,Microsoft YaHei UI,Microsoft YaHei,sans-serif" font-size="13" font-weight="400" text-anchor="start" fill="#536578">我的修改</text>
+<rect x="748" y="498" width="628" height="40" rx="6" fill="#f8fafc" stroke="#7b8b9e" />
+<text x="760" y="524" font-family="Cascadia Code,Consolas,Microsoft YaHei UI,monospace" font-size="14" font-weight="400" text-anchor="start" fill="#16273b">C:\Tools\bin;C:\SDK\bin</text>
+<text x="748" y="583" font-family="Segoe UI,Microsoft YaHei UI,Microsoft YaHei,sans-serif" font-size="13" font-weight="400" text-anchor="start" fill="#536578">当前系统</text>
+<rect x="748" y="593" width="628" height="40" rx="6" fill="#f8fafc" stroke="#7b8b9e" />
+<text x="760" y="619" font-family="Cascadia Code,Consolas,Microsoft YaHei UI,monospace" font-size="14" font-weight="400" text-anchor="start" fill="#16273b">C:\Tools\bin;C:\Other\bin</text>
+<text x="748" y="696" font-family="Segoe UI,Microsoft YaHei UI,Microsoft YaHei,sans-serif" font-size="14" font-weight="400" text-anchor="start" fill="#536578">重新载入会丢弃我的修改，需再次确认。</text>
+<text x="748" y="723" font-family="Segoe UI,Microsoft YaHei UI,Microsoft YaHei,sans-serif" font-size="14" font-weight="400" text-anchor="start" fill="#536578">覆盖按本次变更集执行，保留外部无关项。</text>
+<text x="748" y="750" font-family="Segoe UI,Microsoft YaHei UI,Microsoft YaHei,sans-serif" font-size="14" font-weight="400" text-anchor="start" fill="#536578">覆盖前仍重新校验、备份；不得绕过权限。</text>
+<rect x="748" y="817" width="152" height="36" rx="7" fill="#f8fafc" stroke="#7b8b9e" />
+<text x="824.0" y="840.0" font-family="Segoe UI,Microsoft YaHei UI,Microsoft YaHei,sans-serif" font-size="14" font-weight="600" text-anchor="middle" fill="#16273b">暂不处理</text>
+<rect x="910" y="817" width="190" height="36" rx="7" fill="#f8fafc" stroke="#7b8b9e" />
+<text x="1005.0" y="840.0" font-family="Segoe UI,Microsoft YaHei UI,Microsoft YaHei,sans-serif" font-size="14" font-weight="600" text-anchor="middle" fill="#16273b">重新载入…</text>
+<rect x="1110" y="817" width="266" height="36" rx="7" fill="#ffedf0" stroke="#7b8b9e" />
+<text x="1243.0" y="840.0" font-family="Segoe UI,Microsoft YaHei UI,Microsoft YaHei,sans-serif" font-size="14" font-weight="600" text-anchor="middle" fill="#b52d3b">用我的修改覆盖…</text>
+<text x="40" y="955" font-family="Segoe UI,Microsoft YaHei UI,Microsoft YaHei,sans-serif" font-size="15" font-weight="700" text-anchor="start" fill="#185abd">F11 / F12  再次校验</text>
+<text x="40" y="982" font-family="Segoe UI,Microsoft YaHei UI,Microsoft YaHei,sans-serif" font-size="13" font-weight="400" text-anchor="start" fill="#536578">确认后再读目标，避免审阅期间的旧指纹失效。</text>
+<text x="500" y="955" font-family="Segoe UI,Microsoft YaHei UI,Microsoft YaHei,sans-serif" font-size="15" font-weight="700" text-anchor="start" fill="#185abd">F12  不静默合并</text>
+<text x="500" y="982" font-family="Segoe UI,Microsoft YaHei UI,Microsoft YaHei,sans-serif" font-size="13" font-weight="400" text-anchor="start" fill="#536578">选择覆盖后重建确认；处理期间再次变化则重开差异。</text>
+<text x="960" y="955" font-family="Segoe UI,Microsoft YaHei UI,Microsoft YaHei,sans-serif" font-size="15" font-weight="700" text-anchor="start" fill="#185abd">T27–T32  写入故障</text>
+<text x="960" y="982" font-family="Segoe UI,Microsoft YaHei UI,Microsoft YaHei,sans-serif" font-size="13" font-weight="400" text-anchor="start" fill="#536578">逐项结果可核对；部分失败不显示全部成功。</text>
+<text x="40" y="1020" font-family="Segoe UI,Microsoft YaHei UI,Microsoft YaHei,sans-serif" font-size="12" font-weight="400" text-anchor="start" fill="#536578">设计示意 · 合成数据 · 实际实现和验证范围见 IMPLEMENTATION.md</text>
+<text x="1400" y="1020" font-family="Segoe UI,Microsoft YaHei UI,Microsoft YaHei,sans-serif" font-size="12" font-weight="400" text-anchor="end" fill="#536578">P06</text>
+</svg>

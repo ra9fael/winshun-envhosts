@@ -1,0 +1,73 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1440" height="1040" viewBox="0 0 1440 1040" role="img" aria-labelledby="title desc">
+<title id="title">P04 · hosts 原文 · 原始格式可核对</title>
+<desc id="desc">原文与条目共享工作副本；未改动行、BOM、换行和末尾换行均需保真。。QML 目标设计示意，并非运行截图，数据均为虚构。</desc>
+<defs><filter id="shadow" x="-10%" y="-10%" width="120%" height="135%"><feDropShadow dx="0" dy="8" stdDeviation="12" flood-color="#12233a" flood-opacity=".08"/></filter></defs>
+<rect x="0" y="0" width="1440" height="1040" rx="0" fill="#edf1f5" />
+<text x="40" y="39" font-family="Segoe UI,Microsoft YaHei UI,Microsoft YaHei,sans-serif" font-size="13" font-weight="700" text-anchor="start" fill="#185abd">ENVHOSTS  /  QML DESIGN</text>
+<text x="1400" y="39" font-family="Segoe UI,Microsoft YaHei UI,Microsoft YaHei,sans-serif" font-size="13" font-weight="400" text-anchor="end" fill="#536578">P04   ·   2026.11.08</text>
+<text x="40" y="82" font-family="Segoe UI,Microsoft YaHei UI,Microsoft YaHei,sans-serif" font-size="30" font-weight="700" text-anchor="start" fill="#16273b">hosts 原文 · 原始格式可核对</text>
+<text x="40" y="112" font-family="Segoe UI,Microsoft YaHei UI,Microsoft YaHei,sans-serif" font-size="15" font-weight="400" text-anchor="start" fill="#536578">原文与条目共享工作副本；未改动行、BOM、换行和末尾换行均需保真。</text>
+<rect x="40" y="136" width="1360" height="780" rx="14" fill="#ffffff" stroke="#cbd5e1" filter="url(#shadow)"/>
+<rect x="60" y="148" width="38" height="26" rx="6" fill="#e9f1ff" />
+<text x="70" y="166" font-family="Segoe UI,Microsoft YaHei UI,Microsoft YaHei,sans-serif" font-size="13" font-weight="600" text-anchor="start" fill="#185abd">eh</text>
+<text x="110" y="167" font-family="Segoe UI,Microsoft YaHei UI,Microsoft YaHei,sans-serif" font-size="14" font-weight="600" text-anchor="start" fill="#16273b">EnvHosts  /  hosts 文件</text>
+<text x="1368" y="166" font-family="Segoe UI,Microsoft YaHei UI,Microsoft YaHei,sans-serif" font-size="18" font-weight="400" text-anchor="end" fill="#536578">—     □     ×</text>
+<line x1="40" y1="184" x2="1400" y2="184" stroke="#cbd5e1" stroke-width="1"/>
+<text x="64" y="221" font-family="Segoe UI,Microsoft YaHei UI,Microsoft YaHei,sans-serif" font-size="23" font-weight="700" text-anchor="start" fill="#16273b">hosts 文件</text>
+<rect x="202" y="198" width="130" height="26" rx="6" fill="#fff3d9" />
+<text x="212" y="216" font-family="Segoe UI,Microsoft YaHei UI,Microsoft YaHei,sans-serif" font-size="13" font-weight="600" text-anchor="start" fill="#8c5408">1 项未保存</text>
+<rect x="1018" y="197" width="94" height="36" rx="7" fill="#f8fafc" stroke="#7b8b9e" />
+<text x="1065.0" y="220.0" font-family="Segoe UI,Microsoft YaHei UI,Microsoft YaHei,sans-serif" font-size="14" font-weight="600" text-anchor="middle" fill="#16273b">重新载入</text>
+<rect x="1122" y="197" width="90" height="36" rx="7" fill="#f8fafc" stroke="#7b8b9e" />
+<text x="1167.0" y="220.0" font-family="Segoe UI,Microsoft YaHei UI,Microsoft YaHei,sans-serif" font-size="14" font-weight="600" text-anchor="middle" fill="#16273b">撤销  ↶</text>
+<rect x="1222" y="197" width="154" height="36" rx="7" fill="#185abd" />
+<text x="1299.0" y="220.0" font-family="Segoe UI,Microsoft YaHei UI,Microsoft YaHei,sans-serif" font-size="14" font-weight="600" text-anchor="middle" fill="#ffffff">保存到系统  Ctrl+S</text>
+<text x="76" y="271" font-family="Segoe UI,Microsoft YaHei UI,Microsoft YaHei,sans-serif" font-size="15" font-weight="600" text-anchor="start" fill="#536578">条目</text>
+<text x="176" y="271" font-family="Segoe UI,Microsoft YaHei UI,Microsoft YaHei,sans-serif" font-size="15" font-weight="600" text-anchor="start" fill="#185abd">原文</text>
+<line x1="164" y1="287" x2="238" y2="287" stroke="#185abd" stroke-width="3"/>
+<text x="276" y="271" font-family="Segoe UI,Microsoft YaHei UI,Microsoft YaHei,sans-serif" font-size="15" font-weight="600" text-anchor="start" fill="#536578">备份</text>
+<line x1="40" y1="290" x2="1400" y2="290" stroke="#cbd5e1" stroke-width="1"/>
+<line x1="40" y1="852" x2="1400" y2="852" stroke="#cbd5e1" stroke-width="1"/>
+<text x="64" y="877" font-family="Segoe UI,Microsoft YaHei UI,Microsoft YaHei,sans-serif" font-size="13" font-weight="400" text-anchor="start" fill="#8c5408">● 未保存的修改仅保存在工作副本</text>
+<text x="1376" y="877" font-family="Segoe UI,Microsoft YaHei UI,Microsoft YaHei,sans-serif" font-size="13" font-weight="400" text-anchor="end" fill="#536578">当前文件可写  ·  保留原始格式</text>
+<text x="64" y="903" font-family="Segoe UI,Microsoft YaHei UI,Microsoft YaHei,sans-serif" font-size="12" font-weight="400" text-anchor="start" fill="#536578">Ctrl+F  筛选     F2  编辑     Ctrl+Z / Y  撤销 / 重做     F5  重载     Tab  切换焦点</text>
+<rect x="64" y="306" width="138" height="26" rx="6" fill="#e9f1ff" />
+<text x="74" y="324" font-family="Segoe UI,Microsoft YaHei UI,Microsoft YaHei,sans-serif" font-size="13" font-weight="600" text-anchor="start" fill="#185abd">UTF-8 + BOM</text>
+<rect x="212" y="306" width="80" height="26" rx="6" fill="#e9f1ff" />
+<text x="222" y="324" font-family="Segoe UI,Microsoft YaHei UI,Microsoft YaHei,sans-serif" font-size="13" font-weight="600" text-anchor="start" fill="#185abd">CRLF</text>
+<rect x="302" y="306" width="140" height="26" rx="6" fill="#e9f1ff" />
+<text x="312" y="324" font-family="Segoe UI,Microsoft YaHei UI,Microsoft YaHei,sans-serif" font-size="13" font-weight="600" text-anchor="start" fill="#185abd">末尾换行：有</text>
+<text x="1376" y="326" font-family="Cascadia Code,Consolas,Microsoft YaHei UI,monospace" font-size="13" font-weight="400" text-anchor="end" fill="#536578">C:\Fixtures\hosts</text>
+<rect x="64" y="352" width="1312" height="426" rx="8" fill="#f8fafc" stroke="#cbd5e1" />
+<rect x="64" y="352" width="58" height="426" rx="8" fill="#edf1f5" />
+<text x="102" y="385" font-family="Cascadia Code,Consolas,Microsoft YaHei UI,monospace" font-size="14" font-weight="400" text-anchor="end" fill="#536578">1</text>
+<text x="140" y="385" font-family="Cascadia Code,Consolas,Microsoft YaHei UI,monospace" font-size="16" font-weight="400" text-anchor="start" fill="#536578"># EnvHosts sample — synthetic fixture</text>
+<text x="102" y="419" font-family="Cascadia Code,Consolas,Microsoft YaHei UI,monospace" font-size="14" font-weight="400" text-anchor="end" fill="#536578">2</text>
+<text x="140" y="419" font-family="Cascadia Code,Consolas,Microsoft YaHei UI,monospace" font-size="16" font-weight="400" text-anchor="start" fill="#536578"># Local development</text>
+<text x="102" y="453" font-family="Cascadia Code,Consolas,Microsoft YaHei UI,monospace" font-size="14" font-weight="400" text-anchor="end" fill="#536578">3</text>
+<text x="140" y="453" font-family="Cascadia Code,Consolas,Microsoft YaHei UI,monospace" font-size="16" font-weight="400" text-anchor="start" fill="#16273b">127.0.0.1 localhost</text>
+<text x="102" y="487" font-family="Cascadia Code,Consolas,Microsoft YaHei UI,monospace" font-size="14" font-weight="400" text-anchor="end" fill="#536578">4</text>
+<text x="140" y="487" font-family="Cascadia Code,Consolas,Microsoft YaHei UI,monospace" font-size="16" font-weight="400" text-anchor="start" fill="#16273b">::1 localhost-v6</text>
+<text x="102" y="521" font-family="Cascadia Code,Consolas,Microsoft YaHei UI,monospace" font-size="14" font-weight="400" text-anchor="end" fill="#536578">5</text>
+<text x="140" y="521" font-family="Cascadia Code,Consolas,Microsoft YaHei UI,monospace" font-size="16" font-weight="400" text-anchor="start" fill="#16273b"></text>
+<text x="102" y="555" font-family="Cascadia Code,Consolas,Microsoft YaHei UI,monospace" font-size="14" font-weight="400" text-anchor="end" fill="#536578">6</text>
+<text x="140" y="555" font-family="Cascadia Code,Consolas,Microsoft YaHei UI,monospace" font-size="16" font-weight="400" text-anchor="start" fill="#536578"># Development services</text>
+<text x="102" y="589" font-family="Cascadia Code,Consolas,Microsoft YaHei UI,monospace" font-size="14" font-weight="400" text-anchor="end" fill="#536578">7</text>
+<text x="140" y="589" font-family="Cascadia Code,Consolas,Microsoft YaHei UI,monospace" font-size="16" font-weight="400" text-anchor="start" fill="#16273b">127.0.0.1 api.test auth.test # local gateway</text>
+<text x="102" y="623" font-family="Cascadia Code,Consolas,Microsoft YaHei UI,monospace" font-size="14" font-weight="400" text-anchor="end" fill="#536578">8</text>
+<text x="140" y="623" font-family="Cascadia Code,Consolas,Microsoft YaHei UI,monospace" font-size="16" font-weight="400" text-anchor="start" fill="#536578"># 10.0.0.24 preview.test</text>
+<text x="102" y="657" font-family="Cascadia Code,Consolas,Microsoft YaHei UI,monospace" font-size="14" font-weight="400" text-anchor="end" fill="#536578">9</text>
+<text x="140" y="657" font-family="Cascadia Code,Consolas,Microsoft YaHei UI,monospace" font-size="16" font-weight="400" text-anchor="start" fill="#16273b">10.0.0.25 api.test # duplicate hostname</text>
+<text x="102" y="691" font-family="Cascadia Code,Consolas,Microsoft YaHei UI,monospace" font-size="14" font-weight="400" text-anchor="end" fill="#536578">10</text>
+<text x="140" y="691" font-family="Cascadia Code,Consolas,Microsoft YaHei UI,monospace" font-size="16" font-weight="400" text-anchor="start" fill="#16273b"></text>
+<text x="64" y="811" font-family="Segoe UI,Microsoft YaHei UI,Microsoft YaHei,sans-serif" font-size="14" font-weight="400" text-anchor="start" fill="#8c5408">原文编辑中：离开此页或保存时合并成一次模型撤销。</text>
+<text x="64" y="837" font-family="Segoe UI,Microsoft YaHei UI,Microsoft YaHei,sans-serif" font-size="13" font-weight="400" text-anchor="start" fill="#536578">Ctrl+Z / Y 在文本区仅作用于原文输入；切回条目后可撤销整次原文修改。</text>
+<text x="40" y="955" font-family="Segoe UI,Microsoft YaHei UI,Microsoft YaHei,sans-serif" font-size="15" font-weight="700" text-anchor="start" fill="#185abd">F08 / F09  同一份数据</text>
+<text x="40" y="982" font-family="Segoe UI,Microsoft YaHei UI,Microsoft YaHei,sans-serif" font-size="13" font-weight="400" text-anchor="start" fill="#536578">条目页与原文页往返；注释和未知行留在文件中。</text>
+<text x="500" y="955" font-family="Segoe UI,Microsoft YaHei UI,Microsoft YaHei,sans-serif" font-size="15" font-weight="700" text-anchor="start" fill="#185abd">F10  实际写权限</text>
+<text x="500" y="982" font-family="Segoe UI,Microsoft YaHei UI,Microsoft YaHei,sans-serif" font-size="13" font-weight="400" text-anchor="start" fill="#536578">只读仍可选择、搜索、复制；修改控件禁用并说明原因。</text>
+<text x="960" y="955" font-family="Segoe UI,Microsoft YaHei UI,Microsoft YaHei,sans-serif" font-size="15" font-weight="700" text-anchor="start" fill="#185abd">T18–T23  字节校验</text>
+<text x="960" y="982" font-family="Segoe UI,Microsoft YaHei UI,Microsoft YaHei,sans-serif" font-size="13" font-weight="400" text-anchor="start" fill="#536578">比较真实字节，不只比较解析后显示的文字。</text>
+<text x="40" y="1020" font-family="Segoe UI,Microsoft YaHei UI,Microsoft YaHei,sans-serif" font-size="12" font-weight="400" text-anchor="start" fill="#536578">设计示意 · 合成数据 · 实际实现和验证范围见 IMPLEMENTATION.md</text>
+<text x="1400" y="1020" font-family="Segoe UI,Microsoft YaHei UI,Microsoft YaHei,sans-serif" font-size="12" font-weight="400" text-anchor="end" fill="#536578">P04</text>
+</svg>

@@ -798,7 +798,35 @@ struct HostsModel {
         for (const HostsRow& r : rows)
             if (r.origin >= 0)
                 byOrigin[r.origin] = &r;
+        // New rows between original rows belong immediately after their
+        // preceding original line, even when that line is marked deleted.
+        // Rows appended to the working list stay after trailing blank lines.
+        std::map<int, std::vector<const HostsRow*>> insertedAfter;
+        int lastOriginal = -1;
+        for (std::size_t i = 0; i < rows.size(); ++i)
+            if (rows[i].origin >= 0)
+                lastOriginal = static_cast<int>(i);
+        int preceding = -1;
+        for (std::size_t i = 0; i < rows.size(); ++i) {
+            const HostsRow& r = rows[i];
+            if (r.origin >= 0)
+                preceding = r.isHeader ? m_headerEnd : r.origin;
+            else if (!r.deleted)
+                insertedAfter[static_cast<int>(i) > lastOriginal ? static_cast<int>(base.lines.size()) : preceding].push_back(&r);
+        }
+        const auto emitInserted = [&](int origin) {
+            const auto it = insertedAfter.find(origin);
+            if (it == insertedAfter.end())
+                return;
+            for (const HostsRow* r : it->second) {
+                HostsLine line;
+                line.text = emitRow(*r);
+                line.crlf = m_dominantCrlf;
+                out.lines.push_back(line);
+            }
+        };
         for (std::size_t i = 0; i < base.lines.size(); ++i) {
+            emitInserted(static_cast<int>(i) - 1);
             if (static_cast<int>(i) <= m_headerEnd) {
                 out.lines.push_back(base.lines[i]); // folded header: byte-exact
                 continue;
@@ -814,7 +842,7 @@ struct HostsModel {
             const HostsRow& r = *it->second;
             if (r.deleted)
                 continue; // removed line
-            if (!rowChanged(r, i)) {
+            if (!rowChanged(r, static_cast<int>(i))) {
                 out.lines.push_back(base.lines[i]); // byte-exact
             } else {
                 HostsLine nl;
@@ -823,16 +851,8 @@ struct HostsModel {
                 out.lines.push_back(nl);
             }
         }
-        // Append new rows at the end.
-        for (const HostsRow& r : rows) {
-            if (r.origin != -1 || r.deleted)
-                continue;
-            HostsLine nl;
-            nl.text = emitRow(r);
-            nl.crlf = m_dominantCrlf;
-            out.lines.push_back(nl);
-        }
-        // Keep a blank separator before the first appended new row if needed.
+        emitInserted(static_cast<int>(base.lines.size()) - 1);
+        emitInserted(static_cast<int>(base.lines.size()));
         return out;
     }
 

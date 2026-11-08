@@ -1,0 +1,1193 @@
+{
+  "schemaVersion": 1,
+  "designRevision": "repair-1-compact",
+  "scope": "QML_IMPLEMENTATION",
+  "productImplementation": "IN_PROGRESS",
+  "productAcceptance": "PARTIAL",
+  "standard": "docs/qml/QT_IMPLEMENTATION_STANDARD.md",
+  "tokens": "docs/qml/design-tokens.json",
+  "components": {
+    "HOST": {
+      "state": "IMPLEMENTED",
+      "paths": [
+        "qt/qt_editor.cpp"
+      ]
+    },
+    "SHELL": {
+      "state": "IMPLEMENTED",
+      "paths": [
+        "qt/qml/Main.qml"
+      ]
+    },
+    "ROWS": {
+      "state": "IMPLEMENTED",
+      "paths": [
+        "qt/qml/RowDelegate.qml"
+      ]
+    },
+    "BRIDGE": {
+      "state": "IMPLEMENTED",
+      "paths": [
+        "qt/qt_editor.h",
+        "qt/qt_editor.cpp"
+      ]
+    },
+    "STORAGE": {
+      "state": "ADAPT",
+      "paths": [
+        "native.h",
+        "editor_model.h",
+        "logic.h"
+      ]
+    },
+    "SESSION": {
+      "state": "IMPLEMENTED",
+      "paths": [
+        "qt/editor_session.h",
+        "qt/editor_session.cpp"
+      ]
+    },
+    "MODELS": {
+      "state": "IMPLEMENTED",
+      "paths": [
+        "qt/editor_models.h",
+        "qt/editor_models.cpp"
+      ]
+    },
+    "WRITE": {
+      "state": "IMPLEMENTED",
+      "paths": [
+        "qt/write_service.h",
+        "qt/write_service.cpp"
+      ]
+    },
+    "ENV": {
+      "state": "IMPLEMENTED",
+      "paths": [
+        "qt/qml/pages/EnvironmentPage.qml"
+      ]
+    },
+    "PARTS": {
+      "state": "IMPLEMENTED",
+      "paths": [
+        "qt/qml/pages/PartsEditor.qml"
+      ]
+    },
+    "HOSTS": {
+      "state": "IMPLEMENTED",
+      "paths": [
+        "qt/qml/pages/HostsEntriesPage.qml"
+      ]
+    },
+    "RAW": {
+      "state": "IMPLEMENTED",
+      "paths": [
+        "qt/qml/pages/HostsRawPage.qml"
+      ]
+    },
+    "BACKUPS": {
+      "state": "IMPLEMENTED",
+      "paths": [
+        "qt/qml/pages/BackupsPage.qml"
+      ]
+    },
+    "REVIEW": {
+      "state": "IMPLEMENTED",
+      "paths": [
+        "qt/qml/dialogs/SaveReview.qml",
+        "qt/qml/dialogs/ConflictReview.qml"
+      ]
+    },
+    "FEEDBACK": {
+      "state": "IMPLEMENTED",
+      "paths": [
+        "qt/qml/controls/StatusBanner.qml",
+        "qt/qml/dialogs/DraftRecovery.qml"
+      ]
+    },
+    "TOKENS": {
+      "state": "IMPLEMENTED",
+      "paths": [
+        "qt/qml/DesignTokens.qml"
+      ]
+    },
+    "CONTROLS": {
+      "state": "IMPLEMENTED",
+      "paths": [
+        "qt/qml/controls/CommandButton.qml",
+        "qt/qml/controls/EditField.qml",
+        "qt/qml/controls/EntryList.qml",
+        "qt/qml/controls/CompactCheckBox.qml",
+        "qt/qml/controls/CompactTextField.qml",
+        "qt/qml/controls/CompactComboBox.qml",
+        "qt/qml/controls/ListSurface.qml",
+        "qt/qml/controls/RowSurface.qml",
+        "qt/qml/controls/ColumnHeader.qml"
+      ]
+    }
+  },
+  "pages": [
+    {
+      "id": "P00",
+      "svg": "docs/qml/design/00-overview.svg",
+      "components": [
+        "HOST",
+        "SHELL"
+      ]
+    },
+    {
+      "id": "P01",
+      "svg": "docs/qml/design/01-environment.svg",
+      "components": [
+        "ENV",
+        "ROWS"
+      ]
+    },
+    {
+      "id": "P02",
+      "svg": "docs/qml/design/02-split-items.svg",
+      "components": [
+        "PARTS"
+      ]
+    },
+    {
+      "id": "P03",
+      "svg": "docs/qml/design/03-hosts-entries.svg",
+      "components": [
+        "HOSTS",
+        "ROWS"
+      ]
+    },
+    {
+      "id": "P04",
+      "svg": "docs/qml/design/04-hosts-raw.svg",
+      "components": [
+        "RAW"
+      ]
+    },
+    {
+      "id": "P05",
+      "svg": "docs/qml/design/05-backups.svg",
+      "components": [
+        "BACKUPS"
+      ]
+    },
+    {
+      "id": "P06",
+      "svg": "docs/qml/design/06-save-conflict.svg",
+      "components": [
+        "REVIEW"
+      ]
+    },
+    {
+      "id": "P07",
+      "svg": "docs/qml/design/07-states-recovery.svg",
+      "components": [
+        "FEEDBACK"
+      ]
+    },
+    {
+      "id": "P08",
+      "svg": "docs/qml/design/08-environment-dark.svg",
+      "components": [
+        "TOKENS",
+        "CONTROLS"
+      ]
+    },
+    {
+      "id": "P09",
+      "svg": "docs/qml/design/09-state-flow.svg",
+      "components": [
+        "SESSION",
+        "WRITE"
+      ]
+    }
+  ],
+  "commands": [
+    {
+      "id": "C01",
+      "entryPoint": "finishEdit/beginEdit/updateEdit/cancelEdit",
+      "components": [
+        "SESSION",
+        "BRIDGE",
+        "CONTROLS"
+      ],
+      "tests": [
+        "T08",
+        "T13",
+        "T22",
+        "T40"
+      ]
+    },
+    {
+      "id": "C02",
+      "entryPoint": "navigate/select/setFilter/setScope",
+      "components": [
+        "SESSION",
+        "BRIDGE",
+        "MODELS"
+      ],
+      "tests": [
+        "T01",
+        "T04",
+        "T05",
+        "T11"
+      ]
+    },
+    {
+      "id": "C03",
+      "entryPoint": "addRow/deleteSelected/enableSelected",
+      "components": [
+        "SESSION",
+        "BRIDGE"
+      ],
+      "tests": [
+        "T06",
+        "T07",
+        "T08",
+        "T18"
+      ]
+    },
+    {
+      "id": "C04",
+      "entryPoint": "addPart/deleteSelected/moveParts/setDelimiter",
+      "components": [
+        "SESSION",
+        "PARTS"
+      ],
+      "tests": [
+        "T09",
+        "T10",
+        "T11",
+        "T12",
+        "T13",
+        "T14"
+      ]
+    },
+    {
+      "id": "C05",
+      "entryPoint": "history",
+      "components": [
+        "SESSION",
+        "BRIDGE"
+      ],
+      "tests": [
+        "T39",
+        "T40"
+      ]
+    },
+    {
+      "id": "C06",
+      "entryPoint": "requestSave",
+      "components": [
+        "SESSION",
+        "BRIDGE",
+        "WRITE",
+        "REVIEW"
+      ],
+      "tests": [
+        "T15",
+        "T24",
+        "T26"
+      ]
+    },
+    {
+      "id": "C07",
+      "entryPoint": "respond/saveConfirmed",
+      "components": [
+        "WRITE",
+        "BRIDGE",
+        "REVIEW"
+      ],
+      "tests": [
+        "T25",
+        "T26",
+        "T27",
+        "T28",
+        "T29",
+        "T30",
+        "T32"
+      ]
+    },
+    {
+      "id": "C08",
+      "entryPoint": "poll/respond",
+      "components": [
+        "SESSION",
+        "WRITE",
+        "REVIEW"
+      ],
+      "tests": [
+        "T31",
+        "T32"
+      ]
+    },
+    {
+      "id": "C09",
+      "entryPoint": "requestReload/respond",
+      "components": [
+        "SESSION",
+        "BRIDGE",
+        "FEEDBACK"
+      ],
+      "tests": [
+        "T11",
+        "T17",
+        "T41"
+      ]
+    },
+    {
+      "id": "C10",
+      "entryPoint": "previewBackup/restoreBackup/respond",
+      "components": [
+        "SESSION",
+        "WRITE",
+        "BACKUPS"
+      ],
+      "tests": [
+        "T35",
+        "T36",
+        "T37"
+      ]
+    },
+    {
+      "id": "C11",
+      "entryPoint": "respond/requestClose",
+      "components": [
+        "SESSION",
+        "WRITE",
+        "FEEDBACK",
+        "HOST"
+      ],
+      "tests": [
+        "T02",
+        "T33",
+        "T34"
+      ]
+    },
+    {
+      "id": "C12",
+      "entryPoint": "appearance",
+      "components": [
+        "SESSION",
+        "BRIDGE",
+        "TOKENS"
+      ],
+      "tests": [
+        "T45",
+        "T46"
+      ]
+    },
+    {
+      "id": "C13",
+      "entryPoint": "copySelected/exportBackup/deleteBackup",
+      "components": [
+        "BRIDGE",
+        "WRITE",
+        "BACKUPS"
+      ],
+      "tests": [
+        "T05",
+        "T37",
+        "T38"
+      ]
+    },
+    {
+      "id": "C14",
+      "entryPoint": "openEditor/load/applyFocus",
+      "components": [
+        "HOST",
+        "SESSION",
+        "BRIDGE"
+      ],
+      "tests": [
+        "T01",
+        "T02",
+        "T03",
+        "T47",
+        "T48"
+      ]
+    }
+  ],
+  "requirements": [
+    {
+      "id": "F01",
+      "pages": [
+        "P00"
+      ],
+      "components": [
+        "HOST",
+        "SHELL",
+        "BRIDGE",
+        "SESSION"
+      ],
+      "commands": [
+        "C02",
+        "C11",
+        "C14"
+      ],
+      "tests": [
+        "T01",
+        "T02",
+        "T48"
+      ],
+      "prototypeChecks": [
+        "R12"
+      ],
+      "acceptance": "PARTIAL",
+      "evidence": [
+        {
+          "source": "tests/test_qml_editor.cpp",
+          "test": "realQmlHostsPagesAndCloseReview"
+        }
+      ]
+    },
+    {
+      "id": "F02",
+      "pages": [
+        "P01",
+        "P03"
+      ],
+      "components": [
+        "MODELS",
+        "ENV",
+        "HOSTS",
+        "ROWS"
+      ],
+      "commands": [
+        "C02",
+        "C14"
+      ],
+      "tests": [
+        "T03",
+        "T04"
+      ],
+      "prototypeChecks": [
+        "R01",
+        "R09"
+      ],
+      "acceptance": "PARTIAL",
+      "evidence": [
+        {
+          "source": "tests/test_qml_editor.cpp",
+          "test": "selectionRanges"
+        },
+        {
+          "source": "tests/test_qml_editor.cpp",
+          "test": "repairHostsProjectionAndScopes"
+        },
+        {
+          "source": "tests/test_qml_editor.cpp",
+          "test": "repairColumnStateAndLargeProjection"
+        },
+        {
+          "source": "tests/test_qml_editor.cpp",
+          "test": "repairRealCellsColumnsAndStateColors"
+        },
+        {
+          "source": "tests/test_qml_editor.cpp",
+          "test": "repairRealScopeScrollAndSelection"
+        },
+        {
+          "source": "tests/test_qml_editor.cpp",
+          "test": "insertionOrderAndUndo"
+        },
+        {
+          "source": "tests/test_qml_editor.cpp",
+          "test": "insertionRealButtonsAndGreenState"
+        }
+      ]
+    },
+    {
+      "id": "F03",
+      "pages": [
+        "P01",
+        "P03"
+      ],
+      "components": [
+        "SESSION",
+        "MODELS",
+        "ENV",
+        "HOSTS"
+      ],
+      "commands": [
+        "C02",
+        "C03",
+        "C13"
+      ],
+      "tests": [
+        "T04",
+        "T05",
+        "T06"
+      ],
+      "prototypeChecks": [
+        "R09"
+      ],
+      "acceptance": "PARTIAL",
+      "evidence": [
+        {
+          "source": "tests/test_qml_editor.cpp",
+          "test": "batchDeleteAndUndo"
+        },
+        {
+          "source": "tests/test_qml_editor.cpp",
+          "test": "realQmlMultiSelectionAndScreenshots"
+        },
+        {
+          "source": "tests/test_qml_editor.cpp",
+          "test": "repairHostsProjectionAndScopes"
+        },
+        {
+          "source": "tests/test_qml_editor.cpp",
+          "test": "repairColumnStateAndLargeProjection"
+        },
+        {
+          "source": "tests/test_qml_editor.cpp",
+          "test": "repairRealCellsColumnsAndStateColors"
+        },
+        {
+          "source": "tests/test_qml_editor.cpp",
+          "test": "repairRealScopeScrollAndSelection"
+        },
+        {
+          "source": "tests/test_qml_editor.cpp",
+          "test": "insertionOrderAndUndo"
+        },
+        {
+          "source": "tests/test_qml_editor.cpp",
+          "test": "insertionRealButtonsAndGreenState"
+        }
+      ]
+    },
+    {
+      "id": "F04",
+      "pages": [
+        "P01"
+      ],
+      "components": [
+        "SESSION",
+        "STORAGE",
+        "ENV",
+        "CONTROLS"
+      ],
+      "commands": [
+        "C01",
+        "C03"
+      ],
+      "tests": [
+        "T07",
+        "T08"
+      ],
+      "prototypeChecks": [
+        "R02",
+        "R10",
+        "R13"
+      ],
+      "acceptance": "PARTIAL",
+      "evidence": [
+        {
+          "source": "tests/test_qml_editor.cpp",
+          "test": "multiSzPreservesSemicolons"
+        },
+        {
+          "source": "tests/test_qml_editor.cpp",
+          "test": "isolatedNativeStorage"
+        },
+        {
+          "source": "tests/test_qml_editor.cpp",
+          "test": "repairRealCellsColumnsAndStateColors"
+        }
+      ]
+    },
+    {
+      "id": "F05",
+      "pages": [
+        "P02",
+        "P09"
+      ],
+      "components": [
+        "SESSION",
+        "MODELS",
+        "PARTS"
+      ],
+      "commands": [
+        "C01",
+        "C02",
+        "C04",
+        "C05"
+      ],
+      "tests": [
+        "T09",
+        "T10",
+        "T11",
+        "T12",
+        "T13"
+      ],
+      "prototypeChecks": [
+        "R02",
+        "R03",
+        "R04",
+        "R10",
+        "R13"
+      ],
+      "acceptance": "PARTIAL",
+      "evidence": [
+        {
+          "source": "tests/test_qml_editor.cpp",
+          "test": "partsBatchAndMetadata"
+        },
+        {
+          "source": "tests/test_qml_editor.cpp",
+          "test": "moveStableBlocks"
+        },
+        {
+          "source": "tests/test_qml_editor.cpp",
+          "test": "realQmlMultiSelectionAndScreenshots"
+        },
+        {
+          "source": "tests/test_qml_editor.cpp",
+          "test": "repairRealCellsColumnsAndStateColors"
+        },
+        {
+          "source": "tests/test_qml_editor.cpp",
+          "test": "insertionOrderAndUndo"
+        },
+        {
+          "source": "tests/test_qml_editor.cpp",
+          "test": "insertionRealButtonsAndGreenState"
+        }
+      ]
+    },
+    {
+      "id": "F06",
+      "pages": [
+        "P02"
+      ],
+      "components": [
+        "SESSION",
+        "PARTS"
+      ],
+      "commands": [
+        "C04"
+      ],
+      "tests": [
+        "T14"
+      ],
+      "prototypeChecks": [],
+      "acceptance": "PARTIAL",
+      "evidence": [
+        {
+          "source": "tests/test_qml_editor.cpp",
+          "test": "partsBatchAndMetadata"
+        }
+      ]
+    },
+    {
+      "id": "F07",
+      "pages": [
+        "P01",
+        "P02",
+        "P07"
+      ],
+      "components": [
+        "SESSION",
+        "ENV",
+        "PARTS",
+        "FEEDBACK"
+      ],
+      "commands": [
+        "C01",
+        "C06"
+      ],
+      "tests": [
+        "T15",
+        "T16",
+        "T17"
+      ],
+      "prototypeChecks": [],
+      "acceptance": "PARTIAL",
+      "evidence": [
+        {
+          "source": "tests/test_qml_editor.cpp",
+          "test": "buffersAndIme"
+        }
+      ]
+    },
+    {
+      "id": "F08",
+      "pages": [
+        "P03"
+      ],
+      "components": [
+        "SESSION",
+        "STORAGE",
+        "HOSTS"
+      ],
+      "commands": [
+        "C03",
+        "C05"
+      ],
+      "tests": [
+        "T18",
+        "T19",
+        "T20"
+      ],
+      "prototypeChecks": [
+        "R05"
+      ],
+      "acceptance": "PARTIAL",
+      "evidence": [
+        {
+          "source": "tests/test_qml_editor.cpp",
+          "test": "hostsBatchRawAndUndo"
+        },
+        {
+          "source": "tests/test_qml_editor.cpp",
+          "test": "repairRealCellsColumnsAndStateColors"
+        },
+        {
+          "source": "tests/test_qml_editor.cpp",
+          "test": "insertionOrderAndUndo"
+        },
+        {
+          "source": "tests/test_qml_editor.cpp",
+          "test": "insertionRealButtonsAndGreenState"
+        }
+      ]
+    },
+    {
+      "id": "F09",
+      "pages": [
+        "P04"
+      ],
+      "components": [
+        "SESSION",
+        "STORAGE",
+        "RAW"
+      ],
+      "commands": [
+        "C01",
+        "C05"
+      ],
+      "tests": [
+        "T21",
+        "T22",
+        "T23"
+      ],
+      "prototypeChecks": [],
+      "acceptance": "PARTIAL",
+      "evidence": [
+        {
+          "source": "tests/test_qml_editor.cpp",
+          "test": "hostsBatchRawAndUndo"
+        },
+        {
+          "source": "tests/test_qml_editor.cpp",
+          "test": "hostsDraftRoundtrip"
+        }
+      ]
+    },
+    {
+      "id": "F10",
+      "pages": [
+        "P03",
+        "P07"
+      ],
+      "components": [
+        "BRIDGE",
+        "WRITE",
+        "STORAGE",
+        "FEEDBACK"
+      ],
+      "commands": [
+        "C03",
+        "C06",
+        "C07",
+        "C10",
+        "C12"
+      ],
+      "tests": [
+        "T24",
+        "T25",
+        "T48"
+      ],
+      "prototypeChecks": [
+        "R09"
+      ],
+      "acceptance": "PARTIAL",
+      "evidence": [
+        {
+          "source": "tests/test_qml_editor.cpp",
+          "test": "conflictsAndPermissions"
+        },
+        {
+          "source": "tests/test_qml_editor.cpp",
+          "test": "isolatedNativeStorage"
+        }
+      ]
+    },
+    {
+      "id": "F11",
+      "pages": [
+        "P06",
+        "P09"
+      ],
+      "components": [
+        "SESSION",
+        "BRIDGE",
+        "WRITE",
+        "REVIEW"
+      ],
+      "commands": [
+        "C01",
+        "C06",
+        "C07"
+      ],
+      "tests": [
+        "T26",
+        "T27",
+        "T28",
+        "T29",
+        "T30",
+        "T32"
+      ],
+      "prototypeChecks": [
+        "R02",
+        "R07",
+        "R08",
+        "R12"
+      ],
+      "acceptance": "PARTIAL",
+      "evidence": [
+        {
+          "source": "tests/test_qml_editor.cpp",
+          "test": "backupBeforeWriteAndReadback"
+        },
+        {
+          "source": "tests/test_qml_editor.cpp",
+          "test": "backupFailureBlocksEveryWrite"
+        },
+        {
+          "source": "tests/test_qml_editor.cpp",
+          "test": "partialReadbackBroadcastFailures"
+        },
+        {
+          "source": "tests/test_qml_editor.cpp",
+          "test": "hostsPartialWriteHasRecovery"
+        }
+      ]
+    },
+    {
+      "id": "F12",
+      "pages": [
+        "P06",
+        "P07",
+        "P09"
+      ],
+      "components": [
+        "SESSION",
+        "WRITE",
+        "REVIEW"
+      ],
+      "commands": [
+        "C08",
+        "C09"
+      ],
+      "tests": [
+        "T31",
+        "T32"
+      ],
+      "prototypeChecks": [
+        "R07",
+        "R11",
+        "R12"
+      ],
+      "acceptance": "PARTIAL",
+      "evidence": [
+        {
+          "source": "tests/test_qml_editor.cpp",
+          "test": "conflictsAndPermissions"
+        }
+      ]
+    },
+    {
+      "id": "F13",
+      "pages": [
+        "P07",
+        "P09"
+      ],
+      "components": [
+        "SESSION",
+        "WRITE",
+        "FEEDBACK",
+        "HOST"
+      ],
+      "commands": [
+        "C11"
+      ],
+      "tests": [
+        "T33",
+        "T34"
+      ],
+      "prototypeChecks": [],
+      "acceptance": "PARTIAL",
+      "evidence": [
+        {
+          "source": "tests/test_qml_editor.cpp",
+          "test": "draftsKeepPendingAndIds"
+        },
+        {
+          "source": "tests/test_qml_editor.cpp",
+          "test": "legacyAndCorruptDrafts"
+        }
+      ]
+    },
+    {
+      "id": "F14",
+      "pages": [
+        "P05"
+      ],
+      "components": [
+        "SESSION",
+        "WRITE",
+        "STORAGE",
+        "BACKUPS"
+      ],
+      "commands": [
+        "C10",
+        "C13"
+      ],
+      "tests": [
+        "T35",
+        "T36",
+        "T37",
+        "T38"
+      ],
+      "prototypeChecks": [
+        "R06"
+      ],
+      "acceptance": "PARTIAL",
+      "evidence": [
+        {
+          "source": "tests/test_qml_editor.cpp",
+          "test": "backupPreviewRestoreIsUndoable"
+        }
+      ]
+    },
+    {
+      "id": "F15",
+      "pages": [
+        "P01",
+        "P02",
+        "P03",
+        "P04",
+        "P05",
+        "P06",
+        "P07",
+        "P08",
+        "P09"
+      ],
+      "components": [
+        "SESSION",
+        "SHELL",
+        "CONTROLS"
+      ],
+      "commands": [
+        "C01",
+        "C02",
+        "C04",
+        "C05",
+        "C09"
+      ],
+      "tests": [
+        "T39",
+        "T40"
+      ],
+      "prototypeChecks": [
+        "R04",
+        "R05",
+        "R10"
+      ],
+      "acceptance": "PARTIAL",
+      "evidence": [
+        {
+          "source": "tests/test_qml_editor.cpp",
+          "test": "partsBatchAndMetadata"
+        },
+        {
+          "source": "tests/test_qml_editor.cpp",
+          "test": "realQmlMultiSelectionAndScreenshots"
+        }
+      ]
+    },
+    {
+      "id": "F16",
+      "pages": [
+        "P07"
+      ],
+      "components": [
+        "BRIDGE",
+        "FEEDBACK"
+      ],
+      "commands": [
+        "C06",
+        "C09",
+        "C14"
+      ],
+      "tests": [
+        "T41",
+        "T42"
+      ],
+      "prototypeChecks": [
+        "R08",
+        "R09"
+      ],
+      "acceptance": "PARTIAL",
+      "evidence": [
+        {
+          "source": "tests/test_qml_editor.cpp",
+          "test": "realQmlHostsPagesAndCloseReview"
+        }
+      ]
+    },
+    {
+      "id": "F17",
+      "pages": [
+        "P01",
+        "P02",
+        "P03",
+        "P04",
+        "P05",
+        "P06",
+        "P07",
+        "P08"
+      ],
+      "components": [
+        "SHELL",
+        "ROWS",
+        "CONTROLS",
+        "REVIEW"
+      ],
+      "commands": [
+        "C02",
+        "C12"
+      ],
+      "tests": [
+        "T43",
+        "T44"
+      ],
+      "prototypeChecks": [],
+      "acceptance": "PARTIAL",
+      "evidence": [
+        {
+          "source": "tests/test_qml_editor.cpp",
+          "test": "realQmlMultiSelectionAndScreenshots"
+        },
+        {
+          "source": "tests/test_qml_editor.cpp",
+          "test": "repairRealCellsColumnsAndStateColors"
+        },
+        {
+          "source": "tests/test_qml_editor.cpp",
+          "test": "insertionOrderAndUndo"
+        },
+        {
+          "source": "tests/test_qml_editor.cpp",
+          "test": "insertionRealButtonsAndGreenState"
+        }
+      ]
+    },
+    {
+      "id": "F18",
+      "pages": [
+        "P01",
+        "P07",
+        "P08"
+      ],
+      "components": [
+        "BRIDGE",
+        "SESSION",
+        "TOKENS",
+        "CONTROLS"
+      ],
+      "commands": [
+        "C12"
+      ],
+      "tests": [
+        "T45",
+        "T46"
+      ],
+      "prototypeChecks": [
+        "R09"
+      ],
+      "acceptance": "PARTIAL",
+      "evidence": [
+        {
+          "source": "tests/test_qml_editor.cpp",
+          "test": "repairRealCellsColumnsAndStateColors"
+        },
+        {
+          "source": "tests/test_qml_editor.cpp",
+          "test": "repairColumnStateAndLargeProjection"
+        }
+      ]
+    },
+    {
+      "id": "F19",
+      "pages": [
+        "P00"
+      ],
+      "components": [
+        "HOST",
+        "MODELS",
+        "WRITE"
+      ],
+      "commands": [
+        "C14"
+      ],
+      "tests": [
+        "T47"
+      ],
+      "prototypeChecks": [],
+      "acceptance": "NOT_RUN"
+    },
+    {
+      "id": "F20",
+      "pages": [
+        "P00"
+      ],
+      "components": [
+        "HOST",
+        "STORAGE",
+        "SHELL"
+      ],
+      "commands": [
+        "C14"
+      ],
+      "tests": [
+        "T48"
+      ],
+      "prototypeChecks": [],
+      "acceptance": "PARTIAL",
+      "evidence": [
+        {
+          "source": "tests/qml_protocol.py",
+          "test": "main"
+        }
+      ]
+    }
+  ],
+  "plannedTestSources": [],
+  "knownGaps": [
+    "PARTIAL is evidence for named variants only; no F or T group is certified fully accepted.",
+    "Real Windows IME, Narrator, mixed-monitor DPI, full 10000-row paint/history performance, real host loading/reloading and clean-machine install remain unverified.",
+    "Backup auto-pruning is deferred to avoid deleting active recovery points; manual deletion is available.",
+    "Legacy REG_MULTI_SZ drafts/backups that have lost element boundaries are retained and explicitly rejected.",
+    "See IMPLEMENTATION.md for API deviations and outstanding release gates."
+  ],
+  "implementationReport": "docs/qml/IMPLEMENTATION.md",
+  "testSources": [
+    "tests/test_qml_editor.cpp",
+    "tests/qml_protocol.py"
+  ]
+}

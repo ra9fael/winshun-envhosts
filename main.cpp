@@ -14,8 +14,10 @@
 // x64 is mandatory: a 32-bit build is redirected by the file-system redirector
 // to SysWOW64 and would silently edit the wrong hosts file.
 #include "winshun.h"
+#include "build_info.h"
 
 #include <cstdint>
+#include <iostream>
 #include <string>
 #include <vector>
 
@@ -559,9 +561,18 @@ struct EnvHosts : winshun::Plugin {
                 oa.systemWritable = st.showSystem && es.canWriteSystem(werr);
             }
             std::string err;
+#ifdef ENVHOSTS_QML_EDITOR
+            // Do not block the action reply on QML component creation. The
+            // protocol thread answers while the GUI thread creates the window.
+            const bool ok = editorwin::openEditorDeferred(oa);
+            if (ok)
+                return {winshun::effect::notify(tr(zh, "正在打开编辑窗口", "Opening editor window")), winshun::effect::hide()};
+            err = "E_QML_INIT";
+#else
             const bool ok = editorwin::openEditor(oa, err);
             if (ok)
                 return {winshun::effect::notify(tr(zh, "已打开编辑窗口", "Editor window opened")), winshun::effect::hide()};
+#endif
             return {winshun::effect::notify(tr(zh, "无法打开编辑窗口：", "Cannot open editor: ") + err), winshun::effect::keep()};
         }
 
@@ -594,6 +605,62 @@ struct EnvHosts : winshun::Plugin {
         }
 
         // ---- env inline edit ----
+#ifdef ENVHOSTS_QML_EDITOR
+        // The launcher and QML window share the same verified write transaction.
+        // Opening a window is deliberately outside the process-wide write lock.
+        const bool inlineWrite=(kind=="envEdit"&&a.action=="save")
+            ||(kind=="envDeleteConfirm"&&a.action!="cancel")
+            ||(kind=="hosts"&&a.action=="toggle")
+            ||((kind=="hostsDeleteConfirm"||kind=="hostsAddConfirm")&&a.action!="cancel");
+        if(inlineWrite){
+            const bool environment=kind=="envEdit"||kind=="envDeleteConfirm";
+            editorwin::OpenArgs args;args.kind=environment?"env":"hosts";args.userSubkey=testUserSubkey();args.sysSubkey=testSystemSubkey();
+            args.hostsPath=winshun::wide(testHostsPath(st));args.dataDir=dataDir();args.backupCount=st.backupCount;args.showSystem=true;
+            editorwin::NativeBackend backend(args);auto snapshot=backend.read();
+            if(!snapshot.error.isEmpty())return {notify(snapshot.error.toStdString()),winshun::effect::keep()};
+            editorwin::WriteRequest request;request.kind=QString::fromStdString(args.kind);request.token=editorwin::freshId();request.revision="launcher-action";
+            if(environment){
+                const auto target=data["target"].toString();const QString scope=kind=="envEdit"||target.compare(0,7,"system/")!=0?"user":"system";
+                const QString name=QString::fromStdString(kind=="envEdit"?data["name"].toString():target.substr(target.find('/')+1));
+                if(!envh::isValidEnvName(name.toStdString()))return {notify("E_ENV_NAME"),winshun::effect::keep()};
+                editorwin::Change change;change.scope=scope;change.name=name;
+                for(const auto& value:snapshot.env)if(value.key()==editorwin::envKey(scope,name)){change.before=value;change.hasBefore=true;}
+                change.hasAfter=kind=="envEdit";
+                if(change.hasAfter){const auto value=data["value"].toString();if(!envh::isValidEnvValue(value))return {notify("E_ENV_VALUE"),winshun::effect::keep()};
+                    if(change.hasBefore&&(change.before.type=="REG_MULTI_SZ"||!change.before.formatError.isEmpty()))return {notify(tr(zh,"请在 QML 编辑器中编辑此类型，避免丢失元素边界。","Edit this type in the QML editor to preserve element boundaries.")),winshun::effect::keep()};
+                    change.after=change.hasBefore?change.before:editorwin::EnvValue{};change.after.scope=scope;change.after.name=name;
+                    if(!change.hasBefore)change.after.type=QString::fromStdString(envh::envTypeForValue(value));
+                    change.after.value=QString::fromStdString(value);change.after.encode();}
+                change.operation=change.hasAfter?(change.hasBefore?"modify":"add"):"delete";
+                if(change.hasAfter&&change.hasBefore&&editorwin::sameValue(change.before,change.after))return {notify(tr(zh,"没有修改","No changes")),winshun::effect::keep()};
+                request.changes.append(change);request.fingerprints[scope]=snapshot.fingerprint(scope);
+            }else{
+                auto parsed=envh::parseHosts(snapshot.hosts.toStdString());
+                if(kind=="hostsAddConfirm"){
+                    const auto target=data["target"].toString();auto row=envh::parseHostLine(target,0);
+                    if(row.section||row.hostnames.empty())return {notify("E_HOSTS_HOST"),winshun::effect::keep()};
+                    auto added=envh::hostsAdd(parsed,row.ip,row.hostnames.front(),row.comment);if(!added.success)return {notify(added.failure.message),winshun::effect::keep()};parsed=added.value;
+                }else{
+                    int line=-1;if(kind=="hosts")envh::findHostsEntryById(parsed,data["id"].toString(),line);
+                    else for(size_t i=0;i<parsed.lines.size();++i)if(parsed.lines[i].text==data["target"].toString()){line=int(i);break;}
+                    if(line<0)return {notify("E_STALE_HOSTS_ROW"),winshun::effect::keep()};
+                    auto changed=kind=="hosts"?envh::hostsToggle(parsed,line):envh::hostsDelete(parsed,line);
+                    if(!changed.success)return {notify(changed.failure.message),winshun::effect::keep()};parsed=changed.value;
+                }
+                request.hosts=QByteArray::fromStdString(envh::serializeHosts(parsed));request.fingerprints["hosts"]=snapshot.fingerprint("hosts");
+            }
+            const auto result=editorwin::WriteService::execute(backend,request);
+            if(result.state!="Succeeded"&&result.state!="StoredButBroadcastFailed")return {notify((result.state+": "+result.error+" "+result.backupId).toStdString()),winshun::effect::keep()};
+            editorwin::onExternalChange(args.kind);
+            return {notify(result.state=="Succeeded"?tr(zh,"已保存并核对","Saved and verified"):tr(zh,"已保存，广播失败","Saved; broadcast failed")),winshun::effect::hide()};
+        }
+        if((kind=="envRestore"||kind=="hostsRestore")&&a.action=="restore"){
+            editorwin::OpenArgs args;args.kind=kind=="envRestore"?"env":"hosts";args.userSubkey=testUserSubkey();args.sysSubkey=testSystemSubkey();
+            args.hostsPath=winshun::wide(testHostsPath(st));args.dataDir=dataDir();args.backupCount=st.backupCount;args.showSystem=st.showSystem;args.setLang(uiLang());args.dark=theme()=="dark";
+            if(!editorwin::openEditorDeferred(args))return {notify("E_QML_INIT"),winshun::effect::keep()};
+            return {notify(tr(zh,"请在“备份”页预览并恢复；保存后才写入目标。","Preview and restore in Backups, then Save to write the target.")),winshun::effect::hide()};
+        }
+#endif
         if (kind == "envEdit") {
             const std::string name = data["name"].toString();
             const std::string value = data["value"].toString();
@@ -828,6 +895,10 @@ struct EnvHosts : winshun::Plugin {
         editorwin::onAppearanceChanged(uiLang(), theme() == "dark");
     }
 
+#ifdef ENVHOSTS_QML_EDITOR
+    void shuttingDown() override { editorwin::closeAllEditors(1800); }
+#endif
+
 
     void cancel(long long queryId) override { winshun::debug("ra9fael.envhosts: cancel " + std::to_string(queryId)); }
 };
@@ -851,16 +922,27 @@ struct EnvHosts : winshun::Plugin {
 
 int main(int argc, char** argv)
 {
+    if(argc==2&&std::string(argv[1])=="--build-info") {
+        std::cout << "{\"id\":\"ra9fael.envhosts\",\"version\":\"" << ENVHOSTS_VERSION
+                  << "\",\"backend\":\"" << ENVHOSTS_BACKEND << "\"}\n";
+        return 0;
+    }
 #ifdef ENVHOSTS_QML_EDITOR
     // Qt Quick requires the GUI thread, so the Qt loop owns the main thread and
     // the JSON-RPC loop moves to a worker. stdio stays owned by the protocol
     // thread; the GUI thread never writes to it.
+    // Use the Windows GDI font database with this software-rendered editor.
+    // DirectWrite's process-wide font data survived engine destruction and
+    // accounted for most of the measured post-close footprint on this machine.
+    // An explicit platform selection remains available for diagnostics.
+    if(qEnvironmentVariableIsEmpty("QT_QPA_PLATFORM"))
+        qputenv("QT_QPA_PLATFORM", "windows:fontengine=gdi");
     QGuiApplication app(argc, argv);
     app.setQuitOnLastWindowClosed(false);
     editorwin::initialize();
     std::thread protocol([] {
         EnvHosts().serve();
-        QMetaObject::invokeMethod(qApp, "quit", Qt::QueuedConnection);
+        editorwin::shutdownWhenReady();
     });
     const int rc = app.exec();
     protocol.join();

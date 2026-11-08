@@ -1,0 +1,90 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1440" height="1040" viewBox="0 0 1440 1040" role="img" aria-labelledby="title desc">
+<title id="title">P09 · 状态转换 · 编辑与写入分开</title>
+<desc id="desc">自动暂存只改变工作副本；错误、冲突和取消都有明确返回路径。。QML 目标设计示意，并非运行截图，数据均为虚构。</desc>
+<defs><filter id="shadow" x="-10%" y="-10%" width="120%" height="135%"><feDropShadow dx="0" dy="8" stdDeviation="12" flood-color="#12233a" flood-opacity=".08"/></filter></defs>
+<rect x="0" y="0" width="1440" height="1040" rx="0" fill="#edf1f5" />
+<text x="40" y="39" font-family="Segoe UI,Microsoft YaHei UI,Microsoft YaHei,sans-serif" font-size="13" font-weight="700" text-anchor="start" fill="#185abd">ENVHOSTS  /  QML DESIGN</text>
+<text x="1400" y="39" font-family="Segoe UI,Microsoft YaHei UI,Microsoft YaHei,sans-serif" font-size="13" font-weight="400" text-anchor="end" fill="#536578">P09   ·   2026.11.08</text>
+<text x="40" y="82" font-family="Segoe UI,Microsoft YaHei UI,Microsoft YaHei,sans-serif" font-size="30" font-weight="700" text-anchor="start" fill="#16273b">状态转换 · 编辑与写入分开</text>
+<text x="40" y="112" font-family="Segoe UI,Microsoft YaHei UI,Microsoft YaHei,sans-serif" font-size="15" font-weight="400" text-anchor="start" fill="#536578">自动暂存只改变工作副本；错误、冲突和取消都有明确返回路径。</text>
+<rect x="40" y="218" width="300" height="145" rx="10" fill="#ffffff" stroke="#cbd5e1" />
+<rect x="58" y="238" width="110" height="26" rx="6" fill="#e7f5ed" />
+<text x="68" y="256" font-family="Segoe UI,Microsoft YaHei UI,Microsoft YaHei,sans-serif" font-size="13" font-weight="600" text-anchor="start" fill="#16734a">Clean</text>
+<text x="58" y="303" font-family="Segoe UI,Microsoft YaHei UI,Microsoft YaHei,sans-serif" font-size="22" font-weight="700" text-anchor="start" fill="#16273b">与目标同步</text>
+<text x="58" y="339" font-family="Segoe UI,Microsoft YaHei UI,Microsoft YaHei,sans-serif" font-size="13" font-weight="400" text-anchor="start" fill="#536578">开始编辑进入 Dirty</text>
+<text x="364" y="296" font-family="Segoe UI,Microsoft YaHei UI,Microsoft YaHei,sans-serif" font-size="24" font-weight="400" text-anchor="middle" fill="#185abd">→</text>
+<text x="364" y="321" font-family="Segoe UI,Microsoft YaHei UI,Microsoft YaHei,sans-serif" font-size="12" font-weight="400" text-anchor="middle" fill="#536578">编辑</text>
+<rect x="393" y="218" width="300" height="145" rx="10" fill="#ffffff" stroke="#cbd5e1" />
+<rect x="411" y="238" width="110" height="26" rx="6" fill="#fff3d9" />
+<text x="421" y="256" font-family="Segoe UI,Microsoft YaHei UI,Microsoft YaHei,sans-serif" font-size="13" font-weight="600" text-anchor="start" fill="#8c5408">Dirty</text>
+<text x="411" y="303" font-family="Segoe UI,Microsoft YaHei UI,Microsoft YaHei,sans-serif" font-size="22" font-weight="700" text-anchor="start" fill="#16273b">有未保存修改</text>
+<text x="411" y="339" font-family="Segoe UI,Microsoft YaHei UI,Microsoft YaHei,sans-serif" font-size="13" font-weight="400" text-anchor="start" fill="#536578">普通切页与选择保持此状态</text>
+<text x="717" y="296" font-family="Segoe UI,Microsoft YaHei UI,Microsoft YaHei,sans-serif" font-size="24" font-weight="400" text-anchor="middle" fill="#185abd">→</text>
+<text x="717" y="321" font-family="Segoe UI,Microsoft YaHei UI,Microsoft YaHei,sans-serif" font-size="12" font-weight="400" text-anchor="middle" fill="#536578">保存</text>
+<rect x="746" y="218" width="300" height="145" rx="10" fill="#ffffff" stroke="#cbd5e1" />
+<rect x="764" y="238" width="110" height="26" rx="6" fill="#e9f1ff" />
+<text x="774" y="256" font-family="Segoe UI,Microsoft YaHei UI,Microsoft YaHei,sans-serif" font-size="13" font-weight="600" text-anchor="start" fill="#185abd">Review</text>
+<text x="764" y="303" font-family="Segoe UI,Microsoft YaHei UI,Microsoft YaHei,sans-serif" font-size="22" font-weight="700" text-anchor="start" fill="#16273b">审阅实际变更</text>
+<text x="764" y="339" font-family="Segoe UI,Microsoft YaHei UI,Microsoft YaHei,sans-serif" font-size="13" font-weight="400" text-anchor="start" fill="#536578">取消回 Dirty，保留修改</text>
+<text x="1070" y="296" font-family="Segoe UI,Microsoft YaHei UI,Microsoft YaHei,sans-serif" font-size="24" font-weight="400" text-anchor="middle" fill="#185abd">→</text>
+<text x="1070" y="321" font-family="Segoe UI,Microsoft YaHei UI,Microsoft YaHei,sans-serif" font-size="12" font-weight="400" text-anchor="middle" fill="#536578">确认</text>
+<rect x="1099" y="218" width="300" height="145" rx="10" fill="#ffffff" stroke="#cbd5e1" />
+<rect x="1117" y="238" width="110" height="26" rx="6" fill="#e9f1ff" />
+<text x="1127" y="256" font-family="Segoe UI,Microsoft YaHei UI,Microsoft YaHei,sans-serif" font-size="13" font-weight="600" text-anchor="start" fill="#185abd">Writing</text>
+<text x="1117" y="303" font-family="Segoe UI,Microsoft YaHei UI,Microsoft YaHei,sans-serif" font-size="22" font-weight="700" text-anchor="start" fill="#16273b">备份 / 写入 / 读回</text>
+<text x="1117" y="339" font-family="Segoe UI,Microsoft YaHei UI,Microsoft YaHei,sans-serif" font-size="13" font-weight="400" text-anchor="start" fill="#536578">禁用重复保存，延后关闭</text>
+<line x1="1249" y1="218" x2="1249" y2="164" stroke="#16734a" stroke-width="2"/>
+<line x1="1249" y1="164" x2="190" y2="164" stroke="#16734a" stroke-width="2"/>
+<line x1="190" y1="164" x2="190" y2="216" stroke="#16734a" stroke-width="2"/>
+<text x="190" y="215" font-family="Segoe UI,Microsoft YaHei UI,Microsoft YaHei,sans-serif" font-size="13" font-weight="400" text-anchor="middle" fill="#16734a">▼</text>
+<text x="720" y="154" font-family="Segoe UI,Microsoft YaHei UI,Microsoft YaHei,sans-serif" font-size="14" font-weight="400" text-anchor="middle" fill="#16734a">全部写入并读回成功 → 更新基线、清理对应草稿</text>
+<rect x="40" y="469" width="300" height="162" rx="10" fill="#ffffff" stroke="#cbd5e1" />
+<rect x="58" y="487" width="110" height="26" rx="6" fill="#e9f1ff" />
+<text x="68" y="505" font-family="Segoe UI,Microsoft YaHei UI,Microsoft YaHei,sans-serif" font-size="13" font-weight="600" text-anchor="start" fill="#185abd">Draft</text>
+<text x="58" y="550" font-family="Segoe UI,Microsoft YaHei UI,Microsoft YaHei,sans-serif" font-size="21" font-weight="700" text-anchor="start" fill="#16273b">恢复草稿</text>
+<text x="58" y="582" font-family="Segoe UI,Microsoft YaHei UI,Microsoft YaHei,sans-serif" font-size="13" font-weight="400" text-anchor="start" fill="#536578">显式恢复 → Dirty</text>
+<text x="58" y="608" font-family="Segoe UI,Microsoft YaHei UI,Microsoft YaHei,sans-serif" font-size="13" font-weight="400" text-anchor="start" fill="#536578">目标变化 → Conflict</text>
+<rect x="393" y="469" width="300" height="162" rx="10" fill="#ffffff" stroke="#cbd5e1" />
+<rect x="411" y="487" width="110" height="26" rx="6" fill="#ffedf0" />
+<text x="421" y="505" font-family="Segoe UI,Microsoft YaHei UI,Microsoft YaHei,sans-serif" font-size="13" font-weight="600" text-anchor="start" fill="#b52d3b">Invalid</text>
+<text x="411" y="550" font-family="Segoe UI,Microsoft YaHei UI,Microsoft YaHei,sans-serif" font-size="21" font-weight="700" text-anchor="start" fill="#16273b">输入存在硬错误</text>
+<text x="411" y="582" font-family="Segoe UI,Microsoft YaHei UI,Microsoft YaHei,sans-serif" font-size="13" font-weight="400" text-anchor="start" fill="#536578">阻止保存，定位字段</text>
+<text x="411" y="608" font-family="Segoe UI,Microsoft YaHei UI,Microsoft YaHei,sans-serif" font-size="13" font-weight="400" text-anchor="start" fill="#536578">修正 → Dirty</text>
+<line x1="543" y1="363" x2="543" y2="460" stroke="#b52d3b" stroke-width="2"/>
+<text x="543" y="465" font-family="Segoe UI,Microsoft YaHei UI,Microsoft YaHei,sans-serif" font-size="13" font-weight="400" text-anchor="middle" fill="#b52d3b">▼</text>
+<text x="558" y="419" font-family="Segoe UI,Microsoft YaHei UI,Microsoft YaHei,sans-serif" font-size="13" font-weight="400" text-anchor="start" fill="#b52d3b">校验失败</text>
+<rect x="746" y="469" width="300" height="162" rx="10" fill="#ffffff" stroke="#cbd5e1" />
+<rect x="764" y="487" width="110" height="26" rx="6" fill="#fff3d9" />
+<text x="774" y="505" font-family="Segoe UI,Microsoft YaHei UI,Microsoft YaHei,sans-serif" font-size="13" font-weight="600" text-anchor="start" fill="#8c5408">Conflict</text>
+<text x="764" y="550" font-family="Segoe UI,Microsoft YaHei UI,Microsoft YaHei,sans-serif" font-size="21" font-weight="700" text-anchor="start" fill="#16273b">目标被外部修改</text>
+<text x="764" y="582" font-family="Segoe UI,Microsoft YaHei UI,Microsoft YaHei,sans-serif" font-size="13" font-weight="400" text-anchor="start" fill="#536578">暂不处理 → Dirty + 提示</text>
+<text x="764" y="608" font-family="Segoe UI,Microsoft YaHei UI,Microsoft YaHei,sans-serif" font-size="13" font-weight="400" text-anchor="start" fill="#536578">覆盖 → 重新 Review</text>
+<line x1="896" y1="363" x2="896" y2="460" stroke="#8c5408" stroke-width="2"/>
+<text x="896" y="465" font-family="Segoe UI,Microsoft YaHei UI,Microsoft YaHei,sans-serif" font-size="13" font-weight="400" text-anchor="middle" fill="#8c5408">▼</text>
+<text x="911" y="419" font-family="Segoe UI,Microsoft YaHei UI,Microsoft YaHei,sans-serif" font-size="13" font-weight="400" text-anchor="start" fill="#8c5408">指纹变化</text>
+<rect x="1099" y="469" width="300" height="162" rx="10" fill="#ffffff" stroke="#cbd5e1" />
+<rect x="1117" y="487" width="110" height="26" rx="6" fill="#ffedf0" />
+<text x="1127" y="505" font-family="Segoe UI,Microsoft YaHei UI,Microsoft YaHei,sans-serif" font-size="13" font-weight="600" text-anchor="start" fill="#b52d3b">Failed</text>
+<text x="1117" y="550" font-family="Segoe UI,Microsoft YaHei UI,Microsoft YaHei,sans-serif" font-size="21" font-weight="700" text-anchor="start" fill="#16273b">保存未完成</text>
+<text x="1117" y="582" font-family="Segoe UI,Microsoft YaHei UI,Microsoft YaHei,sans-serif" font-size="13" font-weight="400" text-anchor="start" fill="#536578">保留工作副本和恢复信息</text>
+<text x="1117" y="608" font-family="Segoe UI,Microsoft YaHei UI,Microsoft YaHei,sans-serif" font-size="13" font-weight="400" text-anchor="start" fill="#536578">重试 → 重新校验 / Review</text>
+<line x1="1249" y1="363" x2="1249" y2="460" stroke="#b52d3b" stroke-width="2"/>
+<text x="1249" y="465" font-family="Segoe UI,Microsoft YaHei UI,Microsoft YaHei,sans-serif" font-size="13" font-weight="400" text-anchor="middle" fill="#b52d3b">▼</text>
+<text x="1264" y="419" font-family="Segoe UI,Microsoft YaHei UI,Microsoft YaHei,sans-serif" font-size="13" font-weight="400" text-anchor="start" fill="#b52d3b">任一步失败</text>
+<rect x="40" y="676" width="1360" height="219" rx="10" fill="#ffffff" stroke="#cbd5e1" />
+<text x="64" y="717" font-family="Segoe UI,Microsoft YaHei UI,Microsoft YaHei,sans-serif" font-size="22" font-weight="700" text-anchor="start" fill="#16273b">三个交互约束</text>
+<text x="64" y="759" font-family="Segoe UI,Microsoft YaHei UI,Microsoft YaHei,sans-serif" font-size="15" font-weight="700" text-anchor="start" fill="#185abd">切换不中断</text>
+<text x="214" y="759" font-family="Segoe UI,Microsoft YaHei UI,Microsoft YaHei,sans-serif" font-size="15" font-weight="400" text-anchor="start" fill="#536578">变量、筛选、页签、主题切换保留工作副本，不弹提交确认。</text>
+<text x="64" y="806" font-family="Segoe UI,Microsoft YaHei UI,Microsoft YaHei,sans-serif" font-size="15" font-weight="700" text-anchor="start" fill="#185abd">撤销有边界</text>
+<text x="214" y="806" font-family="Segoe UI,Microsoft YaHei UI,Microsoft YaHei,sans-serif" font-size="15" font-weight="400" text-anchor="start" fill="#536578">输入中的 Esc 取消本次输入；已暂存的编辑通过统一命令历史撤销。</text>
+<text x="64" y="853" font-family="Segoe UI,Microsoft YaHei UI,Microsoft YaHei,sans-serif" font-size="15" font-weight="700" text-anchor="start" fill="#185abd">失败不伪装成功</text>
+<text x="214" y="853" font-family="Segoe UI,Microsoft YaHei UI,Microsoft YaHei,sans-serif" font-size="15" font-weight="400" text-anchor="start" fill="#536578">部分写入进入失败状态，保留每项结果；不得标为已同步。</text>
+<text x="40" y="955" font-family="Segoe UI,Microsoft YaHei UI,Microsoft YaHei,sans-serif" font-size="15" font-weight="700" text-anchor="start" fill="#185abd">F05 / F15  自动暂存</text>
+<text x="40" y="982" font-family="Segoe UI,Microsoft YaHei UI,Microsoft YaHei,sans-serif" font-size="13" font-weight="400" text-anchor="start" fill="#536578">文本确认、移动和删除各形成可撤销命令。</text>
+<text x="500" y="955" font-family="Segoe UI,Microsoft YaHei UI,Microsoft YaHei,sans-serif" font-size="15" font-weight="700" text-anchor="start" fill="#185abd">F11 / F12  写入边界</text>
+<text x="500" y="982" font-family="Segoe UI,Microsoft YaHei UI,Microsoft YaHei,sans-serif" font-size="13" font-weight="400" text-anchor="start" fill="#536578">确认 token 与目标指纹绑定；变化后重新审阅。</text>
+<text x="960" y="955" font-family="Segoe UI,Microsoft YaHei UI,Microsoft YaHei,sans-serif" font-size="15" font-weight="700" text-anchor="start" fill="#185abd">原型验证</text>
+<text x="960" y="982" font-family="Segoe UI,Microsoft YaHei UI,Microsoft YaHei,sans-serif" font-size="13" font-weight="400" text-anchor="start" fill="#536578">三条任务可点击演示；实际 QML 与系统写入待实现。</text>
+<text x="40" y="1020" font-family="Segoe UI,Microsoft YaHei UI,Microsoft YaHei,sans-serif" font-size="12" font-weight="400" text-anchor="start" fill="#536578">设计示意 · 合成数据 · 实际实现和验证范围见 IMPLEMENTATION.md</text>
+<text x="1400" y="1020" font-family="Segoe UI,Microsoft YaHei UI,Microsoft YaHei,sans-serif" font-size="12" font-weight="400" text-anchor="end" fill="#536578">P09</text>
+</svg>

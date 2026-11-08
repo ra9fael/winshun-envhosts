@@ -1,0 +1,66 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1440" height="1040" viewBox="0 0 1440 1040" role="img" aria-labelledby="title desc">
+<title id="title">P07 · 异常与恢复 · 有明确的下一步</title>
+<desc id="desc">空、只读、校验失败、外部变化与恢复草稿各有独立状态，不复用模糊的错误空屏。。QML 目标设计示意，并非运行截图，数据均为虚构。</desc>
+<defs><filter id="shadow" x="-10%" y="-10%" width="120%" height="135%"><feDropShadow dx="0" dy="8" stdDeviation="12" flood-color="#12233a" flood-opacity=".08"/></filter></defs>
+<rect x="0" y="0" width="1440" height="1040" rx="0" fill="#edf1f5" />
+<text x="40" y="39" font-family="Segoe UI,Microsoft YaHei UI,Microsoft YaHei,sans-serif" font-size="13" font-weight="700" text-anchor="start" fill="#185abd">ENVHOSTS  /  QML DESIGN</text>
+<text x="1400" y="39" font-family="Segoe UI,Microsoft YaHei UI,Microsoft YaHei,sans-serif" font-size="13" font-weight="400" text-anchor="end" fill="#536578">P07   ·   2026.11.08</text>
+<text x="40" y="82" font-family="Segoe UI,Microsoft YaHei UI,Microsoft YaHei,sans-serif" font-size="30" font-weight="700" text-anchor="start" fill="#16273b">异常与恢复 · 有明确的下一步</text>
+<text x="40" y="112" font-family="Segoe UI,Microsoft YaHei UI,Microsoft YaHei,sans-serif" font-size="15" font-weight="400" text-anchor="start" fill="#536578">空、只读、校验失败、外部变化与恢复草稿各有独立状态，不复用模糊的错误空屏。</text>
+<rect x="40" y="155" width="670" height="224" rx="12" fill="#ffffff" stroke="#cbd5e1" />
+<rect x="62" y="175" width="64" height="26" rx="6" fill="#f8fafc" />
+<text x="72" y="193" font-family="Segoe UI,Microsoft YaHei UI,Microsoft YaHei,sans-serif" font-size="13" font-weight="600" text-anchor="start" fill="#536578">S01</text>
+<text x="62" y="241" font-family="Segoe UI,Microsoft YaHei UI,Microsoft YaHei,sans-serif" font-size="22" font-weight="700" text-anchor="start" fill="#16273b">没有匹配的变量</text>
+<text x="62" y="273" font-family="Segoe UI,Microsoft YaHei UI,Microsoft YaHei,sans-serif" font-size="14" font-weight="400" text-anchor="start" fill="#536578">当前筛选：sdk</text>
+<text x="62" y="300" font-family="Segoe UI,Microsoft YaHei UI,Microsoft YaHei,sans-serif" font-size="14" font-weight="400" text-anchor="start" fill="#536578">数据仍在工作副本中，清除筛选即可查看。</text>
+<rect x="62" y="324" width="250" height="36" rx="7" fill="#f8fafc" stroke="#7b8b9e" />
+<text x="187.0" y="347.0" font-family="Segoe UI,Microsoft YaHei UI,Microsoft YaHei,sans-serif" font-size="14" font-weight="600" text-anchor="middle" fill="#16273b">清除筛选</text>
+<rect x="730" y="155" width="670" height="224" rx="12" fill="#ffffff" stroke="#cbd5e1" />
+<rect x="752" y="175" width="64" height="26" rx="6" fill="#f8fafc" />
+<text x="762" y="193" font-family="Segoe UI,Microsoft YaHei UI,Microsoft YaHei,sans-serif" font-size="13" font-weight="600" text-anchor="start" fill="#536578">S02</text>
+<text x="752" y="241" font-family="Segoe UI,Microsoft YaHei UI,Microsoft YaHei,sans-serif" font-size="22" font-weight="700" text-anchor="start" fill="#16273b">当前目标只读</text>
+<text x="752" y="273" font-family="Segoe UI,Microsoft YaHei UI,Microsoft YaHei,sans-serif" font-size="14" font-weight="400" text-anchor="start" fill="#536578">读取成功；你仍可搜索、选择与复制。</text>
+<text x="752" y="300" font-family="Segoe UI,Microsoft YaHei UI,Microsoft YaHei,sans-serif" font-size="14" font-weight="400" text-anchor="start" fill="#536578">修改控件禁用，权限详情解释如何获取权限。</text>
+<rect x="752" y="324" width="250" height="36" rx="7" fill="#f8fafc" stroke="#7b8b9e" />
+<text x="877.0" y="347.0" font-family="Segoe UI,Microsoft YaHei UI,Microsoft YaHei,sans-serif" font-size="14" font-weight="600" text-anchor="middle" fill="#16273b">查看权限说明</text>
+<rect x="40" y="401" width="670" height="224" rx="12" fill="#ffffff" stroke="#cbd5e1" />
+<rect x="62" y="421" width="64" height="26" rx="6" fill="#ffedf0" />
+<text x="72" y="439" font-family="Segoe UI,Microsoft YaHei UI,Microsoft YaHei,sans-serif" font-size="13" font-weight="600" text-anchor="start" fill="#b52d3b">S03</text>
+<text x="62" y="487" font-family="Segoe UI,Microsoft YaHei UI,Microsoft YaHei,sans-serif" font-size="22" font-weight="700" text-anchor="start" fill="#b52d3b">名称不能为空</text>
+<text x="62" y="519" font-family="Segoe UI,Microsoft YaHei UI,Microsoft YaHei,sans-serif" font-size="14" font-weight="400" text-anchor="start" fill="#536578">字段错误与保存摘要同时显示。</text>
+<text x="62" y="546" font-family="Segoe UI,Microsoft YaHei UI,Microsoft YaHei,sans-serif" font-size="14" font-weight="400" text-anchor="start" fill="#536578">保留输入和光标；修正后才能进入保存确认。</text>
+<rect x="62" y="570" width="250" height="36" rx="7" fill="#f8fafc" stroke="#7b8b9e" />
+<text x="187.0" y="593.0" font-family="Segoe UI,Microsoft YaHei UI,Microsoft YaHei,sans-serif" font-size="14" font-weight="600" text-anchor="middle" fill="#16273b">定位错误字段</text>
+<rect x="730" y="401" width="670" height="224" rx="12" fill="#ffffff" stroke="#cbd5e1" />
+<rect x="752" y="421" width="64" height="26" rx="6" fill="#e9f1ff" />
+<text x="762" y="439" font-family="Segoe UI,Microsoft YaHei UI,Microsoft YaHei,sans-serif" font-size="13" font-weight="600" text-anchor="start" fill="#185abd">S04</text>
+<text x="752" y="487" font-family="Segoe UI,Microsoft YaHei UI,Microsoft YaHei,sans-serif" font-size="22" font-weight="700" text-anchor="start" fill="#185abd">发现可恢复草稿</text>
+<text x="752" y="519" font-family="Segoe UI,Microsoft YaHei UI,Microsoft YaHei,sans-serif" font-size="14" font-weight="400" text-anchor="start" fill="#536578">草稿时间：2026-11-08 14:25</text>
+<text x="752" y="546" font-family="Segoe UI,Microsoft YaHei UI,Microsoft YaHei,sans-serif" font-size="14" font-weight="400" text-anchor="start" fill="#536578">目标若已变化，恢复后进入三快照差异。</text>
+<rect x="752" y="570" width="250" height="36" rx="7" fill="#185abd" />
+<text x="877.0" y="593.0" font-family="Segoe UI,Microsoft YaHei UI,Microsoft YaHei,sans-serif" font-size="14" font-weight="600" text-anchor="middle" fill="#ffffff">恢复草稿  /  丢弃…</text>
+<rect x="40" y="647" width="670" height="224" rx="12" fill="#ffffff" stroke="#cbd5e1" />
+<rect x="62" y="667" width="64" height="26" rx="6" fill="#fff3d9" />
+<text x="72" y="685" font-family="Segoe UI,Microsoft YaHei UI,Microsoft YaHei,sans-serif" font-size="13" font-weight="600" text-anchor="start" fill="#8c5408">S05</text>
+<text x="62" y="733" font-family="Segoe UI,Microsoft YaHei UI,Microsoft YaHei,sans-serif" font-size="22" font-weight="700" text-anchor="start" fill="#8c5408">目标被其他程序修改</text>
+<text x="62" y="765" font-family="Segoe UI,Microsoft YaHei UI,Microsoft YaHei,sans-serif" font-size="14" font-weight="400" text-anchor="start" fill="#536578">当前有未保存修改；不会自动重载。</text>
+<text x="62" y="792" font-family="Segoe UI,Microsoft YaHei UI,Microsoft YaHei,sans-serif" font-size="14" font-weight="400" text-anchor="start" fill="#536578">无未保存内容时才允许自动刷新。</text>
+<rect x="62" y="816" width="250" height="36" rx="7" fill="#f8fafc" stroke="#7b8b9e" />
+<text x="187.0" y="839.0" font-family="Segoe UI,Microsoft YaHei UI,Microsoft YaHei,sans-serif" font-size="14" font-weight="600" text-anchor="middle" fill="#16273b">查看差异</text>
+<rect x="730" y="647" width="670" height="224" rx="12" fill="#ffffff" stroke="#cbd5e1" />
+<rect x="752" y="667" width="64" height="26" rx="6" fill="#ffedf0" />
+<text x="762" y="685" font-family="Segoe UI,Microsoft YaHei UI,Microsoft YaHei,sans-serif" font-size="13" font-weight="600" text-anchor="start" fill="#b52d3b">S06</text>
+<text x="752" y="733" font-family="Segoe UI,Microsoft YaHei UI,Microsoft YaHei,sans-serif" font-size="22" font-weight="700" text-anchor="start" fill="#b52d3b">未能完成保存</text>
+<text x="752" y="765" font-family="Segoe UI,Microsoft YaHei UI,Microsoft YaHei,sans-serif" font-size="14" font-weight="400" text-anchor="start" fill="#536578">hosts 文件被占用；未报告写入成功。</text>
+<text x="752" y="792" font-family="Segoe UI,Microsoft YaHei UI,Microsoft YaHei,sans-serif" font-size="14" font-weight="400" text-anchor="start" fill="#536578">工作副本保留，显示备份位置与重试入口。</text>
+<rect x="752" y="816" width="250" height="36" rx="7" fill="#f8fafc" stroke="#7b8b9e" />
+<text x="877.0" y="839.0" font-family="Segoe UI,Microsoft YaHei UI,Microsoft YaHei,sans-serif" font-size="14" font-weight="600" text-anchor="middle" fill="#16273b">重试  /  查看详情</text>
+<text x="40" y="955" font-family="Segoe UI,Microsoft YaHei UI,Microsoft YaHei,sans-serif" font-size="15" font-weight="700" text-anchor="start" fill="#185abd">F13  草稿仅落到数据目录</text>
+<text x="40" y="982" font-family="Segoe UI,Microsoft YaHei UI,Microsoft YaHei,sans-serif" font-size="13" font-weight="400" text-anchor="start" fill="#536578">恢复 / 丢弃均需显式选择；保存失败不清理草稿。</text>
+<text x="500" y="955" font-family="Segoe UI,Microsoft YaHei UI,Microsoft YaHei,sans-serif" font-size="15" font-weight="700" text-anchor="start" fill="#185abd">F10 / F16  错误分类</text>
+<text x="500" y="982" font-family="Segoe UI,Microsoft YaHei UI,Microsoft YaHei,sans-serif" font-size="13" font-weight="400" text-anchor="start" fill="#536578">加载、格式、权限、占用、备份、部分写入分别处理。</text>
+<text x="960" y="955" font-family="Segoe UI,Microsoft YaHei UI,Microsoft YaHei,sans-serif" font-size="15" font-weight="700" text-anchor="start" fill="#185abd">F17 / T43–T46  可访问性</text>
+<text x="960" y="982" font-family="Segoe UI,Microsoft YaHei UI,Microsoft YaHei,sans-serif" font-size="13" font-weight="400" text-anchor="start" fill="#536578">状态同时有文字与图形；屏幕阅读器可读出原因。</text>
+<text x="40" y="1020" font-family="Segoe UI,Microsoft YaHei UI,Microsoft YaHei,sans-serif" font-size="12" font-weight="400" text-anchor="start" fill="#536578">设计示意 · 合成数据 · 实际实现和验证范围见 IMPLEMENTATION.md</text>
+<text x="1400" y="1020" font-family="Segoe UI,Microsoft YaHei UI,Microsoft YaHei,sans-serif" font-size="12" font-weight="400" text-anchor="end" fill="#536578">P07</text>
+</svg>

@@ -1,0 +1,89 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1440" height="1040" viewBox="0 0 1440 1040" role="img" aria-labelledby="title desc">
+<title id="title">P05 · 备份 · 先看差异，再载入工作副本</title>
+<desc id="desc">恢复是可撤销的编辑操作；真正写回仍走统一保存确认。。QML 目标设计示意，并非运行截图，数据均为虚构。</desc>
+<defs><filter id="shadow" x="-10%" y="-10%" width="120%" height="135%"><feDropShadow dx="0" dy="8" stdDeviation="12" flood-color="#12233a" flood-opacity=".08"/></filter></defs>
+<rect x="0" y="0" width="1440" height="1040" rx="0" fill="#edf1f5" />
+<text x="40" y="39" font-family="Segoe UI,Microsoft YaHei UI,Microsoft YaHei,sans-serif" font-size="13" font-weight="700" text-anchor="start" fill="#185abd">ENVHOSTS  /  QML DESIGN</text>
+<text x="1400" y="39" font-family="Segoe UI,Microsoft YaHei UI,Microsoft YaHei,sans-serif" font-size="13" font-weight="400" text-anchor="end" fill="#536578">P05   ·   2026.11.08</text>
+<text x="40" y="82" font-family="Segoe UI,Microsoft YaHei UI,Microsoft YaHei,sans-serif" font-size="30" font-weight="700" text-anchor="start" fill="#16273b">备份 · 先看差异，再载入工作副本</text>
+<text x="40" y="112" font-family="Segoe UI,Microsoft YaHei UI,Microsoft YaHei,sans-serif" font-size="15" font-weight="400" text-anchor="start" fill="#536578">恢复是可撤销的编辑操作；真正写回仍走统一保存确认。</text>
+<rect x="40" y="136" width="1360" height="780" rx="14" fill="#ffffff" stroke="#cbd5e1" filter="url(#shadow)"/>
+<rect x="60" y="148" width="38" height="26" rx="6" fill="#e9f1ff" />
+<text x="70" y="166" font-family="Segoe UI,Microsoft YaHei UI,Microsoft YaHei,sans-serif" font-size="13" font-weight="600" text-anchor="start" fill="#185abd">eh</text>
+<text x="110" y="167" font-family="Segoe UI,Microsoft YaHei UI,Microsoft YaHei,sans-serif" font-size="14" font-weight="600" text-anchor="start" fill="#16273b">EnvHosts  /  环境变量</text>
+<text x="1368" y="166" font-family="Segoe UI,Microsoft YaHei UI,Microsoft YaHei,sans-serif" font-size="18" font-weight="400" text-anchor="end" fill="#536578">—     □     ×</text>
+<line x1="40" y1="184" x2="1400" y2="184" stroke="#cbd5e1" stroke-width="1"/>
+<text x="64" y="221" font-family="Segoe UI,Microsoft YaHei UI,Microsoft YaHei,sans-serif" font-size="23" font-weight="700" text-anchor="start" fill="#16273b">环境变量</text>
+<rect x="202" y="198" width="130" height="26" rx="6" fill="#e7f5ed" />
+<text x="212" y="216" font-family="Segoe UI,Microsoft YaHei UI,Microsoft YaHei,sans-serif" font-size="13" font-weight="600" text-anchor="start" fill="#16734a">已与目标同步</text>
+<rect x="1018" y="197" width="94" height="36" rx="7" fill="#f8fafc" stroke="#7b8b9e" />
+<text x="1065.0" y="220.0" font-family="Segoe UI,Microsoft YaHei UI,Microsoft YaHei,sans-serif" font-size="14" font-weight="600" text-anchor="middle" fill="#16273b">重新载入</text>
+<rect x="1122" y="197" width="90" height="36" rx="7" fill="#f8fafc" stroke="#7b8b9e" />
+<text x="1167.0" y="220.0" font-family="Segoe UI,Microsoft YaHei UI,Microsoft YaHei,sans-serif" font-size="14" font-weight="600" text-anchor="middle" fill="#16273b">撤销  ↶</text>
+<rect x="1222" y="197" width="154" height="36" rx="7" fill="#f8fafc" />
+<text x="1299.0" y="220.0" font-family="Segoe UI,Microsoft YaHei UI,Microsoft YaHei,sans-serif" font-size="14" font-weight="600" text-anchor="middle" fill="#536578">保存到系统  Ctrl+S</text>
+<text x="76" y="271" font-family="Segoe UI,Microsoft YaHei UI,Microsoft YaHei,sans-serif" font-size="15" font-weight="600" text-anchor="start" fill="#536578">变量</text>
+<text x="176" y="271" font-family="Segoe UI,Microsoft YaHei UI,Microsoft YaHei,sans-serif" font-size="15" font-weight="600" text-anchor="start" fill="#185abd">备份</text>
+<line x1="164" y1="287" x2="238" y2="287" stroke="#185abd" stroke-width="3"/>
+<line x1="40" y1="290" x2="1400" y2="290" stroke="#cbd5e1" stroke-width="1"/>
+<line x1="40" y1="852" x2="1400" y2="852" stroke="#cbd5e1" stroke-width="1"/>
+<text x="64" y="877" font-family="Segoe UI,Microsoft YaHei UI,Microsoft YaHei,sans-serif" font-size="13" font-weight="400" text-anchor="start" fill="#16734a">✓ 已同步</text>
+<text x="1376" y="877" font-family="Segoe UI,Microsoft YaHei UI,Microsoft YaHei,sans-serif" font-size="13" font-weight="400" text-anchor="end" fill="#536578">用户范围可写  ·  系统范围只读</text>
+<text x="64" y="903" font-family="Segoe UI,Microsoft YaHei UI,Microsoft YaHei,sans-serif" font-size="12" font-weight="400" text-anchor="start" fill="#536578">Ctrl+F  筛选     F2  编辑     Ctrl+Z / Y  撤销 / 重做     F5  重载     Tab  切换焦点</text>
+<text x="64" y="328" font-family="Segoe UI,Microsoft YaHei UI,Microsoft YaHei,sans-serif" font-size="17" font-weight="700" text-anchor="start" fill="#16273b">环境变量备份  ·  3 份</text>
+<text x="400" y="328" font-family="Segoe UI,Microsoft YaHei UI,Microsoft YaHei,sans-serif" font-size="17" font-weight="600" text-anchor="start" fill="#16273b">2026-11-08 14:32:08  ·  用户范围</text>
+<line x1="376" y1="306" x2="376" y2="831" stroke="#cbd5e1" stroke-width="1"/>
+<text x="1376" y="328" font-family="Segoe UI,Microsoft YaHei UI,Microsoft YaHei,sans-serif" font-size="13" font-weight="400" text-anchor="end" fill="#536578">与当前工作副本比较</text>
+<rect x="64" y="351" width="288" height="82" rx="8" fill="#e9f1ff" stroke="#cbd5e1" />
+<text x="80" y="380" font-family="Segoe UI,Microsoft YaHei UI,Microsoft YaHei,sans-serif" font-size="15" font-weight="600" text-anchor="start" fill="#16273b">2026-11-08  14:32:08</text>
+<text x="80" y="409" font-family="Segoe UI,Microsoft YaHei UI,Microsoft YaHei,sans-serif" font-size="13" font-weight="400" text-anchor="start" fill="#536578">用户 · 3 个变量</text>
+<rect x="64" y="449" width="288" height="82" rx="8" fill="#f8fafc" stroke="#cbd5e1" />
+<text x="80" y="478" font-family="Segoe UI,Microsoft YaHei UI,Microsoft YaHei,sans-serif" font-size="15" font-weight="600" text-anchor="start" fill="#16273b">2026-11-08  11:18:42</text>
+<text x="80" y="507" font-family="Segoe UI,Microsoft YaHei UI,Microsoft YaHei,sans-serif" font-size="13" font-weight="400" text-anchor="start" fill="#536578">用户 + 系统 · 12 个变量</text>
+<rect x="64" y="547" width="288" height="82" rx="8" fill="#f8fafc" stroke="#cbd5e1" />
+<text x="80" y="576" font-family="Segoe UI,Microsoft YaHei UI,Microsoft YaHei,sans-serif" font-size="15" font-weight="600" text-anchor="start" fill="#16273b">2026-11-08  09:05:11</text>
+<text x="80" y="605" font-family="Segoe UI,Microsoft YaHei UI,Microsoft YaHei,sans-serif" font-size="13" font-weight="400" text-anchor="start" fill="#536578">用户 · 4 个变量</text>
+<rect x="64" y="641" width="288" height="36" rx="7" fill="#f8fafc" stroke="#7b8b9e" />
+<text x="208.0" y="664.0" font-family="Segoe UI,Microsoft YaHei UI,Microsoft YaHei,sans-serif" font-size="14" font-weight="600" text-anchor="middle" fill="#16273b">范围：全部  ▾</text>
+<text x="64" y="700" font-family="Segoe UI,Microsoft YaHei UI,Microsoft YaHei,sans-serif" font-size="13" font-weight="400" text-anchor="start" fill="#536578">时间按本地时区显示</text>
+<text x="64" y="724" font-family="Segoe UI,Microsoft YaHei UI,Microsoft YaHei,sans-serif" font-size="13" font-weight="400" text-anchor="start" fill="#536578">备份 ID 保持原样</text>
+<rect x="64" y="784" width="130" height="36" rx="7" fill="#f8fafc" stroke="#7b8b9e" />
+<text x="129.0" y="807.0" font-family="Segoe UI,Microsoft YaHei UI,Microsoft YaHei,sans-serif" font-size="14" font-weight="600" text-anchor="middle" fill="#16273b">刷新列表</text>
+<rect x="400" y="351" width="976" height="38" rx="7" fill="#f8fafc" stroke="#cbd5e1" />
+<text x="414" y="376" font-family="Segoe UI,Microsoft YaHei UI,Microsoft YaHei,sans-serif" font-size="14" font-weight="400" text-anchor="start" fill="#536578">⌕  搜索备份中的名称或值</text>
+<text x="400" y="426" font-family="Segoe UI,Microsoft YaHei UI,Microsoft YaHei,sans-serif" font-size="14" font-weight="400" text-anchor="start" fill="#536578">= 相同 1    ~ 值不同 1    + 仅备份有 1    − 当前多出 1</text>
+<rect x="400" y="446" width="976" height="39" rx="5" fill="#e9f1ff" />
+<text x="414" y="472" font-family="Segoe UI,Microsoft YaHei UI,Microsoft YaHei,sans-serif" font-size="16" font-weight="700" text-anchor="start" fill="#8c5408">~</text>
+<text x="452" y="472" font-family="Segoe UI,Microsoft YaHei UI,Microsoft YaHei,sans-serif" font-size="15" font-weight="600" text-anchor="start" fill="#16273b">Path</text>
+<text x="1050" y="472" font-family="Segoe UI,Microsoft YaHei UI,Microsoft YaHei,sans-serif" font-size="13" font-weight="400" text-anchor="start" fill="#8c5408">值不同</text>
+<rect x="400" y="489" width="976" height="39" rx="5" fill="#f8fafc" />
+<text x="414" y="515" font-family="Segoe UI,Microsoft YaHei UI,Microsoft YaHei,sans-serif" font-size="16" font-weight="700" text-anchor="start" fill="#536578">=</text>
+<text x="452" y="515" font-family="Segoe UI,Microsoft YaHei UI,Microsoft YaHei,sans-serif" font-size="15" font-weight="600" text-anchor="start" fill="#16273b">JAVA_HOME</text>
+<text x="1050" y="515" font-family="Segoe UI,Microsoft YaHei UI,Microsoft YaHei,sans-serif" font-size="13" font-weight="400" text-anchor="start" fill="#536578">相同</text>
+<rect x="400" y="532" width="976" height="39" rx="5" fill="#f8fafc" />
+<text x="414" y="558" font-family="Segoe UI,Microsoft YaHei UI,Microsoft YaHei,sans-serif" font-size="16" font-weight="700" text-anchor="start" fill="#16734a">+</text>
+<text x="452" y="558" font-family="Segoe UI,Microsoft YaHei UI,Microsoft YaHei,sans-serif" font-size="15" font-weight="600" text-anchor="start" fill="#16273b">OLD_SDK</text>
+<text x="1050" y="558" font-family="Segoe UI,Microsoft YaHei UI,Microsoft YaHei,sans-serif" font-size="13" font-weight="400" text-anchor="start" fill="#16734a">仅备份有 · 恢复时新增</text>
+<rect x="400" y="575" width="976" height="39" rx="5" fill="#f8fafc" />
+<text x="414" y="601" font-family="Segoe UI,Microsoft YaHei UI,Microsoft YaHei,sans-serif" font-size="16" font-weight="700" text-anchor="start" fill="#b52d3b">−</text>
+<text x="452" y="601" font-family="Segoe UI,Microsoft YaHei UI,Microsoft YaHei,sans-serif" font-size="15" font-weight="600" text-anchor="start" fill="#16273b">DEV_MODE</text>
+<text x="1050" y="601" font-family="Segoe UI,Microsoft YaHei UI,Microsoft YaHei,sans-serif" font-size="13" font-weight="400" text-anchor="start" fill="#b52d3b">当前多出 · 恢复时删除</text>
+<text x="400" y="652" font-family="Segoe UI,Microsoft YaHei UI,Microsoft YaHei,sans-serif" font-size="13" font-weight="400" text-anchor="start" fill="#536578">备份中的 Path</text>
+<rect x="400" y="662" width="976" height="40" rx="6" fill="#f8fafc" stroke="#7b8b9e" />
+<text x="412" y="688" font-family="Cascadia Code,Consolas,Microsoft YaHei UI,monospace" font-size="14" font-weight="400" text-anchor="start" fill="#16273b">%USERPROFILE%\bin;C:\SDK\bin</text>
+<text x="400" y="735" font-family="Segoe UI,Microsoft YaHei UI,Microsoft YaHei,sans-serif" font-size="14" font-weight="400" text-anchor="start" fill="#536578">此备份只包含用户范围；系统变量不会进入本次恢复计划。</text>
+<rect x="400" y="784" width="150" height="36" rx="7" fill="#f8fafc" stroke="#7b8b9e" />
+<text x="475.0" y="807.0" font-family="Segoe UI,Microsoft YaHei UI,Microsoft YaHei,sans-serif" font-size="14" font-weight="600" text-anchor="middle" fill="#16273b">导出 JSON</text>
+<rect x="560" y="784" width="132" height="36" rx="7" fill="#ffedf0" stroke="#7b8b9e" />
+<text x="626.0" y="807.0" font-family="Segoe UI,Microsoft YaHei UI,Microsoft YaHei,sans-serif" font-size="14" font-weight="600" text-anchor="middle" fill="#b52d3b">删除备份…</text>
+<rect x="1146" y="784" width="230" height="36" rx="7" fill="#185abd" />
+<text x="1261.0" y="807.0" font-family="Segoe UI,Microsoft YaHei UI,Microsoft YaHei,sans-serif" font-size="14" font-weight="600" text-anchor="middle" fill="#ffffff">恢复到工作副本…</text>
+<text x="40" y="955" font-family="Segoe UI,Microsoft YaHei UI,Microsoft YaHei,sans-serif" font-size="15" font-weight="700" text-anchor="start" fill="#185abd">F14  恢复范围</text>
+<text x="40" y="982" font-family="Segoe UI,Microsoft YaHei UI,Microsoft YaHei,sans-serif" font-size="13" font-weight="400" text-anchor="start" fill="#536578">逐范围展示增改删；恢复前保护当前工作副本。</text>
+<text x="500" y="955" font-family="Segoe UI,Microsoft YaHei UI,Microsoft YaHei,sans-serif" font-size="15" font-weight="700" text-anchor="start" fill="#185abd">F14 / F11  二次核对</text>
+<text x="500" y="982" font-family="Segoe UI,Microsoft YaHei UI,Microsoft YaHei,sans-serif" font-size="13" font-weight="400" text-anchor="start" fill="#536578">恢复后显示未保存；保存时再备份当前系统值。</text>
+<text x="960" y="955" font-family="Segoe UI,Microsoft YaHei UI,Microsoft YaHei,sans-serif" font-size="15" font-weight="700" text-anchor="start" fill="#185abd">T35–T38  失败可辨</text>
+<text x="960" y="982" font-family="Segoe UI,Microsoft YaHei UI,Microsoft YaHei,sans-serif" font-size="13" font-weight="400" text-anchor="start" fill="#536578">空备份、损坏文件、无法读取必须是不同结果。</text>
+<text x="40" y="1020" font-family="Segoe UI,Microsoft YaHei UI,Microsoft YaHei,sans-serif" font-size="12" font-weight="400" text-anchor="start" fill="#536578">设计示意 · 合成数据 · 实际实现和验证范围见 IMPLEMENTATION.md</text>
+<text x="1400" y="1020" font-family="Segoe UI,Microsoft YaHei UI,Microsoft YaHei,sans-serif" font-size="12" font-weight="400" text-anchor="end" fill="#536578">P05</text>
+</svg>

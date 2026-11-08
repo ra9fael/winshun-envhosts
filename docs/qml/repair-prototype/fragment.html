@@ -1,0 +1,312 @@
+<div id="envhosts-repair" aria-label="EnvHosts 紧凑列表修复演示">
+  <style>
+    #envhosts-repair { color-scheme: light dark; --eh-bg: light-dark(#edf1f5,#121a26); --eh-panel: light-dark(#ffffff,#1c2838); --eh-field: light-dark(#f7f9fc,#172231); --eh-ink: light-dark(#16273b,#f0f5fc); --eh-muted: light-dark(#536578,#b3c2d5); --eh-line: light-dark(#cbd5e1,#42536b); --eh-accent: light-dark(#185abd,#9ac4ff); --eh-on-accent: light-dark(#ffffff,#121a26); --eh-selected: light-dark(#e9f1ff,#293f5c); --eh-green: light-dark(#16613e,#85ddb0); --eh-green-bg: light-dark(#e7f5ed,#203e35); --eh-amber: light-dark(#805000,#f2c57e); --eh-amber-bg: light-dark(#fff3d9,#443820); --eh-red: light-dark(#a12536,#ff9caa); --eh-red-bg: light-dark(#ffedf0,#482a35); --eh-row:28px; --eh-control:26px; font:13px/1.4 "Segoe UI","Microsoft YaHei UI",sans-serif; color:var(--eh-ink); width:100%; }
+    #envhosts-repair *, #envhosts-repair *::before, #envhosts-repair *::after { box-sizing:border-box; }
+    #envhosts-repair [hidden] { display:none !important; }
+    #envhosts-repair button, #envhosts-repair input, #envhosts-repair select, #envhosts-repair textarea { font:inherit; color:var(--eh-ink); }
+    #envhosts-repair button { min-height:var(--eh-control); padding:2px 8px; border:1px solid var(--eh-line); border-radius:3px; background:var(--eh-panel); white-space:nowrap; }
+    #envhosts-repair button:hover:enabled { background:var(--eh-selected); }
+    #envhosts-repair button:disabled { color:var(--eh-muted); opacity:.6; }
+    #envhosts-repair button.primary, #envhosts-repair button[aria-pressed="true"] { color:var(--eh-on-accent); background:var(--eh-accent); border-color:var(--eh-accent); }
+    #envhosts-repair input:not([type="checkbox"]), #envhosts-repair select { height:28px; min-width:0; padding:3px 6px; border:1px solid var(--eh-line); border-radius:3px; background:var(--eh-panel); }
+    #envhosts-repair textarea { width:100%; padding:6px 8px; border:1px solid var(--eh-line); border-radius:3px; background:var(--eh-panel); resize:vertical; min-height:124px; }
+    #envhosts-repair input[type="checkbox"] { width:14px; height:14px; margin:0; accent-color:var(--eh-accent); vertical-align:middle; }
+    #envhosts-repair .eh-review { display:flex; flex-wrap:wrap; align-items:center; gap:6px; margin-bottom:8px; padding-right:96px; }
+    #envhosts-repair .eh-review .eh-muted { margin-right:auto; }
+    #envhosts-repair .eh-app { background:var(--eh-bg); border:1px solid var(--eh-line); border-radius:6px; padding:12px; }
+    #envhosts-repair .eh-heading, #envhosts-repair .eh-toolbar, #envhosts-repair .eh-tabs, #envhosts-repair .eh-detail-heading { display:flex; align-items:center; gap:6px; flex-wrap:wrap; }
+    #envhosts-repair .eh-heading { margin-bottom:10px; }
+    #envhosts-repair h2 { font-size:18px; font-weight:600; margin:0 6px 0 0; }
+    #envhosts-repair .eh-grow { flex:1; min-width:8px; }
+    #envhosts-repair .eh-muted, #envhosts-repair .eh-hint { color:var(--eh-muted); }
+    #envhosts-repair .eh-tabs { margin-bottom:8px; }
+    #envhosts-repair .eh-tabs .eh-scope-note { margin-left:auto; }
+    #envhosts-repair .eh-toolbar { margin-bottom:6px; }
+    #envhosts-repair .eh-filter { flex:1 1 200px; max-width:380px; }
+    #envhosts-repair .eh-count { margin-left:auto; white-space:nowrap; }
+    #envhosts-repair .eh-table-wrap { width:100%; overflow-x:auto; background:var(--eh-panel); border:1px solid var(--eh-line); border-radius:3px; min-height:206px; }
+    #envhosts-repair table { border-spacing:0; border-collapse:separate; table-layout:fixed; width:100%; font-size:13px; }
+    #envhosts-repair th, #envhosts-repair td { height:var(--eh-row); padding:0 7px; text-align:left; font-weight:400; border-bottom:1px solid var(--eh-line); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    #envhosts-repair th { position:relative; height:28px; background:var(--eh-field); color:var(--eh-muted); }
+    #envhosts-repair tr:last-child td { border-bottom:0; }
+    #envhosts-repair th:first-child, #envhosts-repair td:first-child { text-align:center; padding:0; }
+    #envhosts-repair .eh-head { border:0; padding:0; min-height:26px; border-radius:0; background:transparent; text-align:left; max-width:calc(100% - 8px); overflow:hidden; text-overflow:ellipsis; color:var(--eh-muted); }
+    #envhosts-repair .eh-grip { position:absolute; right:0; top:0; height:28px; width:9px; min-height:0; padding:0; border:0; border-radius:0; background:transparent; cursor:col-resize; touch-action:none; }
+    #envhosts-repair .eh-grip::after { content:""; position:absolute; right:3px; top:6px; bottom:6px; border-right:1px solid var(--eh-line); }
+    #envhosts-repair .eh-cell { display:block; width:100%; min-height:calc(var(--eh-row) - 1px); border:0; border-radius:0; padding:0; text-align:left; overflow:hidden; text-overflow:ellipsis; background:transparent; }
+    #envhosts-repair .eh-cell:hover:enabled { background:transparent; }
+    #envhosts-repair .eh-checkbox-cell { display:flex; min-height:var(--eh-row); align-items:center; justify-content:center; }
+    #envhosts-repair .eh-mono { font-family:Consolas,"Cascadia Code",monospace; }
+    #envhosts-repair tbody tr { background:var(--eh-panel); }
+    #envhosts-repair tbody tr.eh-off { background:var(--eh-field); }
+    #envhosts-repair tbody tr.eh-selected { background:var(--eh-selected); }
+    #envhosts-repair tbody tr.eh-added { background:var(--eh-green-bg); }
+    #envhosts-repair tbody tr.eh-added .eh-content { color:var(--eh-green); }
+    #envhosts-repair tbody tr.eh-added td:first-child { border-left:3px solid var(--eh-green); }
+    #envhosts-repair .eh-new-input { color:var(--eh-green) !important; background:var(--eh-green-bg) !important; }
+    #envhosts-repair tbody tr.eh-deleted { background:var(--eh-red-bg); }
+    #envhosts-repair tbody tr.eh-deleted .eh-content { text-decoration:line-through; color:var(--eh-red); }
+    #envhosts-repair tbody tr.eh-deleted td:first-child { box-shadow:inset 3px 0 var(--eh-red); }
+    #envhosts-repair tbody tr.eh-selected td { box-shadow:inset 0 1px var(--eh-accent),inset 0 -1px var(--eh-accent); }
+    #envhosts-repair tbody tr.eh-selected td:first-child { box-shadow:inset 2px 0 var(--eh-accent),inset 0 1px var(--eh-accent),inset 0 -1px var(--eh-accent); }
+    #envhosts-repair tbody tr.eh-selected td:last-child { box-shadow:inset -2px 0 var(--eh-accent),inset 0 1px var(--eh-accent),inset 0 -1px var(--eh-accent); }
+    #envhosts-repair tbody tr.eh-deleted.eh-selected td:first-child { box-shadow:inset 4px 0 var(--eh-red),inset 0 1px var(--eh-accent),inset 0 -1px var(--eh-accent); }
+    #envhosts-repair .eh-badge { display:inline-block; border-radius:3px; padding:1px 5px; font-size:12px; line-height:18px; white-space:nowrap; font-family:"Segoe UI","Microsoft YaHei UI",sans-serif; }
+    #envhosts-repair .eh-on-badge { background:var(--eh-green-bg); color:var(--eh-green); }
+    #envhosts-repair .eh-off-badge { background:var(--eh-amber-bg); color:var(--eh-amber); }
+    #envhosts-repair .eh-delete-badge { background:var(--eh-red-bg); color:var(--eh-red); font-weight:600; }
+    #envhosts-repair .eh-state { color:var(--eh-muted); font-size:12px; }
+    #envhosts-repair .eh-detail { margin-top:10px; }
+    #envhosts-repair .eh-detail-heading { margin-bottom:6px; }
+    #envhosts-repair .eh-detail-grid { display:grid; grid-template-columns:minmax(120px,1fr) 160px auto; align-items:end; gap:8px; margin-bottom:6px; }
+    #envhosts-repair .eh-detail-grid label, #envhosts-repair .eh-host-fields label { display:flex; flex-direction:column; gap:3px; color:var(--eh-muted); }
+    #envhosts-repair .eh-parts-wrap { min-height:142px; }
+    #envhosts-repair .eh-parts-wrap th:nth-child(2), #envhosts-repair .eh-parts-wrap td:nth-child(2) { width:42px; color:var(--eh-muted); }
+    #envhosts-repair .eh-hint { margin:6px 0 0; font-size:12px; }
+    #envhosts-repair .eh-footer { display:flex; justify-content:space-between; gap:8px; flex-wrap:wrap; margin-top:8px; padding-top:6px; border-top:1px solid var(--eh-line); font-size:12px; color:var(--eh-muted); }
+    #envhosts-repair .eh-host-fields { display:grid; grid-template-columns:180px minmax(140px,1fr) minmax(140px,1fr); gap:8px; }
+    #envhosts-repair .eh-error { color:var(--eh-red); background:var(--eh-red-bg); padding:6px 8px; margin-top:6px; border-radius:3px; }
+    #envhosts-repair .eh-dialog { margin-top:8px; padding:12px; background:var(--eh-panel); border:2px solid var(--eh-accent); border-radius:4px; }
+    #envhosts-repair .eh-dialog h3 { margin:0 0 8px; font-size:15px; }
+    #envhosts-repair .eh-dialog ul { margin:6px 0 10px; padding-left:20px; }
+    #envhosts-repair .eh-raw { min-height:310px; white-space:pre; }
+    #envhosts-repair .eh-empty { padding:16px; color:var(--eh-muted); }
+    @media (max-width:620px) {
+      #envhosts-repair .eh-review { padding-right:0; }
+      #envhosts-repair .eh-app { padding:8px; }
+      #envhosts-repair .eh-detail-grid, #envhosts-repair .eh-host-fields { grid-template-columns:1fr; }
+      #envhosts-repair .eh-tabs .eh-scope-note { width:100%; margin-left:0; }
+      #envhosts-repair .eh-filter { max-width:none; }
+      #envhosts-repair .eh-count { margin-left:0; }
+    }
+    @media (pointer:coarse) {
+      #envhosts-repair button { min-height:44px; }
+      #envhosts-repair input:not([type="checkbox"]), #envhosts-repair select { min-height:44px; font-size:16px; }
+      #envhosts-repair td { min-height:44px; }
+      #envhosts-repair input[type="checkbox"] { width:20px; height:20px; }
+      #envhosts-repair .eh-grip { height:44px; min-height:44px; width:16px; }
+    }
+  </style>
+  <div class="eh-review" aria-label="演示场景">
+    <span class="eh-muted">修复预览 · 合成数据</span>
+    <button data-target="env" aria-pressed="true">环境变量</button>
+    <button data-target="hosts" aria-pressed="false">hosts</button>
+    <button data-action="appearance">切换明暗</button>
+  </div>
+  <main class="eh-app">
+    <div class="eh-heading">
+      <h2 id="eh-title">环境变量</h2><span id="eh-dirty" class="eh-muted"></span><span class="eh-grow"></span>
+      <button id="eh-undo" data-action="undo">撤销</button><button id="eh-redo" data-action="redo">重做</button>
+      <button id="eh-save" data-action="review" class="primary">保存全部修改</button>
+    </div>
+    <div id="eh-scopes" class="eh-tabs" aria-label="变量范围">
+      <button data-scope="user" aria-pressed="true">用户变量</button><button data-scope="system" aria-pressed="false">系统变量</button>
+      <span class="eh-scope-note eh-muted" id="eh-scope-note"></span>
+    </div>
+    <div id="eh-host-tabs" class="eh-tabs" aria-label="hosts 视图" hidden>
+      <button data-host-page="entries" aria-pressed="true">条目</button><button data-host-page="raw" aria-pressed="false">全文</button>
+      <span class="eh-scope-note eh-muted">独立注释、空行和未知行只在全文中显示</span>
+    </div>
+    <section id="eh-list-panel">
+      <div class="eh-toolbar">
+        <input id="eh-filter" class="eh-filter" aria-label="筛选当前列表" placeholder="筛选当前范围 · Ctrl+F">
+        <button data-action="delete">删除所选</button><button data-action="restore">恢复所选</button>
+        <button data-action="enable" class="eh-host-command" hidden>启用</button><button data-action="disable" class="eh-host-command" hidden>停用</button>
+        <span id="eh-count" class="eh-count eh-muted"></span>
+      </div>
+      <div class="eh-table-wrap" aria-label="主列表容器"><table id="eh-table" aria-label="环境变量列表"><colgroup></colgroup><thead></thead><tbody></tbody></table></div>
+      <p class="eh-hint" id="eh-list-hint"></p>
+    </section>
+    <section id="eh-env-detail" class="eh-detail" aria-label="变量详情">
+      <div class="eh-detail-grid">
+        <label>变量名<input id="eh-name" data-edit="name" autocomplete="off" spellcheck="false"></label>
+        <label>类型<select id="eh-type" data-edit="type"><option>REG_SZ</option><option>REG_EXPAND_SZ</option></select></label>
+        <div class="eh-tabs" style="margin-bottom:0"><button data-mode="parts" aria-pressed="true">拆分项</button><button data-mode="raw" aria-pressed="false">原始值</button></div>
+      </div>
+      <section id="eh-parts-panel">
+        <div class="eh-toolbar">
+          <button data-action="add-part">新增项</button><button data-action="delete-part">删除所选项</button><button data-action="restore-part">恢复所选项</button>
+          <button data-action="up-part" aria-label="上移所选分隔项">↑ 上移</button><button data-action="down-part" aria-label="下移所选分隔项">↓ 下移</button>
+          <span class="eh-grow"></span><span id="eh-part-count" class="eh-muted"></span>
+        </div>
+        <div class="eh-table-wrap eh-parts-wrap"><table id="eh-parts" aria-label="分隔项列表"><colgroup><col style="width:32px"><col style="width:42px"><col><col style="width:86px"></colgroup><thead><tr><th><input id="eh-part-all" type="checkbox" aria-label="全选分隔项"></th><th>序号</th><th>值</th><th>状态</th></tr></thead><tbody></tbody></table></div>
+        <label id="eh-part-edit-wrap" hidden>编辑分隔项<input id="eh-part-input" data-edit="part" class="eh-mono" style="width:100%"></label>
+      </section>
+      <section id="eh-value-panel" hidden><label for="eh-value" class="eh-muted">原始值 · Enter 保留换行，Ctrl+Enter 暂存，Esc 取消</label><textarea id="eh-value" data-edit="value" class="eh-mono" spellcheck="false"></textarea></section>
+    </section>
+    <section id="eh-host-detail" class="eh-detail" aria-label="hosts 条目详情" hidden><div class="eh-host-fields"><label>IP<input id="eh-ip" data-edit="ip"></label><label>主机名<input id="eh-hostnames" data-edit="names"></label><label>行尾注释<input id="eh-comment" data-edit="comment"></label></div></section>
+    <section id="eh-raw-panel" hidden><label for="eh-raw" class="eh-muted">全文预览 · 保留独立注释及空行，已标记删除的映射不再输出</label><textarea id="eh-raw" class="eh-mono eh-raw" readonly spellcheck="false"></textarea></section>
+    <div id="eh-error" class="eh-error" role="alert" hidden></div>
+    <section id="eh-dialog" class="eh-dialog" role="region" aria-labelledby="eh-dialog-title" hidden><h3 id="eh-dialog-title"></h3><div id="eh-dialog-body"></div><div class="eh-toolbar"><button data-action="close-review">返回编辑</button><button id="eh-confirm" data-action="confirm" class="primary">确认模拟保存</button></div></section>
+    <footer class="eh-footer"><span id="eh-status" role="status" aria-live="polite">修改只暂存在演示内存</span><span id="eh-density">行高 28 · 按钮 26 · 输入 28</span></footer>
+  </main>
+  <script>
+  (() => {
+    const root = document.getElementById('envhosts-repair');
+    const $ = s => root.querySelector(s), $$ = s => [...root.querySelectorAll(s)];
+    const clone = v => JSON.parse(JSON.stringify(v));
+    const escape = v => String(v).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+    const part = (id,value) => ({id,value,deleted:false});
+    const variable = (id,scope,name,value,type='REG_SZ') => ({id,scope,name,value,type,deleted:false,parts:value.split(';').map((v,i)=>part(id+'-p'+i,v))});
+    const envBase = [variable('u-path','user','Path','%USERPROFILE%\\bin;C:\\Tools\\bin;D:\\SDK\\bin;C:\\Git\\cmd','REG_EXPAND_SZ'),variable('u-java','user','JAVA_HOME','C:\\SDK\\jdk-21'),variable('u-mode','user','DEV_MODE','development'),variable('u-temp','user','TEMP','%USERPROFILE%\\AppData\\Local\\Temp','REG_EXPAND_SZ'),variable('u-cache','user','APP_CACHE','D:\\Cache'),variable('u-editor','user','EDITOR','code'),variable('s-path','system','Path','%SystemRoot%\\System32;%SystemRoot%;C:\\Program Files\\Tools','REG_EXPAND_SZ'),variable('s-root','system','SystemRoot','C:\\Windows'),variable('s-cpu','system','NUMBER_OF_PROCESSORS','16'),variable('s-sdk','system','SDK_ROOT','D:\\SDK')];
+    const hostBase = [{id:'h-local',line:1,ip:'127.0.0.1',names:'localhost',comment:'本机',enabled:true,deleted:false},{id:'h-ipv6',line:2,ip:'::1',names:'localhost',comment:'IPv6',enabled:true,deleted:false},{id:'h-api',line:5,ip:'127.0.0.1',names:'api.test',comment:'本地接口',enabled:false,deleted:false},{id:'h-web',line:6,ip:'127.0.0.1',names:'web.test www.web.test',comment:'本地页面',enabled:true,deleted:false},{id:'h-db',line:8,ip:'192.0.2.20',names:'db.test',comment:'测试库',enabled:false,deleted:false},{id:'h-old',line:9,ip:'192.0.2.30',names:'old.test',comment:'旧映射',enabled:true,deleted:false}];
+    const originalLines = ['# EnvHosts 合成示例','127.0.0.1 localhost # 本机','::1 localhost # IPv6','','# 本地开发环境','# 127.0.0.1 api.test # 本地接口','127.0.0.1 web.test www.web.test # 本地页面','# 临时测试','# 192.0.2.20 db.test # 测试库','192.0.2.30 old.test # 旧映射','unknown legacy line',''];
+    const initialHosts = clone(hostBase); initialHosts.find(r=>r.id==='h-old').deleted=true;
+    const stores = {env:{base:clone(envBase),work:clone(envBase),past:[],future:[]},hosts:{base:clone(hostBase),work:initialHosts,past:[clone(hostBase)],future:[]}};
+    const view = (current,selected=[])=>({filter:'',selected,anchor:current,current,sort:'',descending:false});
+    const views = {user:view('u-path',['u-path']),system:view('s-path',['s-path']),hosts:view('h-api',['h-api'])};
+    const partViews = {'u-path':view('u-path-p0',['u-path-p0','u-path-p1'])};
+    const widths = {env:[{key:'name',label:'变量名',width:182,min:100,max:480},{key:'value',label:'值',width:320,min:160,max:800},{key:'type',label:'类型',width:150,min:130,max:300},{key:'state',label:'修改状态',width:94,min:88,max:220}],hosts:[{key:'enabled',label:'启停',width:90,min:82,max:180},{key:'ip',label:'IP',width:150,min:110,max:380},{key:'names',label:'主机名',width:280,min:140,max:700},{key:'comment',label:'行尾注释',width:180,min:120,max:600},{key:'state',label:'修改状态',width:94,min:88,max:220}]};
+    let nextPartId=1;
+    let target='env',scope='user',hostPage='entries',mode='parts',edit=null,partEditing='',review=false,drag=null,theme='auto',tableSignature='',partsSignature='';
+    const design={density:'紧凑',systemReadOnly:false};
+    const store=()=>stores[target], currentView=()=>views[target==='env'?scope:'hosts'];
+    const rows=()=>{const v=currentView();let out=store().work.filter(r=>!(r.deleted&&store().base.find(b=>b.id===r.id)?.deleted)).filter(r=>target==='hosts'||r.scope===scope).filter(r=>!v.filter||[r.name,r.value,r.ip,r.names,r.comment].join(' ').toLowerCase().includes(v.filter.toLowerCase()));if(v.sort)out.sort((a,b)=>String(a[v.sort]).localeCompare(String(b[v.sort]),'zh-CN')*(v.descending?-1:1));return out;};
+    const row=()=>store().work.find(r=>r.id===currentView().current);
+    const writable=r=>r&&!r.deleted&&!(target==='env'&&r.scope==='system'&&design.systemReadOnly);
+    const partView=()=>partViews[currentView().current]||(partViews[currentView().current]=view('',[]));
+    const changed=r=>{const b=store().base.find(v=>v.id===r.id);const fields=target==='env'?['name','value','type','deleted']:['ip','names','comment','enabled','deleted'];return !b||fields.some(k=>r[k]!==b[k]);};
+    const dirty=()=>store().work.filter(changed);
+    const status=s=>{$('#eh-status').textContent=s;};
+    function remember(){if(window.openai?.setWidgetState)window.openai.setWidgetState({modelContent:{target,scope,density:design.density},privateContent:{theme}}).catch(()=>{});}
+    function error(s){$('#eh-error').textContent=s;$('#eh-error').hidden=!s;}
+    function change(fn){const s=store(),before=clone(s.work);fn();if(JSON.stringify(before)!==JSON.stringify(s.work)){s.past.push(before);s.future=[];}review=false;render();}
+    function prune(){const v=currentView(),ids=rows().map(r=>r.id);v.selected=v.selected.filter(id=>ids.includes(id));if(!ids.includes(v.current))v.current=ids[0]||'';if(!ids.includes(v.anchor))v.anchor=v.current;}
+    function choose(id,event,parts=false){
+      const v=parts?partView():currentView(),ids=parts?(row()?.parts||[]).map(p=>p.id):rows().map(r=>r.id);
+      if(event.shiftKey&&ids.includes(v.anchor)){const a=ids.indexOf(v.anchor),b=ids.indexOf(id),range=ids.slice(Math.min(a,b),Math.max(a,b)+1);v.selected=(event.ctrlKey||event.metaKey)?[...new Set([...v.selected,...range])]:range;}
+      else if(event.ctrlKey||event.metaKey){v.selected=v.selected.includes(id)?v.selected.filter(x=>x!==id):[...v.selected,id];v.anchor=id;}
+      else{v.selected=[id];v.anchor=id;}v.current=id;render();
+    }
+    function stateMarkup(r){return r.deleted?'<span class="eh-badge eh-delete-badge">− 待删除</span>':changed(r)?'<span class="eh-badge eh-off-badge">● 已修改</span>':'<span class="eh-state">—</span>';}
+    function rowClass(r,selected){return [r.deleted?'eh-deleted':'',target==='hosts'&&!r.enabled?'eh-off':'',selected?'eh-selected':''].join(' ');}
+    function renderWidths(){const configs=widths[target];$('#eh-table').style.width=Math.max(32+configs.reduce((s,c)=>s+c.width,0),$('#eh-list-panel').clientWidth||0)+'px';configs.forEach((c,i)=>{const col=$('#eh-table colgroup').children[i+1];if(col)col.style.width=c.width+'px';const h=$(`[data-resize="${c.key}"]`);if(h){h.setAttribute('aria-label',`${c.label}列宽 ${c.width} 像素，左右键调整，双击或 Enter 自动适应`);h.dataset.width=c.width;}});}
+    function renderTable(){
+      const visible=rows(),v=currentView(),configs=widths[target];
+      $('#eh-table').setAttribute('aria-label',target==='env'?(scope==='user'?'用户变量列表':'系统变量列表'):'hosts 映射列表');
+      const signature=JSON.stringify([target,scope,v.sort,v.descending,visible]);
+      if(signature!==tableSignature){
+      tableSignature=signature;
+      $('#eh-table colgroup').innerHTML='<col style="width:32px">'+configs.map(c=>`<col style="width:${c.width}px">`).join('');
+      $('#eh-table thead').innerHTML='<tr><th><input id="eh-all" type="checkbox" aria-label="全选当前可见行"></th>'+configs.map(c=>`<th><button class="eh-head" data-sort="${c.key}" aria-label="按${c.label}排序">${c.label}${v.sort===c.key?(v.descending?' ↓':' ↑'):''}</button><button class="eh-grip" data-resize="${c.key}"></button></th>`).join('')+'</tr>';
+      $('#eh-table tbody').innerHTML=visible.map(r=>`<tr data-row="${r.id}" class="${rowClass(r,v.selected.includes(r.id))}"><td><label class="eh-checkbox-cell"><input type="checkbox" data-check="${r.id}" aria-label="选择 ${escape(r.name||r.names)}" ${v.selected.includes(r.id)?'checked':''}></label></td>`+configs.map(c=>{let content=c.key==='state'?stateMarkup(r):c.key==='enabled'?(r.deleted?'<span class="eh-state">待删除</span>':`<span class="eh-badge ${r.enabled?'eh-on-badge':'eh-off-badge'}">${r.enabled?'● 启用':'Ⅱ 停用'}</span>`):`<span class="eh-content">${escape(r[c.key])}</span>`;return `<td data-field="${c.key}"><button class="eh-cell ${['value','ip','names'].includes(c.key)?'eh-mono':''}" data-cell="${r.id}" data-field="${c.key}" aria-label="${escape(c.label+'：'+(c.key==='state'?(r.deleted?'待删除':changed(r)?'已修改':'未修改'):c.key==='enabled'?(r.enabled?'启用':'停用'):r[c.key]))}">${content}</button></td>`;}).join('')+'</tr>').join('')||`<tr><td colspan="${configs.length+1}" class="eh-empty">没有匹配的条目</td></tr>`;
+      }
+      $$('#eh-table tbody tr[data-row]').forEach(tr=>{const r=visible.find(r=>r.id===tr.dataset.row);tr.className=rowClass(r,v.selected.includes(r.id));tr.querySelector('input').checked=v.selected.includes(r.id);});
+      $('#eh-all').checked=visible.length>0&&v.selected.length===visible.length;$('#eh-all').indeterminate=v.selected.length>0&&v.selected.length<visible.length;
+      $('#eh-count').textContent=`选中 ${v.selected.length} / ${visible.length}`;renderWidths();
+    }
+    function renderParts(){
+      const r=row(),ps=r?.parts||[],v=partView();v.selected=v.selected.filter(id=>ps.some(p=>p.id===id));
+      const signature=JSON.stringify(ps);if(signature!==partsSignature){partsSignature=signature;
+      $('#eh-parts tbody').innerHTML=ps.map((p,i)=>`<tr data-part="${p.id}" class="${p.deleted?'eh-deleted ':p.isNew?'eh-added ':''}${v.selected.includes(p.id)?'eh-selected':''}"><td><label class="eh-checkbox-cell"><input type="checkbox" data-part-check="${p.id}" aria-label="选择分隔项 ${i+1}" ${v.selected.includes(p.id)?'checked':''}></label></td><td>${i+1}</td><td><button class="eh-cell eh-mono eh-content" data-part-cell="${p.id}">${escape(p.value||'（空项）')}</button></td><td>${p.deleted?'<span class="eh-badge eh-delete-badge">− 待删除</span>':p.isNew?'<span class="eh-badge eh-on-badge">+ 新增</span>':'<span class="eh-state">—</span>'}</td></tr>`).join('');}
+      $$('#eh-parts tbody tr').forEach(tr=>{const p=ps.find(p=>p.id===tr.dataset.part);tr.className=(p.deleted?'eh-deleted ':p.isNew?'eh-added ':'')+(v.selected.includes(p.id)?'eh-selected':'');tr.querySelector('input').checked=v.selected.includes(p.id);});
+      $('#eh-part-count').textContent=`${ps.filter(p=>!p.deleted).length} 项有效 · 选中 ${v.selected.length} 项`;
+      $('#eh-part-all').checked=ps.length>0&&ps.length===v.selected.length;$('#eh-part-all').indeterminate=v.selected.length>0&&ps.length>v.selected.length;
+      $$('[data-action$="-part"]').forEach(b=>b.disabled=!writable(r)||(b.dataset.action!=='add-part'&&!v.selected.length));
+      $('#eh-part-edit-wrap').hidden=!partEditing;const p=ps.find(p=>p.id===partEditing);$('#eh-part-input').value=p?.value||'';$('#eh-part-input').classList.toggle('eh-new-input',!!p?.isNew);
+    }
+    function render(){
+      const active=document.activeElement,focusKey=active?.dataset.cell?`[data-cell="${active.dataset.cell}"][data-field="${active.dataset.field}"]`:active?.dataset.partCell?`[data-part-cell="${active.dataset.partCell}"]`:active?.dataset.sort?`[data-sort="${active.dataset.sort}"]`:active?.dataset.check?`[data-check="${active.dataset.check}"]`:active?.dataset.partCheck?`[data-part-check="${active.dataset.partCheck}"]`:null;
+      prune();const v=currentView(),r=row(),d=dirty(),env=target==='env',entries=env||hostPage==='entries';
+      root.dataset.target=target;root.dataset.scope=scope;root.style.colorScheme=theme==='auto'?'inherit':theme;
+      root.style.setProperty('--eh-row',design.density==='紧凑'?'28px':'32px');root.style.setProperty('--eh-control',design.density==='紧凑'?'26px':'30px');
+      $('#eh-density').textContent=design.density==='紧凑'?'行高 28 · 按钮 26 · 输入 28':'行高 32 · 按钮 30 · 输入 28';
+      $('#eh-title').textContent=env?'环境变量':'hosts';$('#eh-dirty').textContent=d.length?`${d.length} 项未保存`:'与目标一致';
+      $('#eh-undo').disabled=!store().past.length;$('#eh-redo').disabled=!store().future.length;$('#eh-save').disabled=!d.length;
+      $('#eh-scopes').hidden=!env;$('#eh-host-tabs').hidden=env;$('#eh-list-panel').hidden=!entries;$('#eh-env-detail').hidden=!env||!r;$('#eh-host-detail').hidden=env||!entries||!r;$('#eh-raw-panel').hidden=entries;
+      $$('[data-target]').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.target===target)));
+      $$('[data-scope]').forEach(b=>{b.setAttribute('aria-pressed',String(b.dataset.scope===scope));const count=env?d.filter(r=>r.scope===b.dataset.scope).length:0;b.textContent=(b.dataset.scope==='user'?'用户变量':'系统变量')+(count?` · ${count} 项修改`:'');});
+      $$('[data-host-page]').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.hostPage===hostPage)));
+      $('#eh-scope-note').textContent=(scope==='user'?'当前：用户变量':'当前：系统变量')+(scope==='system'&&design.systemReadOnly?' · 只读':'');
+      $('#eh-filter').value=v.filter;$$('.eh-host-command').forEach(b=>b.hidden=env);
+      $$('[data-action="delete"],[data-action="restore"],[data-action="enable"],[data-action="disable"]').forEach(b=>b.disabled=!v.selected.length||(env&&scope==='system'&&design.systemReadOnly));
+      $('#eh-list-hint').textContent=env?'Ctrl 点选 · Shift 连选 · 双击名称 / 值 / 类型分别编辑 · 拖动列边界，双击边界适应内容':'● 启用 · Ⅱ 停用 · 红底 − 待删除 · 选中描边保留状态色 · Ctrl / Shift 多选';
+      renderTable();
+      if(env&&r){$('#eh-name').value=r.name;$('#eh-type').value=r.type;$('#eh-value').value=r.value;['#eh-name','#eh-type','#eh-value'].forEach(s=>$(s).disabled=!writable(r));$$('[data-mode]').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.mode===mode)));$('#eh-parts-panel').hidden=mode!=='parts';$('#eh-value-panel').hidden=mode!=='raw';renderParts();}
+      if(!env&&r){for(const [id,key] of [['#eh-ip','ip'],['#eh-hostnames','names'],['#eh-comment','comment']]){$(id).value=r[key];$(id).disabled=!writable(r);}}
+      $('#eh-raw').value=serializeHosts();$('#eh-dialog').hidden=!review;
+      if(focusKey&&!active.isConnected){const next=$(focusKey)||$('[data-cell="'+v.current+'"]');if(next)next.focus();}
+    }
+    function serializeHosts(){return originalLines.map((line,i)=>{const r=stores.hosts.work.find(r=>r.line===i);if(!r)return line;if(r.deleted)return null;const old=hostBase.find(h=>h.id===r.id);if(['ip','names','comment','enabled'].every(k=>r[k]===old[k]))return line;return (r.enabled?'':'# ')+r.ip+' '+r.names+(r.comment?' # '+r.comment:'');}).filter(l=>l!==null).join('\n');}
+    function finish(){
+      if(!edit)return true;const e=edit,el=$(e.selector),r=store().work.find(r=>r.id===e.id),value=el.value;
+      if(el.dataset.composing==='true')return false;
+      if(value===e.before){edit=null;error('');return true;}
+      if(e.field==='name'&&(!value||/[=\r\n\0]/.test(value)||store().work.some(x=>x.id!==r.id&&x.scope===r.scope&&!x.deleted&&x.name.toLowerCase()===value.toLowerCase()))){error('变量名不能为空、重复或包含等号 / 换行；请修正，或按 Esc 取消。');el.focus();return false;}
+      if(e.field==='ip'&&!/^[0-9a-fA-F:.]+$/.test(value)||e.field==='names'&&!value.trim()){error('请填写有效的 IP / 主机名；完整校验在 Qt 实现中验收。');el.focus();return false;}
+      edit=null;error('');change(()=>{if(e.field==='part'){const p=r.parts.find(p=>p.id===e.part);p.value=value;r.value=r.parts.filter(p=>!p.deleted).map(p=>p.value).join(';');}else{r[e.field]=value;if(e.field==='value')r.parts=value.split(';').map((v,i)=>part(r.id+'-edit'+i,v));}});status('已暂存到工作副本；尚未写入系统');return true;
+    }
+    function begin(el){if(edit?.selector==='#'+el.id)return;const r=row();if(!r||el.disabled)return;edit={selector:'#'+el.id,id:r.id,field:el.dataset.edit,part:partEditing,before:el.value};}
+    function focusField(field){const map={name:'#eh-name',value:'#eh-value',type:'#eh-type',ip:'#eh-ip',names:'#eh-hostnames',comment:'#eh-comment'};if(!writable(row())){status('当前条目已删除或只读，请先恢复或仅查看');return;}if(field==='value'){mode='raw';render();}const el=$(map[field]);if(el){el.focus();if(el.select)el.select();status('已定位：'+({name:'变量名',value:'原始值',type:'存储类型',ip:'IP',names:'主机名',comment:'行尾注释'}[field]));}}
+    function autoWidth(key){const c=widths[target].find(c=>c.key===key);if(!c)return;const strings=rows().map(r=>key==='state'?'● 已修改':key==='enabled'?'Ⅱ 停用':String(r[key]||''));const units=s=>[...s].reduce((n,ch)=>n+(ch.charCodeAt(0)>255?2:1),0);c.width=Math.min(c.max,Math.max(c.min,Math.ceil(Math.max(units(c.label),...strings.map(units))*7.2+24)));renderWidths();status(`${c.label}列已按当前可见内容调整为 ${c.width} px`);}
+    function showReview(){const changes=dirty();review=true;$('#eh-dialog-title').textContent=target==='env'?'保存全部修改：核对两个范围':'保存 hosts 修改';$('#eh-confirm').hidden=false;$('#eh-dialog-body').innerHTML=(target==='env'?['user','system']:['hosts']).map(s=>{const list=changes.filter(r=>s==='hosts'||r.scope===s);return `<strong>${s==='user'?'用户变量':s==='system'?'系统变量':'hosts'} · ${list.length} 项</strong><ul>${list.map(r=>`<li>${escape(r.name||r.names)} — ${r.deleted?'删除':target==='hosts'?(r.enabled?'启用 / 修改':'停用 / 修改'):'修改'}</li>`).join('')||'<li>无修改</li>'}</ul>`;}).join('');$('#eh-dialog').hidden=false;status('保存复核包含当前目标的全部修改，切换范围不会隐藏待保存范围');}
+    function act(action){
+      if(!finish())return;
+      const v=currentView(),selected=()=>store().work.filter(r=>v.selected.includes(r.id));
+      if(action==='appearance'){theme=theme==='dark'?'light':'dark';render();remember();return;}
+      if(action==='undo'||action==='redo'){const s=store(),from=action==='undo'?s.past:s.future,to=action==='undo'?s.future:s.past;if(from.length){to.push(clone(s.work));s.work=from.pop();partEditing='';render();status(action==='undo'?'已撤销一次操作':'已重做一次操作');}return;}
+      if(action==='delete'||action==='restore'){change(()=>selected().forEach(r=>{if(!(target==='env'&&r.scope==='system'&&design.systemReadOnly))r.deleted=action==='delete';}));status(action==='delete'?'所选行已标记删除；可恢复或一次撤销':'所选行已恢复');return;}
+      if(action==='enable'||action==='disable'){change(()=>selected().filter(r=>!r.deleted).forEach(r=>r.enabled=action==='enable'));status(action==='enable'?'已批量启用；待删除行保持不变':'已批量停用；待删除行保持不变');return;}
+      if(action==='add-part'){
+        const r=row(),p=partView();if(!writable(r))return;
+        const selected=r.parts.filter(x=>p.selected.includes(x.id));const position=selected.length?r.parts.indexOf(selected[selected.length-1])+1:r.parts.length;
+        const id='new-part-'+nextPartId++;
+        change(()=>{r.parts.splice(position,0,{id,value:'',deleted:false,isNew:true});r.value=r.parts.filter(x=>!x.deleted).map(x=>x.value).join(';');p.selected=[id];p.current=id;p.anchor=id;partEditing=id;});
+        $('#eh-part-input').focus();status('已在最后一个选中项后插入；无选择时追加末尾');return;
+      }
+      if(action.endsWith('-part')){const r=row(),p=partView();if(!writable(r))return;change(()=>{if(action==='delete-part'||action==='restore-part'){r.parts=r.parts.filter(x=>!(action==='delete-part'&&x.isNew&&p.selected.includes(x.id)));r.parts.filter(x=>p.selected.includes(x.id)).forEach(x=>x.deleted=action==='delete-part');}else{const direction=action==='up-part'?-1:1;const ids=new Set(p.selected);for(let i=direction<0?1:r.parts.length-2;direction<0?i<r.parts.length:i>=0;i-=direction){if(ids.has(r.parts[i].id)&&!ids.has(r.parts[i+direction].id))[r.parts[i],r.parts[i+direction]]=[r.parts[i+direction],r.parts[i]];}}r.value=r.parts.filter(p=>!p.deleted).map(p=>p.value).join(';');});status('分隔项批量操作已暂存；一次撤销恢复整批');return;}
+      if(action==='review'){showReview();return;}
+      if(action==='close-review'){review=false;render();return;}
+      if(action==='confirm'){for(const r of store().work)for(const p of r.parts||[])p.isNew=false;store().base=clone(store().work);store().past=[];store().future=[];review=false;render();status('已模拟保存；仅更新演示内存');}
+    }
+    root.addEventListener('click',e=>{
+      const el=e.target.closest('button,input');if(!el||el.disabled)return;
+      if(el.dataset.resize)return;
+      if(el.dataset.action){act(el.dataset.action);return;}
+      if(el.dataset.edit)return;
+      if(!finish()){e.preventDefault();return;}
+      if(el.dataset.target){target=el.dataset.target;partEditing='';review=false;render();remember();return;}
+      if(el.dataset.scope){scope=el.dataset.scope;partEditing='';render();status('当前范围独立选择；另一范围的修改已保留');remember();return;}
+      if(el.dataset.hostPage){hostPage=el.dataset.hostPage;render();return;}
+      if(el.dataset.mode){mode=el.dataset.mode;render();return;}
+      if(el.dataset.sort){if(e.detail>1)return;const v=currentView(),key=el.dataset.sort;v.descending=v.sort===key?!v.descending:false;v.sort=key;render();return;}
+      if(el.id==='eh-all'){currentView().selected=el.checked?rows().map(r=>r.id):[];render();return;}
+      if(el.id==='eh-part-all'){partView().selected=el.checked?(row()?.parts||[]).map(p=>p.id):[];render();return;}
+      if(el.dataset.check){choose(el.dataset.check,{ctrlKey:true});return;}
+      if(el.dataset.partCheck){choose(el.dataset.partCheck,{ctrlKey:true},true);return;}
+      if(el.dataset.cell){const v=currentView();if(e.detail>1)return;if(v.selected.includes(el.dataset.cell)&&!e.ctrlKey&&!e.metaKey&&!e.shiftKey){v.current=el.dataset.cell;render();}else choose(el.dataset.cell,e);return;}
+      if(el.dataset.partCell){if(e.detail>1)return;choose(el.dataset.partCell,e,true);}
+    });
+    root.addEventListener('dblclick',e=>{
+      const grip=e.target.closest('[data-resize]');if(grip){autoWidth(grip.dataset.resize);return;}
+      const cell=e.target.closest('[data-cell]');if(cell&&finish()){const v=currentView();v.current=cell.dataset.cell;if(!v.selected.includes(v.current))v.selected=[v.current];render();if(cell.dataset.field==='state'||cell.dataset.field==='enabled'){review=true;$('#eh-dialog-title').textContent='条目状态';$('#eh-dialog-body').textContent=row().deleted?'待删除；保存前可恢复。':target==='hosts'?(row().enabled?'已启用':'已停用'):(changed(row())?'工作副本已修改':'与目标一致');$('#eh-confirm').hidden=true;$('#eh-dialog').hidden=false;}else focusField(cell.dataset.field);return;}
+      const p=e.target.closest('[data-part-cell]');if(p&&finish()&&writable(row())){partEditing=p.dataset.partCell;render();$('#eh-part-input').focus();$('#eh-part-input').select();}
+    });
+    root.addEventListener('focusin',e=>{if(e.target.dataset.edit)begin(e.target);});
+    root.addEventListener('focusout',e=>{if(e.target.dataset.edit&&edit?.selector==='#'+e.target.id)finish();});
+    root.addEventListener('compositionstart',e=>{e.target.dataset.composing='true';});root.addEventListener('compositionend',e=>{e.target.dataset.composing='false';});
+    root.addEventListener('change',e=>{if(e.target.id==='eh-type')finish();});
+    root.addEventListener('input',e=>{if(e.target.id==='eh-filter'){if(!finish())return;currentView().filter=e.target.value;render();$('#eh-filter').focus();}else if(e.target.dataset.edit&&!edit){const r=row(),field=e.target.dataset.edit;edit={selector:'#'+e.target.id,id:r.id,field,part:partEditing,before:field==='part'?r.parts.find(p=>p.id===partEditing)?.value:r[field]};}});
+    root.addEventListener('keydown',e=>{
+      const el=e.target,typing=el.matches('input:not([type="checkbox"]),textarea,select');if(e.isComposing||el.dataset.composing==='true')return;
+      if(el.dataset.resize){const c=widths[target].find(c=>c.key===el.dataset.resize);if(e.key==='Enter'){e.preventDefault();autoWidth(c.key);}else if(['ArrowLeft','ArrowRight'].includes(e.key)){e.preventDefault();c.width=Math.min(c.max,Math.max(c.min,c.width+(e.key==='ArrowLeft'?-1:1)*(e.shiftKey?20:4)));renderWidths();}return;}
+      if(typing){if(e.key==='Escape'&&edit){e.preventDefault();const selector=edit.selector;edit=null;error('');render();$(selector).focus();}else if(e.key==='Enter'&&el.dataset.edit&&(el.tagName!=='TEXTAREA'||e.ctrlKey)){e.preventDefault();finish();}return;}
+      const parts=!!el.closest('#eh-parts'),v=parts?partView():currentView(),ids=parts?(row()?.parts||[]).map(p=>p.id):rows().map(r=>r.id);
+      if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='a'){e.preventDefault();v.selected=ids;render();status('已全选当前可见项');}
+      else if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='z'){e.preventDefault();act(e.shiftKey?'redo':'undo');}
+      else if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='f'){e.preventDefault();$('#eh-filter').focus();}
+      else if(e.key==='Delete'){e.preventDefault();act(parts?'delete-part':'delete');}
+      else if(e.key==='F2'||e.key==='Enter'&&el.dataset.cell){e.preventDefault();focusField(el.dataset.field==='state'?'name':el.dataset.field||'name');}
+      else if(e.key===' '&&target==='hosts'&&el.dataset.cell){e.preventDefault();act(store().work.filter(r=>v.selected.includes(r.id)&&!r.deleted).some(r=>!r.enabled)?'enable':'disable');}
+      else if(['ArrowDown','ArrowUp'].includes(e.key)){e.preventDefault();if(parts&&e.altKey){act(e.key==='ArrowUp'?'up-part':'down-part');return;}const index=ids.indexOf(v.current),id=ids[Math.max(0,Math.min(ids.length-1,index+(e.key==='ArrowUp'?-1:1)))];if(id)choose(id,e,parts);}
+    });
+    root.addEventListener('pointerdown',e=>{const el=e.target.closest('[data-resize]');if(!el)return;if(!finish())return;e.preventDefault();drag={key:el.dataset.resize,start:e.clientX,width:widths[target].find(c=>c.key===el.dataset.resize).width};el.setPointerCapture?.(e.pointerId);});
+    root.addEventListener('pointermove',e=>{if(!drag)return;const c=widths[target].find(c=>c.key===drag.key);c.width=Math.round(Math.min(c.max,Math.max(c.min,drag.width+e.clientX-drag.start)));renderWidths();});
+    root.addEventListener('pointerup',()=>{if(drag){status('列宽已调整；双击列边界可适应内容');drag=null;}});root.addEventListener('pointercancel',()=>{drag=null;});
+    function restoreState(saved){if(saved?.modelContent){target=['env','hosts'].includes(saved.modelContent.target)?saved.modelContent.target:target;scope=['user','system'].includes(saved.modelContent.scope)?saved.modelContent.scope:scope;design.density=['紧凑','舒适'].includes(saved.modelContent.density)?saved.modelContent.density:design.density;}if(['auto','light','dark'].includes(saved?.privateContent?.theme))theme=saved.privateContent.theme;render();}
+    restoreState(window.openai?.widgetState);
+    window.addEventListener('openai:set_globals',e=>{if(e.detail?.globals?.widgetState&&!edit)restoreState(e.detail.globals.widgetState);});
+    if(globalThis.Tweak){const tweak=new Tweak({container:root,onChange:()=>{if(finish()){render();remember();}}});tweak.addSelect(design,'density',{label:'桌面密度',options:['紧凑','舒适']});tweak.addToggle(design,'systemReadOnly',{label:'系统变量只读情境'});}
+  })();
+  </script>
+</div>

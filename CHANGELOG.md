@@ -3,9 +3,31 @@
 All notable changes to this plugin. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions follow
 [Semantic Versioning](https://semver.org/). The version in `plugin.json` is the
-single source of truth; release tags are `v<version>`.
+single source of truth; release tags are `<gdi|qml>/v<version>`.
 
 ## [Unreleased]
+
+## [0.8.0] - 2026-11-09
+
+### Fixed
+
+- Reduce retained editor memory by releasing idle QML engines and using software/GDI text rendering; respond to launcher actions before creating windows.
+- Preserve the current variable, multi-selection, split items and view position after verified save.
+- Isolate drafts per backend, archive and route legacy drafts, and validate shared backup compatibility.
+
+### Added
+
+- Opt-in QML editor with environment, hosts entries/raw text, backup preview,
+  save/conflict review and draft recovery pages, using shared design tokens.
+- Stable-ID multi-selection for variables, hosts and split items: Ctrl-click,
+  Shift ranges, visible-only Ctrl+A, batch delete/restore, hosts enable/disable,
+  split-item movement, and a single undo command per batch.
+- Shared QML/launcher write service with fingerprint checks, verified backups,
+  readback, separate partial/readback/broadcast failure outcomes, and raw
+  REG_MULTI_SZ element preservation. Legacy lossy multi-string edits are rejected.
+- Qt Test UI/model/fault tests, isolated registry/hosts protocol checks, and a
+  checked Qt release packaging script. Full host/IME/DPI/accessibility and
+  performance acceptance remains pending; see `docs/qml/IMPLEMENTATION.md`.
 
 ## [0.7.2] - 2026-11-08
 
@@ -368,9 +390,11 @@ First public release.
 - A backup before every write, with a configurable `backupCount`.
 - Byte-exact hosts round trip (UTF-8 BOM, CRLF, section comments preserved).
 
-[Unreleased]: https://github.com/ra9fael/winshun-envhosts/compare/v0.7.2...HEAD
+[Unreleased]: https://github.com/ra9fael/winshun-envhosts/compare/qml/v0.8.0...qml
 [0.7.2]: https://github.com/ra9fael/winshun-envhosts/releases/tag/v0.7.2
 [0.7.1]: https://github.com/ra9fael/winshun-envhosts/releases/tag/v0.7.1
 [0.7.0]: https://github.com/ra9fael/winshun-envhosts/releases/tag/v0.7.0
 [0.4.0]: https://github.com/ra9fael/winshun-envhosts/releases/tag/v0.4.0
 [0.1.0]: https://github.com/ra9fael/winshun-envhosts/releases/tag/v0.1.0
+
+[0.8.0]: https://github.com/ra9fael/winshun-envhosts/releases/tag/qml%2Fv0.8.0
