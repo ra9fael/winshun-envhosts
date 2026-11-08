@@ -13,6 +13,7 @@ single source of truth; release tags are `v<version>`.
 
 ### Fixed
 
+- 修复同时关闭环境变量和 hosts 编辑器时的线程等待死锁，并加入双窗口退出回归。
 - 修复可执行文件图标，补齐打包中的 ICO 和资源脚本。 为窗口显式设置大小图标，随 DPI 更新并释放图标句柄。
 
 ### Notes

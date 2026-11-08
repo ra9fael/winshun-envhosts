@@ -1,0 +1,570 @@
+{
+  "name": "envhosts",
+  "exe_sha256": "9141be82c21e256b04562a2cf1c4189ea19edf60ae3cf7df0f043449162b77df",
+  "checks": [
+    {
+      "name": "Executable resources load",
+      "passed": true
+    },
+    {
+      "name": "Named icon group exists",
+      "passed": true,
+      "detail": [
+        "IDI_ICON1"
+      ]
+    },
+    {
+      "name": "Eight icon frames exist",
+      "passed": true,
+      "detail": 8
+    },
+    {
+      "name": "Embedded 16px icon loads",
+      "passed": true
+    },
+    {
+      "name": "Embedded 20px icon loads",
+      "passed": true
+    },
+    {
+      "name": "Embedded 24px icon loads",
+      "passed": true
+    },
+    {
+      "name": "Embedded 32px icon loads",
+      "passed": true
+    },
+    {
+      "name": "Embedded 40px icon loads",
+      "passed": true
+    },
+    {
+      "name": "Embedded 48px icon loads",
+      "passed": true
+    },
+    {
+      "name": "Embedded 64px icon loads",
+      "passed": true
+    },
+    {
+      "name": "Embedded 256px icon loads",
+      "passed": true
+    },
+    {
+      "name": "initialize returns a result",
+      "passed": true
+    },
+    {
+      "name": "Plugin initializes",
+      "passed": true,
+      "detail": "ra9fael.envhosts"
+    },
+    {
+      "name": "action returns a result",
+      "passed": true
+    },
+    {
+      "name": "action returns a result",
+      "passed": true
+    },
+    {
+      "name": "Both native editors open",
+      "passed": true
+    },
+    {
+      "name": "hosts — WinShun: large window icon is assigned",
+      "passed": true
+    },
+    {
+      "name": "hosts — WinShun: large icon matches DPI",
+      "passed": true,
+      "detail": {
+        "dpi": 96,
+        "size": [
+          32,
+          32
+        ]
+      }
+    },
+    {
+      "name": "hosts — WinShun: large icon pixels match app.ico",
+      "passed": true
+    },
+    {
+      "name": "hosts — WinShun: small window icon is assigned",
+      "passed": true
+    },
+    {
+      "name": "hosts — WinShun: small icon matches DPI",
+      "passed": true,
+      "detail": {
+        "dpi": 96,
+        "size": [
+          16,
+          16
+        ]
+      }
+    },
+    {
+      "name": "hosts — WinShun: small icon pixels match app.ico",
+      "passed": true
+    },
+    {
+      "name": "hosts — WinShun DPI 96: large window icon is assigned",
+      "passed": true
+    },
+    {
+      "name": "hosts — WinShun DPI 96: large icon matches DPI",
+      "passed": true,
+      "detail": {
+        "dpi": 96,
+        "size": [
+          32,
+          32
+        ]
+      }
+    },
+    {
+      "name": "hosts — WinShun DPI 96: large icon pixels match app.ico",
+      "passed": true
+    },
+    {
+      "name": "hosts — WinShun DPI 96: small window icon is assigned",
+      "passed": true
+    },
+    {
+      "name": "hosts — WinShun DPI 96: small icon matches DPI",
+      "passed": true,
+      "detail": {
+        "dpi": 96,
+        "size": [
+          16,
+          16
+        ]
+      }
+    },
+    {
+      "name": "hosts — WinShun DPI 96: small icon pixels match app.ico",
+      "passed": true
+    },
+    {
+      "name": "hosts — WinShun DPI 120: large window icon is assigned",
+      "passed": true
+    },
+    {
+      "name": "hosts — WinShun DPI 120: large icon matches DPI",
+      "passed": true,
+      "detail": {
+        "dpi": 120,
+        "size": [
+          40,
+          40
+        ]
+      }
+    },
+    {
+      "name": "hosts — WinShun DPI 120: large icon pixels match app.ico",
+      "passed": true
+    },
+    {
+      "name": "hosts — WinShun DPI 120: small window icon is assigned",
+      "passed": true
+    },
+    {
+      "name": "hosts — WinShun DPI 120: small icon matches DPI",
+      "passed": true,
+      "detail": {
+        "dpi": 120,
+        "size": [
+          20,
+          20
+        ]
+      }
+    },
+    {
+      "name": "hosts — WinShun DPI 120: small icon pixels match app.ico",
+      "passed": true
+    },
+    {
+      "name": "hosts — WinShun DPI 144: large window icon is assigned",
+      "passed": true
+    },
+    {
+      "name": "hosts — WinShun DPI 144: large icon matches DPI",
+      "passed": true,
+      "detail": {
+        "dpi": 144,
+        "size": [
+          48,
+          48
+        ]
+      }
+    },
+    {
+      "name": "hosts — WinShun DPI 144: large icon pixels match app.ico",
+      "passed": true
+    },
+    {
+      "name": "hosts — WinShun DPI 144: small window icon is assigned",
+      "passed": true
+    },
+    {
+      "name": "hosts — WinShun DPI 144: small icon matches DPI",
+      "passed": true,
+      "detail": {
+        "dpi": 144,
+        "size": [
+          24,
+          24
+        ]
+      }
+    },
+    {
+      "name": "hosts — WinShun DPI 144: small icon pixels match app.ico",
+      "passed": true
+    },
+    {
+      "name": "hosts — WinShun DPI 192: large window icon is assigned",
+      "passed": true
+    },
+    {
+      "name": "hosts — WinShun DPI 192: large icon matches DPI",
+      "passed": true,
+      "detail": {
+        "dpi": 192,
+        "size": [
+          64,
+          64
+        ]
+      }
+    },
+    {
+      "name": "hosts — WinShun DPI 192: large icon pixels match app.ico",
+      "passed": true
+    },
+    {
+      "name": "hosts — WinShun DPI 192: small window icon is assigned",
+      "passed": true
+    },
+    {
+      "name": "hosts — WinShun DPI 192: small icon matches DPI",
+      "passed": true,
+      "detail": {
+        "dpi": 192,
+        "size": [
+          32,
+          32
+        ]
+      }
+    },
+    {
+      "name": "hosts — WinShun DPI 192: small icon pixels match app.ico",
+      "passed": true
+    },
+    {
+      "name": "hosts — WinShun DPI 96: large window icon is assigned",
+      "passed": true
+    },
+    {
+      "name": "hosts — WinShun DPI 96: large icon matches DPI",
+      "passed": true,
+      "detail": {
+        "dpi": 96,
+        "size": [
+          32,
+          32
+        ]
+      }
+    },
+    {
+      "name": "hosts — WinShun DPI 96: large icon pixels match app.ico",
+      "passed": true
+    },
+    {
+      "name": "hosts — WinShun DPI 96: small window icon is assigned",
+      "passed": true
+    },
+    {
+      "name": "hosts — WinShun DPI 96: small icon matches DPI",
+      "passed": true,
+      "detail": {
+        "dpi": 96,
+        "size": [
+          16,
+          16
+        ]
+      }
+    },
+    {
+      "name": "hosts — WinShun DPI 96: small icon pixels match app.ico",
+      "passed": true
+    },
+    {
+      "name": "Repeated DPI changes keep handles bounded",
+      "passed": true,
+      "detail": {
+        "before": [
+          29,
+          66
+        ],
+        "after": [
+          29,
+          66
+        ]
+      }
+    },
+    {
+      "name": "Environment variables — WinShun: large window icon is assigned",
+      "passed": true
+    },
+    {
+      "name": "Environment variables — WinShun: large icon matches DPI",
+      "passed": true,
+      "detail": {
+        "dpi": 96,
+        "size": [
+          32,
+          32
+        ]
+      }
+    },
+    {
+      "name": "Environment variables — WinShun: large icon pixels match app.ico",
+      "passed": true
+    },
+    {
+      "name": "Environment variables — WinShun: small window icon is assigned",
+      "passed": true
+    },
+    {
+      "name": "Environment variables — WinShun: small icon matches DPI",
+      "passed": true,
+      "detail": {
+        "dpi": 96,
+        "size": [
+          16,
+          16
+        ]
+      }
+    },
+    {
+      "name": "Environment variables — WinShun: small icon pixels match app.ico",
+      "passed": true
+    },
+    {
+      "name": "Environment variables — WinShun DPI 96: large window icon is assigned",
+      "passed": true
+    },
+    {
+      "name": "Environment variables — WinShun DPI 96: large icon matches DPI",
+      "passed": true,
+      "detail": {
+        "dpi": 96,
+        "size": [
+          32,
+          32
+        ]
+      }
+    },
+    {
+      "name": "Environment variables — WinShun DPI 96: large icon pixels match app.ico",
+      "passed": true
+    },
+    {
+      "name": "Environment variables — WinShun DPI 96: small window icon is assigned",
+      "passed": true
+    },
+    {
+      "name": "Environment variables — WinShun DPI 96: small icon matches DPI",
+      "passed": true,
+      "detail": {
+        "dpi": 96,
+        "size": [
+          16,
+          16
+        ]
+      }
+    },
+    {
+      "name": "Environment variables — WinShun DPI 96: small icon pixels match app.ico",
+      "passed": true
+    },
+    {
+      "name": "Environment variables — WinShun DPI 120: large window icon is assigned",
+      "passed": true
+    },
+    {
+      "name": "Environment variables — WinShun DPI 120: large icon matches DPI",
+      "passed": true,
+      "detail": {
+        "dpi": 120,
+        "size": [
+          40,
+          40
+        ]
+      }
+    },
+    {
+      "name": "Environment variables — WinShun DPI 120: large icon pixels match app.ico",
+      "passed": true
+    },
+    {
+      "name": "Environment variables — WinShun DPI 120: small window icon is assigned",
+      "passed": true
+    },
+    {
+      "name": "Environment variables — WinShun DPI 120: small icon matches DPI",
+      "passed": true,
+      "detail": {
+        "dpi": 120,
+        "size": [
+          20,
+          20
+        ]
+      }
+    },
+    {
+      "name": "Environment variables — WinShun DPI 120: small icon pixels match app.ico",
+      "passed": true
+    },
+    {
+      "name": "Environment variables — WinShun DPI 144: large window icon is assigned",
+      "passed": true
+    },
+    {
+      "name": "Environment variables — WinShun DPI 144: large icon matches DPI",
+      "passed": true,
+      "detail": {
+        "dpi": 144,
+        "size": [
+          48,
+          48
+        ]
+      }
+    },
+    {
+      "name": "Environment variables — WinShun DPI 144: large icon pixels match app.ico",
+      "passed": true
+    },
+    {
+      "name": "Environment variables — WinShun DPI 144: small window icon is assigned",
+      "passed": true
+    },
+    {
+      "name": "Environment variables — WinShun DPI 144: small icon matches DPI",
+      "passed": true,
+      "detail": {
+        "dpi": 144,
+        "size": [
+          24,
+          24
+        ]
+      }
+    },
+    {
+      "name": "Environment variables — WinShun DPI 144: small icon pixels match app.ico",
+      "passed": true
+    },
+    {
+      "name": "Environment variables — WinShun DPI 192: large window icon is assigned",
+      "passed": true
+    },
+    {
+      "name": "Environment variables — WinShun DPI 192: large icon matches DPI",
+      "passed": true,
+      "detail": {
+        "dpi": 192,
+        "size": [
+          64,
+          64
+        ]
+      }
+    },
+    {
+      "name": "Environment variables — WinShun DPI 192: large icon pixels match app.ico",
+      "passed": true
+    },
+    {
+      "name": "Environment variables — WinShun DPI 192: small window icon is assigned",
+      "passed": true
+    },
+    {
+      "name": "Environment variables — WinShun DPI 192: small icon matches DPI",
+      "passed": true,
+      "detail": {
+        "dpi": 192,
+        "size": [
+          32,
+          32
+        ]
+      }
+    },
+    {
+      "name": "Environment variables — WinShun DPI 192: small icon pixels match app.ico",
+      "passed": true
+    },
+    {
+      "name": "Environment variables — WinShun DPI 96: large window icon is assigned",
+      "passed": true
+    },
+    {
+      "name": "Environment variables — WinShun DPI 96: large icon matches DPI",
+      "passed": true,
+      "detail": {
+        "dpi": 96,
+        "size": [
+          32,
+          32
+        ]
+      }
+    },
+    {
+      "name": "Environment variables — WinShun DPI 96: large icon pixels match app.ico",
+      "passed": true
+    },
+    {
+      "name": "Environment variables — WinShun DPI 96: small window icon is assigned",
+      "passed": true
+    },
+    {
+      "name": "Environment variables — WinShun DPI 96: small icon matches DPI",
+      "passed": true,
+      "detail": {
+        "dpi": 96,
+        "size": [
+          16,
+          16
+        ]
+      }
+    },
+    {
+      "name": "Environment variables — WinShun DPI 96: small icon pixels match app.ico",
+      "passed": true
+    },
+    {
+      "name": "Repeated DPI changes keep handles bounded",
+      "passed": true,
+      "detail": {
+        "before": [
+          29,
+          65
+        ],
+        "after": [
+          29,
+          65
+        ]
+      }
+    },
+    {
+      "name": "shutdown returns a result",
+      "passed": true
+    },
+    {
+      "name": "Plugin shuts down cleanly",
+      "passed": true,
+      "detail": 0
+    }
+  ],
+  "input": "Directed messages to owned plugin processes",
+  "passed": true
+}

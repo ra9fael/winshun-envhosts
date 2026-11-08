@@ -9,6 +9,7 @@
 
 ### Fixed
 
+- Fix a thread-join deadlock when closing the environment and hosts editors, with a two-window shutdown regression.
 - Embed the executable icon and include the ICO and resource script in the package. Assign large and small window icons explicitly, refresh them for DPI changes and release owned handles.
 
 ### Notes
