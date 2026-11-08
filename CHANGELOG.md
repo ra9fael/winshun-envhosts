@@ -7,6 +7,29 @@ single source of truth; release tags are `v<version>`.
 
 ## [Unreleased]
 
+### Fixed / 修复
+
+- 分隔项“上移 / 下移”按钮统一放入底部“分隔项”操作组，显示 Alt+↑/↓，首尾和
+  只读时禁用相应操作；点击保留选中项及列表焦点。底部按钮按实际文字测量、按组
+  换行，移除原有独占按钮行。Group Up/Down actions in the footer with Alt+↑/↓
+  labels, correct boundary/read-only states and preserved list focus. Measure
+  labels, wrap groups and reclaim the old movement toolbar row.
+- 分隔列表和变量表统一 j/Ctrl+J 向下、k/Ctrl+K 向上；分隔列表支持 dd、gg、G，
+  Alt+J/K 按下/上重排。Use consistent Vim directions and support dd/gg/G in the
+  item list; Alt+J/K reorder down/up without interfering with text entry.
+- 分隔项候选按变量保留，切换变量、筛选或标签不再提交；撤销/重做和草稿恢复保留
+  待提交状态。只有提交或明确保存才应用到工作模型。Keep item candidates per
+  variable across navigation, undo/redo and draft recovery; apply them only on
+  Commit or explicit Save, with registry writes still behind confirmation.
+- 上方变量行显示“待提交”“未保存”及组合状态，包含新增、编辑、删除、重排；
+  状态按变量和范围隔离，随撤销/重做、提交、保存及草稿恢复同步。状态列按中英
+  文案测宽。Show Pending, Unsaved and combined status on the variable row;
+  track candidate operations independently by variable/scope across undo/redo,
+  Commit, Save and draft recovery. Measure the status column for both locales.
+- 备份标签显示独立总数，在打开编辑器和保存/删除备份后刷新；修正用户/系统范围
+  筛选。Initialize and refresh the total backup count independently of scope
+  filtering, and correct the user/system backup predicates.
+
 ## [0.7.3] - 2026-11-08
 
 ### Fixed / 修复

@@ -176,6 +176,13 @@ _, init = call("initialize", {"settings": {}, "locale": "zh", "theme": "light",
                               "pluginDir": PLUGIN_DIR, "dataDir": DATA})
 log("INIT", (init or "").strip()[:300])
 
+if "--interaction-check" in sys.argv:
+    backup_dir = os.path.join(DATA, "backups", "env")
+    os.makedirs(backup_dir, exist_ok=True)
+    for index, scope in enumerate(("user", "user", "system")):
+        with open(os.path.join(backup_dir, "20261108-12000%d.json" % index), "w", encoding="utf-8") as backup:
+            json.dump({"vars": [{"scope": scope, "name": "SAMPLE", "type": "REG_SZ", "value": "fixture"}]}, backup)
+
 if "--dialog-check" in sys.argv:
     # Offer the actual restore-draft dialog without touching a user draft.
     rows = []
@@ -491,56 +498,12 @@ def list_scroll_pos(hwnd):
     return si.nPos, si.nMax, si.nPage
 
 
-def mirror_layout(cw, ch):
-    """Recompute the editor's rects from the same formulas as computeLayout().
-
-    Only the self-drawn bands (mode segment, apply, splitter, status chips) need
-    this; the real child controls are measured from their own windows and the
-    result is cross-checked against the delimiter combo.
-    """
-    work_top, status_h, splitter_h = 34, 48, 7
-    min_list_h, min_detail_h = 112, 200
-    work_bottom = ch - status_h
-    splitter_y = max(work_top + min_list_h, work_bottom - min_detail_h - splitter_h)
-    detail = (8, splitter_y + splitter_h, cw - 8, work_bottom)
-    lx, mode_h = detail[0] + 4, 22
-    mode_top = detail[1] + 48
-    # v0.7.2: the counter strip has a guaranteed minimum; the delimiter box
-    # (the only elastic element) gives up the difference.
-    commit_w, hint_min_w, gaps = 108, 230, 6 + 6 + 8
-    commit_right = detail[2] - 4
-    commit_left = commit_right - commit_w
-    strip = max(160, commit_left - 8 - lx)
-    mode_w = max(132, min(180, strip * 30 // 100))
-    apply_w = max(54, min(72, strip * 14 // 100))
-    rest = max(0, strip - mode_w - apply_w - gaps)
-    combo_w = max(92, min(300, rest - hint_min_w))
-    hint_w = max(0, rest - combo_w)
-    cell_w = mode_w // 2
-    hint_x = lx + mode_w + 6 + combo_w + 6 + apply_w + 8
-    rects = {
-        "modeRaw": (lx, mode_top, lx + cell_w, mode_top + mode_h),
-        "modeList": (lx + cell_w, mode_top, lx + mode_w, mode_top + mode_h),
-        "delimiter": (lx + mode_w + 6, mode_top, lx + mode_w + 6 + combo_w, mode_top + mode_h),
-        "apply": (lx + mode_w + 6 + combo_w + 6, mode_top,
-                  lx + mode_w + 6 + combo_w + 6 + apply_w, mode_top + mode_h),
-        # v0.7.2: the item counter strip, right of the "+ 新增项" button.
-        "hint": (hint_x, mode_top, hint_x + hint_w, mode_top + mode_h),
-        # v0.7.0 two-stage delete: green 提交修改 button at the right end of
-        # the item toolbar (detail.right - 112 .. -4).
-        "commit": (commit_left, mode_top, commit_right, mode_top + mode_h),
-        "splitter": (8, splitter_y, cw - 8, splitter_y + splitter_h),
-        "detail": detail,
-    }
-    widths = [72, 72, 82, 68, 68, 108, 72]  # add, del, edit, undo, redo, save, close
-    x, y = 8, work_bottom + 24 + 4
-    chips = []
-    for w in widths:
-        if x + w > cw - 8:
-            break
-        chips.append((x, y, x + w, y + max(14, ch - (work_bottom + 24) - 8 - 4)))
-        x += w + 4
-    rects["chips"] = chips
+def editor_layout(hwnd):
+    """Read the painter's geometry; avoid a second copy of layout formulas."""
+    fields = {"modeRaw": 7, "modeList": 8, "delimiter": 6, "apply": 5,
+              "hint": 3, "commit": 4, "detail": 23, "splitter": 24}
+    rects = {key: layout_rect(hwnd, which) for key, which in fields.items()}
+    rects["chips"] = [layout_rect(hwnd, 15, i) for i in range(7)]
     return rects
 
 
@@ -787,17 +750,24 @@ if "--split-state-check" in sys.argv:
         ",".join(FAILURES) if FAILURES else "all passed")
     sys.exit(1 if FAILURES else 0)
 
+if "--interaction-check" in sys.argv:
+    from interaction_checks import run
+    run(globals())
+    log("CHECKS", "failures=%d" % len(FAILURES),
+        ",".join(FAILURES) if FAILURES else "all passed")
+    sys.exit(1 if FAILURES else 0)
+
 check(env_hwnd is not None and hosts_hwnd is not None, "both editor windows opened")
 
 if hosts_hwnd:
     cw, ch = client_size(hosts_hwnd)
-    detail_top = ch - 48 - 146
+    detail_top = layout_rect(hosts_hwnd, 14)[1] - 146
     rects = {}
     for ctrl_id, label in ((5, "enabled"), (6, "IP"), (7, "hostnames"), (8, "comment")):
         hwnd, rect = child_client_rect(hosts_hwnd, ctrl_id)
         rects[label] = rect
         check(hwnd and user32.IsWindowVisible(hwnd), "hosts %s field is visible" % label)
-        check(rect and rect[1] >= detail_top and rect[3] <= ch - 48,
+        check(rect and rect[1] >= detail_top and rect[3] <= layout_rect(hosts_hwnd, 14)[1],
               "hosts %s field stays inside detail panel" % label, str(rect))
     check(rects["enabled"][2] <= rects["IP"][0]
           and rects["IP"][2] <= rects["hostnames"][0]
@@ -826,7 +796,7 @@ if hosts_hwnd:
           "raw tab hides the window's own scrollbar (only the text box scrolls)")
     _, rrc = child_client_rect(hosts_hwnd, 9)
     hcw, hch = client_size(hosts_hwnd)
-    status_top = hch - 48
+    status_top = layout_rect(hosts_hwnd, 14)[1]
     check(rrc and 0 <= status_top - rrc[3] <= 8, "raw box reaches the status bar",
           "%s status_top=%d" % (rrc, status_top))
     check(not (user32.GetWindowLongW(raw_h, GWL_STYLE) & ES_READONLY_BIT),
@@ -860,7 +830,7 @@ if hosts_hwnd:
           "raw edit shows up as the entry on that line", get_text(child_by_id(hosts_hwnd, 7)))
     shot(hosts_hwnd, "hosts_after_raw_edit")
     # Save through the Ctrl+S chip and read the temp file back.
-    hlayout = mirror_layout(hcw, hch)
+    hlayout = editor_layout(hosts_hwnd)
     click_at(hosts_hwnd, *center(hlayout["chips"][5]))
     dlg = find_dialog(2.5)
     check(dlg is not None, "hosts save asks for confirmation")
@@ -882,7 +852,7 @@ if hosts_hwnd:
 
 if env_hwnd:
     cw, ch = client_size(env_hwnd)
-    layout = mirror_layout(cw, ch)
+    layout = editor_layout(env_hwnd)
     combo_h, combo_rc = child_client_rect(env_hwnd, 12)
     check(combo_h and not user32.IsWindowVisible(combo_h),
           "custom delimiter box stays hidden until 自定义… is chosen")
@@ -1502,18 +1472,7 @@ if env_hwnd:
           "overlong value still splits into every item without truncation",
           "%d != %d" % (count_before, len(long_segs)))
     def commit_button_rect(hwnd):
-        """Locate the 提交修改 button from the REAL parts-list position.
-
-        The splitter is user-draggable earlier in this suite, so the mirrored
-        detail.top can be stale. The parts list is a real child and always
-        tracks the layout: list top = detail.top + 90 (valTop) + 20 (header).
-        """
-        _h, prc = child_client_rect(hwnd, 10)
-        cw, _ch = client_size(hwnd)
-        detail_top = prc[1] - 110
-        detail_right = cw - 8
-        mode_top = detail_top + 48
-        return (detail_right - 112, mode_top, detail_right - 4, mode_top + 22)
+        return layout_rect(hwnd, 4)
 
     _px, _py = part_action_center(env_hwnd, "del")
     click_at(child_by_id(env_hwnd, 10), _px, _py)
@@ -1598,25 +1557,25 @@ if env_hwnd:
     caret_n = item_caret()
     check(caret_n == 1, "Ctrl+N puts the caret on the new item (after the old)",
           str(caret_n))
-    post_key(env_hwnd, ord("K"), ctrl=True)  # caret down (no reorder)
-    post_key(env_hwnd, ord("K"), ctrl=True)
+    post_key(env_hwnd, ord("J"), ctrl=True)  # caret down (no reorder)
+    post_key(env_hwnd, ord("J"), ctrl=True)
     time.sleep(0.3)
-    check(item_caret() == caret_n + 2, "Ctrl+K moves the caret down", str(item_caret()))
+    check(item_caret() == caret_n + 2, "Ctrl+J moves the caret down", str(item_caret()))
     order_before = [lb_text(parts, i) for i in range(4)]
     caret_j = item_caret()
-    post_key(env_hwnd, ord("J"), alt=True)  # move the caret item up one slot
+    post_key(env_hwnd, ord("K"), alt=True)  # move the caret item up one slot
     time.sleep(0.4)
     order_after = [lb_text(parts, i) for i in range(4)]
     check(order_after[caret_j - 1] == order_before[caret_j]
           and order_after[caret_j] == order_before[caret_j - 1],
-          "Alt+J moves the item up (swap with the previous slot)",
+          "Alt+K moves the item up (swap with the previous slot)",
           "%s -> %s" % (order_before, order_after))
     check(item_caret() == caret_j - 1, "the caret follows the moved item",
           str(item_caret()))
-    post_key(env_hwnd, ord("K"), alt=True)  # move it back down
+    post_key(env_hwnd, ord("J"), alt=True)  # move it back down
     time.sleep(0.4)
     check([lb_text(parts, i) for i in range(4)] == order_before,
-          "Alt+K moves the item back down", str([lb_text(parts, i) for i in range(4)]))
+          "Alt+J moves the item back down", str([lb_text(parts, i) for i in range(4)]))
     post_key(env_hwnd, VK_BACK)  # stage-delete the caret row
     time.sleep(0.4)
     check(send(parts, LB_GETCOUNT) == 4 and partStagedCount(env_hwnd) == 1,
@@ -1629,11 +1588,11 @@ if env_hwnd:
     # Remove the Ctrl+N empty item: walk the caret back to it, then Backspace.
     # An ADDED item never existed in the value, so it is erased at once - no
     # commit needed.
-    post_key(env_hwnd, ord("J"), ctrl=True)
-    post_key(env_hwnd, ord("J"), ctrl=True)
+    post_key(env_hwnd, ord("K"), ctrl=True)
+    post_key(env_hwnd, ord("K"), ctrl=True)
     time.sleep(0.3)
     check(item_caret() == 1 and lb_text(parts, 1) == "",
-          "Ctrl+J walks the caret back to the added empty item",
+          "Ctrl+K walks the caret back to the added empty item",
           "caret=%d item=%r" % (item_caret(), lb_text(parts, 1)))
     post_key(env_hwnd, VK_BACK)
     time.sleep(0.3)
@@ -1643,13 +1602,13 @@ if env_hwnd:
     # Bare j/k on the item list mirror the table vim keys: they move the caret
     # without Ctrl, without reordering (Alt stays the reorder modifier).
     c0 = item_caret()
-    post_key(env_hwnd, ord("K"))
-    check(item_caret() == min(2, c0 + 1), "bare k moves the item caret down",
-          "%d -> %d" % (c0, item_caret()))
-    check(send(parts, LB_GETCOUNT) == 3, "bare k does not reorder the items",
-          [lb_text(parts, i) for i in range(3)])
     post_key(env_hwnd, ord("J"))
-    check(item_caret() == c0, "bare j moves the item caret back up",
+    check(item_caret() == min(2, c0 + 1), "bare j moves the item caret down",
+          "%d -> %d" % (c0, item_caret()))
+    check(send(parts, LB_GETCOUNT) == 3, "bare j does not reorder the items",
+          [lb_text(parts, i) for i in range(3)])
+    post_key(env_hwnd, ord("K"))
+    check(item_caret() == c0, "bare k moves the item caret back up",
           str(item_caret()))
 
     # A whole-row delete must not leave ghost split items behind.

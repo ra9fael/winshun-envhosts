@@ -221,10 +221,10 @@ All data stays local under `WS_DATA_DIR`:
   lists every variable that will be removed. A row marked for deletion
   immediately shows an empty, disabled item list, so a deleted item can no
   longer appear to still be there.
-- **Unsaved-change marking (0.6.0)**: every row is compared against the opened
-  snapshot — new rows get a green bar `+`, value edits an amber bar `●`, deleted
-  rows keep the red bar `−`. The item list marks edited items with an amber dot,
-  so changes made through either editing path are visible at a glance.
+- **Variable status**: each row combines its opened snapshot with its own item
+  candidates. Candidates show amber Pending; model changes show Unsaved, retaining
+  New/Deleted labels where appropriate. Combined states remain visible together,
+  including on selected rows. Items retain their added/edited/staged markers.
 - **Live external-change watcher (0.6.0)**: a 2 s poll (10 s when unfocused,
   paused while a modal, an edit session or the diff panel is active)
   fingerprints the registry / hosts file with the same logic as the save-time
@@ -245,21 +245,29 @@ All data stays local under `WS_DATA_DIR`:
   between the table and the detail editor; each pane keeps its minimum height
   (list 112px, detail 200px) and `WM_GETMINMAXINFO` refuses a window too small
   to hold both. The hosts window and the backup view keep the fixed detail strip.
-- **Delimited-item editing (0.6.0 full-width layout)**: the `Edit items` mode
-  (or `Ctrl+R`) splits a long value on a delimiter into a list that **spans the
-  whole detail pane** — double-click (or Enter) floats an in-place edit box over
-  the row, `Esc` restores the captured text, and the selected row shows trailing
-  `↑ ↓ ×` buttons (`Alt+Up`/`Alt+Down` still work). The toolbar keeps only the
-  `Raw | Items` toggle, the delimiter and `+ Add item`; a permanent counter
-  shows `N items · X / 32,767 chars`. Every change is rejoined into the
-  variable's value immediately and stays a single undo step. `Path` defaults to
-  `;`. The old four-button action pane and the vertical splitter are gone.
+- **Delimited-item editing**: `Ctrl+R` switches between Raw and Items.
+  Double-click or Enter edits inline; Esc restores that edit. Del, dd or the
+  trailing × stages deletion; deleting again restores the item. Visible
+  **Up Alt+↑ / Down Alt+↓** buttons in the footer's **Items** group reorder items,
+  as do Alt+K / Alt+J. Boundary and read-only actions are disabled.
+  j / Ctrl+J moves the caret down, k / Ctrl+K up, gg to the first item, G to the last.
+  Adds, edits, reorders and deletions remain candidates for that variable.
+  Switching variables, filters or tabs preserves them **without committing**.
+  Ctrl+Z / Ctrl+Y undo and redo candidate operations. **Commit** applies this
+  variable's candidates to the working model as one undo step; Ctrl+S collects
+  all variables' candidates and asks for confirmation before writing to the
+  registry. Closing the editor preserves candidates in its recovery draft.
+  The variable row shows **Pending**, then **Unsaved** after Commit, or
+  **Pending · Unsaved** when both apply. Undoing to the original value or saving
+  successfully clears the corresponding indicator.
+  Path defaults to semicolons; the toolbar shows item and character counts.
 - **Delimiter**: a self-drawn dropdown button next to the mode button (e.g.
   `Semicolon (;) ▾`). Its menu offers `semicolon / comma / colon / Tab / pipe /
   space`, applied as soon as you pick one. `Custom…` swaps the button for a text
   box that takes any character or string (`=>`), applied with Enter and dropped
   with `Esc`. Re-splitting first rejoins the items with the old delimiter, so no
-  value is lost. Separators inside `"quoted"` runs are not split points. The
+  value is lost. Separators inside `"quoted"` runs are not split points. Commit
+  or undo pending deletions before changing delimiters. The
   **space** preset always asks first: on a PATH-like variable it warns that
   `C:\Program Files\...` would be cut in half (default No); elsewhere it
   explains that whitespace runs get normalised, and items containing spaces get
@@ -304,7 +312,15 @@ All data stays local under `WS_DATA_DIR`:
 | `showSystemVars` | bool | true | include read-only system vars in `env` |
 | `uiLanguage` | choice | `auto` | UI language: follow WinShun / pin Chinese / pin English; open windows switch at once |
 
+Footer shortcut buttons use measured label widths and wrap in narrow windows.
+The Backup tab displays the total count independently of the page's scope filter;
+it loads on editor startup and refreshes after saving or deleting a backup.
+
 ## Tests
+
+- `tests/gui_preview.py --interaction-check --no-hold`: visible reorder buttons,
+  Vim bindings, Chinese/English narrow-window footer layout, backup totals/scopes,
+  candidate navigation, explicit commit/save, and draft recovery.
 
 - `tests/gui_preview.py --split-state-check --no-hold`: pending-delete
   undo/redo, row/filter/delimiter changes, adding items and mixed deletion;

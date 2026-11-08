@@ -235,7 +235,7 @@ public:
         if (m_kind == "hosts" && m_tab == 1)
             commitRaw(); // a pending raw edit belongs in the draft too
         if (m_kind == "env" && m_envDirty())
-            writeDraft(m_env.toDraft());
+            writeDraft(envDraft());
         else if (m_kind == "hosts" && m_hostsDirty())
             writeDraft(m_hosts.toDraft());
     }
@@ -262,6 +262,7 @@ private:
     int m_rangeAnchor = 0; // visible index where Shift+range started
     int m_skippedSelected = 0; // read-only rows skipped by the last batch op
     std::vector<std::string> m_backupIds; // for the backup tab
+    std::size_t m_backupTotal = 0; // independent of the page's scope filter
     std::string m_filterText;
     bool m_listMode = false;
     std::string m_listDelimiter = ";";
@@ -294,10 +295,23 @@ private:
     int m_partInline = -1; // index being edited in place, -1 = none
     std::string m_partInlineOriginal; // rollback text for an in-place edit
     std::vector<char> m_partNew;      // per-item "added in this session" flags
-    // v0.7.0 two-stage delete: x on an item only STAGES it (red strikethrough,
-    // "− 待删除"); the joined value excludes staged items from the next
-    // commitDetail, and 提交修改 / Ctrl+S apply them for real.
+    // Item candidates live outside the working model until Commit / Save.
+    // Navigation retains the values and markers in m_partSessions.
     std::vector<char> m_partDeleted;  // per-item "staged for deletion" flags
+    struct PartState {
+        std::vector<std::string> values, base;
+        std::vector<char> added, deleted, selected;
+        std::string delimiter;
+        int caret = 0, anchor = 0;
+    };
+    struct PartSession {
+        std::string sourceValue;
+        PartState current;
+        std::vector<PartState> undo, redo;
+    };
+    std::map<std::string, PartSession> m_partSessions;
+    std::string m_partRef, m_partSourceValue;
+    PartState m_partInitial;
     RECT m_rcCommitBtn = {};          // green 提交修改 button in the detail pane
     RECT m_rcDiffPanel = {}, m_rcDiffReload = {}, m_rcDiffForce = {}, m_rcDiffDefer = {};
     // v0.7.2: the read-only footer hint of the diff panel. It used to be
@@ -375,7 +389,10 @@ private:
     int m_statusFlashKind = 0; // 0 info, 1 warn, 2 error, 3 success
     ULONGLONG m_statusFlashUntil = 0;
 
-    enum ChipId { kChipAdd = 1, kChipDel, kChipEdit, kChipUndo, kChipRedo, kChipSave, kChipClose };
+    enum ChipId { kChipAdd = 1, kChipDel, kChipEdit, kChipUndo, kChipRedo, kChipSave, kChipClose,
+                  kChipPartUp, kChipPartDown };
+    RECT m_rcPartGroup = {};
+    int m_envStateWidth = 80;
     static constexpr UINT kTimerDraft = 1;
     static constexpr UINT kTimerCommit = 2;
     static constexpr UINT kTimerStatus = 3;
@@ -481,6 +498,8 @@ private:
         // fall back to its normal (now translated) text.
         m_statusFlash.clear();
         m_statusFlashUntil = 0;
+        computeLayout();
+        applyLayout();
         InvalidateRect(m_hwnd, nullptr, TRUE);
     }
     void applyAppearance(const AppearanceArgs& a)
@@ -520,13 +539,65 @@ private:
         // The model holds rows, but the view indexes them through m_visible.
         // Without this the table is permanently empty.
         rebuildVisible();
+        refreshBackups();
+    }
+
+    static std::map<std::string, PartSession> draftPartSessions(
+        const winshun::Json& d, const envh::edit::EnvModel& model)
+    {
+        std::map<std::string, PartSession> sessions;
+        for (const auto& entry : d["itemCandidates"].toArray()) {
+            const std::string ref = entry["ref"].toString();
+            const auto row = std::find_if(model.rows.begin(), model.rows.end(), [&](const auto& r) {
+                return !r.deleted && r.scope + "/" + r.name == ref;
+            });
+            if (row == model.rows.end() || !entry["source"].isString()
+                || entry["source"].toString() != row->value || !entry["values"].isArray())
+                continue;
+            PartSession s;
+            s.sourceValue = row->value;
+            s.current.delimiter = entry["delimiter"].toString();
+            if (s.current.delimiter.empty())
+                continue;
+            bool valid = true;
+            for (const auto& v : entry["values"].toArray()) {
+                valid = valid && v.isString();
+                s.current.values.push_back(v.toString());
+            }
+            if (!valid)
+                continue;
+            for (const auto& v : entry["base"].toArray())
+                s.current.base.push_back(v.toString());
+            for (const auto& v : entry["added"].toArray())
+                s.current.added.push_back(v.toBool() ? 1 : 0);
+            for (const auto& v : entry["deleted"].toArray())
+                s.current.deleted.push_back(v.toBool() ? 1 : 0);
+            s.current.added.resize(s.current.values.size());
+            s.current.deleted.resize(s.current.values.size());
+            s.current.selected.resize(s.current.values.size());
+            if (!partPending(s))
+                continue;
+            // Restored candidates can be undone together back to their source.
+            PartState initial;
+            initial.delimiter = s.current.delimiter;
+            initial.values = envh::edit::splitDelimited(s.sourceValue, initial.delimiter, true);
+            initial.base = initial.values;
+            initial.added.resize(initial.values.size());
+            initial.deleted.resize(initial.values.size());
+            initial.selected.resize(initial.values.size());
+            s.undo.push_back(std::move(initial));
+            sessions.emplace(ref, std::move(s));
+        }
+        return sessions;
     }
 
     void loadDraft(const winshun::Json& d, bool markDirty)
     {
-        if (m_kind == "env")
+        if (m_kind == "env") {
+            clearPartSessions();
             m_env.fromDraft(d);
-        else
+            m_partSessions = draftPartSessions(d, m_env);
+        } else
             m_hosts.fromDraft(d);
         (void)markDirty; // fromDraft makes work differ from base => dirty
         clearSelection();
@@ -545,7 +616,7 @@ private:
         if (m_kind == "env") {
             envh::edit::EnvModel probe = m_env;
             probe.fromDraft(d);
-            n = probe.changeList().size();
+            n = probe.changeList().size() + draftPartSessions(d, probe).size();
         } else {
             envh::edit::HostsModel probe = m_hosts;
             probe.fromDraft(d);
@@ -602,7 +673,7 @@ private:
         std::filesystem::remove(std::filesystem::u8path(m_args.dataDir + "/drafts/" + m_kind + ".json"), ec);
     }
 
-    bool m_envDirty() const { return m_hasEnv && m_env.isDirty(); }
+    bool m_envDirty() const { return m_hasEnv && (m_env.isDirty() || pendingPartChanges()); }
     bool m_hostsDirty() const { return m_hasHosts && m_hosts.isDirty(); }
 
     // Identity of the selected row, used to put the selection back after the
@@ -624,6 +695,7 @@ private:
     void reloadFromDisk()
     {
         const std::string ref = currentRowRef();
+        clearPartSessions();
         clearDraft();
         clearSelection();
         m_skippedSelected = 0;
@@ -732,10 +804,12 @@ private:
 
     void selectRow(int idx)
     {
+        stashPartView();
+        m_lastG = m_lastD = 0;
+        m_vimCount = -1;
         endEdit(); // changing rows ends the current edit session
-        // Detail changes, including staged item deletes, already live in the
-        // model. Callers may have replaced it (undo/reload) or rebuilt visible
-        // indices (filter/tab); stale controls must never write into that row.
+        // Preserve candidates by their bound variable identity. Rebuilding a
+        // view never applies candidate values to this or another model row.
         if (m_tab == 2) {
             const int n = static_cast<int>(m_backupIds.size());
             m_sel = n == 0 ? 0 : std::max(0, std::min(idx, n - 1));
@@ -1047,12 +1121,17 @@ private:
                 if (ctrl && (wp == 'N' || wp == 'n' || wp == 'J' || wp == 'j'
                              || wp == 'K' || wp == 'k'))
                     return self->onKey(wp);
-                // Bare j/k: vim caret move on the item list (no modifier).
+                // List commands stay out of text fields and native type-to-select.
                 if (!alt && !ctrl
-                    && (wp == 'J' || wp == 'j' || wp == 'K' || wp == 'k'))
+                    && (wp == 'J' || wp == 'K' || wp == 'G' || wp == 'D'
+                        || wp == 'X' || wp == 'U' || (wp >= '0' && wp <= '9')))
                     return self->onKey(wp);
             }
         }
+        if (self && h == self->m_partsList && msg == WM_CHAR
+            && (wp == 'j' || wp == 'k' || wp == 'g' || wp == 'G' || wp == 'd'
+                || wp == 'x' || wp == 'u' || (wp >= '0' && wp <= '9')))
+            return 0;
         return CallWindowProcW(old, h, msg, wp, lp);
     }
 
@@ -1158,7 +1237,8 @@ private:
         // child window paints over it.
         m_rcFilterLabel = {x, 4, x + 82, 28};
         m_rcFilter = {x + 82, 5, m_clientW - 12, 27};
-        const int statusH = 48;
+        buildChips(); // measure and reserve all footer rows before laying out panes
+        const int statusH = m_clientH - m_rcStatus.top;
         const int workTop = 34;
         const int workBottom = m_clientH - statusH;
         const int minListH = 112, minDetailH = 200, splitterH = 7;
@@ -1224,9 +1304,6 @@ private:
         // The counter sits directly after the "+ 新增项" button, as in the
         // design draft, and is left-aligned so nothing is clipped away.
         m_rcItemHint = {cx, modeTop, cx + hintW, modeTop + modeH};
-        m_rcStatus = {0, workBottom, m_clientW, m_clientH};
-        m_rcStatusRow1 = {0, workBottom, m_clientW, workBottom + 24};
-        m_rcStatusRow2 = {0, workBottom + 24, m_clientW, m_clientH};
 
         if (m_kind == "hosts" && m_tab == 0) {
             const int innerLeft = m_rcDetail.left + 12;
@@ -1268,7 +1345,6 @@ private:
             m_rcUndoBtn = {bx, by, bx + bw, by + 22}; bx += bw + gap;
             m_rcRedoBtn = {bx, by, bx + bw, by + 22};
         }
-        buildChips();
         // v0.7.1: the "备份 (N)" pill is gone - the backup count lives in the
         // top tab strip now ("备份 (N)"), so no detail-header control here.
 
@@ -1282,7 +1358,7 @@ private:
             m_colX[0] = L;
             m_colX[1] = L + W * 28 / 100;
             m_colX[2] = L + W * 43 / 100;
-            m_colX[3] = m_rcTable.right - std::max(80, W * 11 / 100);
+            m_colX[3] = m_rcTable.right - m_envStateWidth;
             m_colX[4] = m_rcTable.right;
         } else {
             m_colCount = 5;
@@ -1342,17 +1418,75 @@ private:
     void buildChips()
     {
         m_chips.clear();
-        const int ids[7] = {kChipAdd, kChipDel, kChipEdit, kChipUndo, kChipRedo, kChipSave, kChipClose};
-        const int widths[7] = {72, 72, 82, 68, 68, 108, 72};
-        const int y = m_rcStatusRow2.top + 4;
-        const int h = std::max<int>(14, m_rcStatusRow2.bottom - m_rcStatusRow2.top - 8);
-        int x = 8;
-        for (int i = 0; i < 7; ++i) {
-            if (x + widths[i] > m_clientW - 8)
-                break;
-            m_chips.push_back({ids[i], {x, y, x + widths[i], y + h}});
-            x += widths[i] + 4;
+        SetRectEmpty(&m_rcPartUp);
+        SetRectEmpty(&m_rcPartDown);
+        SetRectEmpty(&m_rcPartGroup);
+        HDC dc = GetDC(m_hwnd);
+        HFONT font = makeFont(11, false, L"Microsoft YaHei UI", DEFAULT_PITCH | FF_DONTCARE);
+        HGDIOBJ old = SelectObject(dc, font);
+        TEXTMETRICW tm {};
+        GetTextMetricsW(dc, &tm);
+        const int h = std::max(24, static_cast<int>(tm.tmHeight) + 8);
+        const auto textWidth = [&](const wchar_t* label) {
+            SIZE size {};
+            GetTextExtentPoint32W(dc, label, lstrlenW(label), &size);
+            return static_cast<int>(size.cx);
+        };
+        m_envStateWidth = 80;
+        for (auto state : {envh::edit::RowState::Unchanged, envh::edit::RowState::Added,
+                           envh::edit::RowState::Modified, envh::edit::RowState::Deleted})
+            for (bool pending : {false, true})
+                m_envStateWidth = std::max(m_envStateWidth, textWidth(envStateLabel(state, pending)) + 20);
+        const auto chipWidth = [&](int id) {
+            int w = textWidth(chipLabel(id));
+            if (id == kChipDel) {
+                for (const wchar_t* variant : {m_args.zh ? L"Ctrl+U 删除整行" : L"Ctrl+U del row",
+                                              m_args.zh ? L"Del 恢复" : L"Del restore"})
+                    w = std::max(w, textWidth(variant));
+            }
+            return w + 20;
+        };
+        int x = 8, y = 4;
+        const auto group = [&](std::initializer_list<int> ids, const wchar_t* label) {
+            const int labelW = *label ? textWidth(label) + 8 : 0;
+            int width = labelW - 6;
+            for (int id : ids) width += chipWidth(id) + 6;
+            if (x + width > m_clientW - 8 && x > 8) {
+                x = 8;
+                y += h + 4;
+            }
+            if (labelW) {
+                m_rcPartGroup = {x, y, x + labelW - 8, y + h};
+                x += labelW;
+            }
+            for (int id : ids) {
+                const int w = chipWidth(id);
+                m_chips.push_back({id, {x, y, x + w, y + h}});
+                x += w + 6;
+            }
+            x += 10;
+        };
+        group({kChipAdd, kChipDel, kChipEdit, kChipUndo, kChipRedo}, L"");
+        if (m_kind == "env" && m_tab != 2 && m_listMode)
+            group({kChipPartUp, kChipPartDown}, m_args.zh ? L"分隔项：" : L"Items:");
+        group({kChipSave, kChipClose}, L"");
+        // Stable action indices for read-only geometry probes and callers.
+        std::sort(m_chips.begin(), m_chips.end(), [](const Chip& a, const Chip& b) { return a.id < b.id; });
+        SelectObject(dc, old);
+        DeleteObject(font);
+        ReleaseDC(m_hwnd, dc);
+        const int top = m_clientH - (y + h + 4);
+        for (auto& chip : m_chips)
+            OffsetRect(&chip.rc, 0, top);
+        if (m_rcPartGroup.right > m_rcPartGroup.left)
+            OffsetRect(&m_rcPartGroup, 0, top);
+        for (const auto& chip : m_chips) {
+            if (chip.id == kChipPartUp) m_rcPartUp = chip.rc;
+            if (chip.id == kChipPartDown) m_rcPartDown = chip.rc;
         }
+        m_rcStatusRow2 = {0, top, m_clientW, m_clientH};
+        m_rcStatusRow1 = {0, top - 24, m_clientW, top};
+        m_rcStatus = {0, top - 24, m_clientW, m_clientH};
     }
 
     // ---- virtual list --------------------------------------------------------
@@ -1483,11 +1617,11 @@ private:
             return;
         }
         // Label row 1 is painted at top+2; editable controls live at top+20..42.
-        // The mode/delimiter toolbar is at top+48, labels at top+74 and the
-        // value/item area starts at top+90.
+        // The mode/delimiter toolbar is at top+48. Items start at top+76;
+        // raw values retain their label at top+74 and begin at top+90.
         const int lx = m_rcDetail.left + 4;
         const int top = m_rcDetail.top + 20;
-        const int valTop = m_rcDetail.top + 90;
+        const int valTop = m_rcDetail.top + (m_kind == "env" && m_listMode ? 76 : 90);
         const int rowW = m_rcDetail.right - lx - 4 - 200; // reserve the action buttons
         const int valueW = m_rcDetail.right - lx - 4;
         const int valueH = std::max(60, static_cast<int>(m_rcDetail.bottom - valTop - 6));
@@ -1511,7 +1645,7 @@ private:
                 // v0.6.0 item table: the list is a full-width owner-drawn table
                 // with its own column header (# / item / chars / action), as in
                 // the design. There is no side strip any more: the per-row ×
-                // lives in the last column and Up/Down stay on Alt+Up/Down.
+                // lives in the last column; Up/Down buttons live in the footer.
                 constexpr int kPartHeadH = 20;
                 m_rcPartHeader = {lx, valTop, lx + valueW, valTop + kPartHeadH};
                 const int listTop = valTop + kPartHeadH;
@@ -1519,8 +1653,6 @@ private:
                 show(m_partsList, lx, listTop, valueW, listH);
                 EnableWindow(m_partsList, rowEditable(m_sel) ? TRUE : FALSE);
                 SetRectEmpty(&m_rcPartActions);
-                SetRectEmpty(&m_rcPartUp);
-                SetRectEmpty(&m_rcPartDown);
                 SetRectEmpty(&m_rcPartInsert);
                 SetRectEmpty(&m_rcPartDelete);
                 if (m_partInline >= 0 && m_partInline < static_cast<int>(m_valueParts.size())) {
@@ -1884,8 +2016,182 @@ private:
         InvalidateRect(m_partsList, nullptr, FALSE);
         return true;
     }
-    // Staged deletes are already reflected in the working model, but remain
-    // visible/restorable in this view. Only Save writes to the registry.
+    PartState partState() const
+    {
+        return {m_valueParts, m_partBase, m_partNew, m_partDeleted, m_partMulti,
+                m_listDelimiter, m_partSel, m_partAnchor};
+    }
+    void restorePartState(const PartState& s)
+    {
+        m_valueParts = s.values;
+        m_partBase = s.base;
+        m_partNew = s.added;
+        m_partDeleted = s.deleted;
+        m_partMulti = s.selected;
+        m_listDelimiter = s.delimiter;
+        m_partSel = s.caret;
+        m_partAnchor = s.anchor;
+        m_partInline = -1;
+        m_partInlineOriginal.clear();
+    }
+    static std::string partValue(const PartState& s)
+    {
+        std::vector<std::string> live;
+        for (std::size_t i = 0; i < s.values.size(); ++i)
+            if (i >= s.deleted.size() || !s.deleted[i])
+                live.push_back(s.values[i]);
+        return envh::edit::joinDelimited(live, s.delimiter);
+    }
+    static bool samePartContent(const PartState& a, const PartState& b)
+    {
+        return a.values == b.values && a.added == b.added && a.deleted == b.deleted
+            && a.delimiter == b.delimiter;
+    }
+    static bool partPending(const PartSession& s)
+    {
+        return partValue(s.current) != s.sourceValue
+            || std::any_of(s.current.deleted.begin(), s.current.deleted.end(), [](char c) { return c != 0; });
+    }
+    bool envRowPending(std::size_t i) const
+    {
+        if (i >= m_env.rows.size() || m_env.rows[i].deleted)
+            return false;
+        const auto& row = m_env.rows[i];
+        const auto it = m_partSessions.find(row.scope + "/" + row.name);
+        return it != m_partSessions.end() && it->second.sourceValue == row.value && partPending(it->second);
+    }
+    const wchar_t* envStateLabel(envh::edit::RowState state, bool pending) const
+    {
+        const bool zh = m_args.zh;
+        switch (state) {
+        case envh::edit::RowState::Added:
+            return pending ? (zh ? L"待提交 · 新增未保存" : L"Pending · New/unsaved")
+                           : (zh ? L"新增 · 未保存" : L"New · Unsaved");
+        case envh::edit::RowState::Modified:
+            return pending ? (zh ? L"待提交 · 未保存" : L"Pending · Unsaved")
+                           : (zh ? L"未保存" : L"Unsaved");
+        case envh::edit::RowState::Deleted:
+            return zh ? L"删除 · 未保存" : L"Deleted · Unsaved";
+        default:
+            return pending ? (zh ? L"待提交" : L"Pending") : L"";
+        }
+    }
+    bool pendingPartChanges() const
+    {
+        for (const auto& item : m_partSessions)
+            if (partPending(item.second))
+                return true;
+        return false;
+    }
+    void stashPartView()
+    {
+        auto it = m_partSessions.find(m_partRef);
+        if (m_listMode && it != m_partSessions.end())
+            it->second.current = partState();
+    }
+    void rememberPartChange()
+    {
+        if (m_partRef.empty() || m_loading)
+            return;
+        auto it = m_partSessions.find(m_partRef);
+        const PartState next = partState();
+        if (it == m_partSessions.end()) {
+            if (samePartContent(next, m_partInitial))
+                return;
+            it = m_partSessions.emplace(m_partRef,
+                PartSession {m_partSourceValue, m_partInitial, {}, {}}).first;
+        }
+        auto& session = it->second;
+        if (!samePartContent(next, session.current)) {
+            session.undo.push_back(session.current);
+            if (session.undo.size() > 100)
+                session.undo.erase(session.undo.begin());
+            session.redo.clear();
+        }
+        session.current = next;
+        InvalidateRect(m_hwnd, nullptr, TRUE);
+    }
+    bool undoPartChange(bool redo)
+    {
+        const HWND focus = GetFocus();
+        auto it = m_partSessions.find(currentRowRef());
+        if (it == m_partSessions.end())
+            return false;
+        auto& s = it->second;
+        auto& from = redo ? s.redo : s.undo;
+        auto& to = redo ? s.undo : s.redo;
+        if (from.empty())
+            return false;
+        to.push_back(s.current);
+        s.current = from.back();
+        from.pop_back();
+        restorePartState(s.current);
+        syncRawValueEdit();
+        rebuildPartsList(true);
+        applyLayout();
+        if (focus == m_partsList || focus == m_partEdit)
+            SetFocus(m_partsList);
+        InvalidateRect(m_hwnd, nullptr, TRUE);
+        return true;
+    }
+    void clearPartSessions()
+    {
+        m_partSessions.clear();
+        m_partRef.clear();
+        m_partInline = -1;
+    }
+    winshun::Json envDraft()
+    {
+        stashPartView();
+        auto draft = m_env.toDraft().toObject();
+        winshun::Json::Array items;
+        for (const auto& entry : m_partSessions) {
+            const auto& s = entry.second;
+            if (!partPending(s))
+                continue;
+            winshun::Json::Object item;
+            item["ref"] = entry.first;
+            item["source"] = s.sourceValue;
+            item["delimiter"] = s.current.delimiter;
+            winshun::Json::Array values, base, added, deleted;
+            for (const auto& v : s.current.values) values.emplace_back(v);
+            for (const auto& v : s.current.base) base.emplace_back(v);
+            for (char v : s.current.added) added.emplace_back(v != 0);
+            for (char v : s.current.deleted) deleted.emplace_back(v != 0);
+            item["values"] = winshun::Json(std::move(values));
+            item["base"] = winshun::Json(std::move(base));
+            item["added"] = winshun::Json(std::move(added));
+            item["deleted"] = winshun::Json(std::move(deleted));
+            items.emplace_back(std::move(item));
+        }
+        draft["itemCandidates"] = winshun::Json(std::move(items));
+        return winshun::Json(std::move(draft));
+    }
+    void applyPartSessions(bool all)
+    {
+        stashPartView();
+        bool pushed = false;
+        for (auto it = m_partSessions.begin(); it != m_partSessions.end();) {
+            if (!all && it->first != currentRowRef()) { ++it; continue; }
+            const auto& session = it->second;
+            for (auto& row : m_env.rows) {
+                if (row.scope + "/" + row.name != it->first || row.deleted
+                    || row.value != session.sourceValue)
+                    continue;
+                const std::string value = partValue(session.current);
+                if (value != row.value) {
+                    if (!pushed) { endEdit(); m_env.pushUndo(); pushed = true; }
+                    row.value = value;
+                }
+                break;
+            }
+            it = m_partSessions.erase(it);
+        }
+        m_partRef.clear(); // refresh must not resurrect the committed candidate
+        refreshDetail();
+        applyLayout();
+    }
+    // A preview value only: navigation never writes it into the model.
     std::string joinedPartsValue() const
     {
         if (!m_listMode)
@@ -1899,47 +2205,20 @@ private:
                 live.push_back(m_valueParts[i]);
         return envh::edit::joinDelimited(live, m_listDelimiter);
     }
-    // Erase staged items from the current view only. Never call this after
-    // replacing m_valueParts: the flags belong to the old list's indices.
-    void applyStagedPartDeletions()
-    {
-        if (stagedPartCount() == 0)
-            return;
-        for (int i = static_cast<int>(m_valueParts.size()) - 1; i >= 0; --i) {
-            if (i < static_cast<int>(m_partDeleted.size()) && m_partDeleted[static_cast<std::size_t>(i)]) {
-                m_valueParts.erase(m_valueParts.begin() + i);
-                if (i < static_cast<int>(m_partNew.size()))
-                    m_partNew.erase(m_partNew.begin() + i);
-                m_partDeleted.erase(m_partDeleted.begin() + i);
-            }
-        }
-        if (m_valueParts.empty()) {
-            // Deleting everything leaves an empty item, mirroring deletePart.
-            m_valueParts.emplace_back();
-            m_partNew.assign(1, 1);
-            m_partDeleted.assign(1, 0);
-        }
-        m_partSel = std::max(0, std::min(m_partSel, static_cast<int>(m_valueParts.size()) - 1));
-        m_partMulti.assign(m_valueParts.size(), 0);
-        m_partAnchor = m_partSel;
-    }
     // The 提交修改 button: apply staged item operations into the row value
     // (still model-staged; the registry write remains behind Ctrl+S).
     void commitPartChanges()
     {
-        if (!m_listMode || stagedPartCount() == 0)
+        if (m_kind != "env" || !rowEditable(m_sel))
             return;
-        const int n = stagedPartCount();
-        applyStagedPartDeletions();
-        syncRawValueEdit();
-        rebuildPartsList(false);
-        commitDetail();
+        commitPartEdit();
+        applyPartSessions(false);
+        if (m_listMode)
+            SetFocus(m_partsList);
         invalidatePartChrome();
         InvalidateRect(m_hwnd, nullptr, TRUE);
-        setStatus(m_args.zh ? "已提交分隔项修改（删除 " + std::to_string(n)
-                                  + " 项）；按 Ctrl+S 写入注册表"
-                            : "Item changes applied (" + std::to_string(n)
-                                  + " removed); press Ctrl+S to write",
+        setStatus(m_args.zh ? "已提交分隔项修改；按 Ctrl+S 写入注册表"
+                            : "Item changes committed; press Ctrl+S to write",
                   0);
     }
 
@@ -2128,7 +2407,7 @@ private:
             m_valueParts[static_cast<std::size_t>(idx)] = m_partInlineOriginal;
             updatePartRow(idx);
             syncRawValueEdit();
-            commitDetail();
+            rememberPartChange();
         }
         m_partInline = -1;
         m_partInlineOriginal.clear();
@@ -2189,7 +2468,7 @@ private:
         m_valueParts[m_partSel] = next;
         updatePartRow(m_partSel);
         syncRawValueEdit();
-        commitDetail();
+        rememberPartChange();
     }
     // Keep the (hidden) raw value box in sync with the joined list, so toggling
     // back with Ctrl+R and any control-text read see the current value.
@@ -2221,7 +2500,7 @@ private:
         }
         invalidatePartChrome();
         syncRawValueEdit();
-        commitDetail();
+        rememberPartChange();
         beginPartInline(m_partSel);
     }
     void deletePart()
@@ -2283,7 +2562,7 @@ private:
             rebuildPartsList(true);
         InvalidateRect(m_partsList, nullptr, FALSE);
         syncRawValueEdit();
-        commitDetail();
+        rememberPartChange();
         invalidatePartChrome();
         showCurrentPart();
         if (addedErased > 0)
@@ -2312,9 +2591,7 @@ private:
             return;
         if (m_partInline >= 0)
             endPartInline(true); // commits the text and refocuses the list
-        const int next = m_partSel + delta;
-        if (next < 0 || next >= static_cast<int>(m_valueParts.size()))
-            return;
+        const int next = std::clamp(m_partSel + delta, 0, static_cast<int>(m_valueParts.size()) - 1);
         const PartsGuard g {this};
         commitPartEdit();
         m_partSel = next;
@@ -2334,22 +2611,17 @@ private:
     }
     void movePart(int delta)
     {
-        const bool focusNear = GetFocus() == m_partsList || GetFocus() == m_partEdit;
-        if (!focusNear)
-            return;
         if (m_partInline >= 0)
             endPartInline(true);
         const int from = m_partSel;
         const int to = from + delta;
         if (!rowEditable(m_sel) || to < 0 || to >= static_cast<int>(m_valueParts.size()))
             return;
-        // Reordering around staged rows scrambles the flags - commit first.
-        if (stagedPartCount() > 0)
-            return;
         const PartsGuard g {this};
         commitPartEdit();
         std::swap(m_valueParts[from], m_valueParts[to]);
         std::swap(m_partNew[from], m_partNew[to]);
+        std::swap(m_partDeleted[from], m_partDeleted[to]);
         m_partSel = to;
         m_partMulti.assign(m_valueParts.size(), 0);
         m_partMulti[static_cast<std::size_t>(to)] = 1;
@@ -2362,8 +2634,9 @@ private:
         }
         invalidatePartChrome();
         syncRawValueEdit();
-        commitDetail();
+        rememberPartChange();
         showCurrentPart();
+        SetFocus(m_partsList);
     }
     // Raw <-> delimited-item editing (Ctrl+R or the mode segment).
     void setListMode(bool enabled)
@@ -2371,38 +2644,13 @@ private:
         if (m_kind != "env" || m_tab == 2 || m_listMode == enabled)
             return;
         commitPartEdit();
-        const std::string joined = m_listMode ? joinedPartsValue()
-                                             : getEdit(m_valueEdit);
+        stashPartView();
         m_listMode = enabled;
-        if (m_listMode) {
-            const std::string name = m_visible.empty() ? std::string {} : m_env.rows[m_visible[m_sel]].name;
-            m_listDelimiter = preferredDelimiter(name, joined);
-            m_valueParts = envh::edit::splitDelimited(joined, m_listDelimiter, true);
-            m_partBase = m_valueParts;
-            m_partSel = 0;
-            resetPartState();
-            syncRawValueEdit();
-            rebuildPartsList(false);
-            syncDelimiterComboText();
-            applyLayout();
-            SetFocus(m_partsList);
-        } else {
-            m_valueParts.clear();
-            resetPartState();
-            // Write the rejoined value back into the raw box before dropping the
-            // parts; syncing from an empty part list would blank the field.
-            m_loading = true;
-            setEdit(m_valueEdit, joined, !rowEditable(m_sel));
-            m_loading = false;
-            applyLayout();
-            SetFocus(m_valueEdit);
-        }
-        commitDetail();
+        refreshDetail();
+        computeLayout();
+        applyLayout();
+        SetFocus(enabled ? m_partsList : m_valueEdit);
         InvalidateRect(m_hwnd, nullptr, TRUE);
-        setStatus(m_listMode ? (m_args.zh ? "分隔项编辑 · 分隔符 " + delimiterLabel()
-                                          : "item list · delimiter " + delimiterLabel())
-                             : (m_args.zh ? "原文编辑" : "raw value editing"),
-                  0);
     }
     void toggleListMode() { setListMode(!m_listMode); }
 
@@ -2439,6 +2687,13 @@ private:
 
     void applyDelimiter()
     {
+        if (stagedPartCount() > 0) {
+            m_pendingDelim.clear();
+            syncDelimiterComboText();
+            setStatus(m_args.zh ? "请先提交或撤销待删除项，再更换分隔符"
+                                : "Commit or undo pending deletions before changing the delimiter", 1);
+            return;
+        }
         const std::string next = pendingDelimiterValue();
         if (next.empty()) {
             setStatus(m_args.zh ? "分隔符不能为空" : "Delimiter cannot be empty", 2);
@@ -2477,7 +2732,7 @@ private:
             applyLayout();
             InvalidateRect(m_hwnd, nullptr, TRUE);
         }
-        commitDetail();
+        rememberPartChange();
         if (m_delimCustom)
             syncDelimiterComboText();
         m_pendingDelim.clear();
@@ -2488,6 +2743,7 @@ private:
     // Fill the detail controls from the selected row (no model write).
     void refreshDetail()
     {
+        stashPartView();
         m_loading = true;
         if (m_partInline >= 0) {
             // A different row (or tab) invalidates the floating edit box.
@@ -2508,29 +2764,29 @@ private:
             setEdit(m_nameEdit, name, ro);
             setEdit(m_typeEdit, type, ro);
             setEdit(m_valueEdit, value, ro);
-            if (m_listMode) {
-                if (deleted) {
-                    // A deleted row still holds its old value in the model
-                    // until save. Rebuilding the split list from that value
-                    // made a just-deleted item reappear, which read as "the
-                    // deletion did not take" before the whole variable vanished
-                    // on save. Show an empty, disabled list instead.
-                    m_valueParts.clear();
-                    m_partBase.clear();
-                    m_partSel = 0;
-                    resetPartState();
-                    rebuildPartsList(false);
-                } else {
-                    m_listDelimiter = preferredDelimiter(name, value);
-                    m_valueParts = envh::edit::splitDelimited(value, m_listDelimiter, true);
-                    m_partBase = m_valueParts; // snapshot for item-level dirty dots
-                    m_partSel = 0;
-                    resetPartState();
-                    rebuildPartsList(false);
+            m_partRef = currentRowRef();
+            m_partSourceValue = value;
+            m_listDelimiter = preferredDelimiter(name, value);
+            m_valueParts = deleted || m_partRef.empty() ? std::vector<std::string> {}
+                : envh::edit::splitDelimited(value, m_listDelimiter, true);
+            m_partBase = m_valueParts;
+            m_partSel = 0;
+            resetPartState();
+            m_partInitial = partState();
+            auto candidate = m_partSessions.find(m_partRef);
+            if (candidate != m_partSessions.end()) {
+                if (candidate->second.sourceValue != value) {
+                    m_partSessions.erase(candidate); // explicit model undo/reload/replacement
+                } else if (!deleted) {
+                    restorePartState(candidate->second.current);
+                    setEdit(m_valueEdit, partValue(candidate->second.current), ro);
                 }
+            }
+            if (m_listMode) {
+                rebuildPartsList(false);
                 syncDelimiterComboText();
                 if (m_partsList)
-                    EnableWindow(m_partsList, deleted ? FALSE : TRUE);
+                    EnableWindow(m_partsList, (deleted || ro) ? FALSE : TRUE);
                 if (m_partEdit)
                     SendMessageW(m_partEdit, EM_SETREADONLY, (deleted || ro) ? TRUE : FALSE, 0);
             }
@@ -2585,7 +2841,17 @@ private:
         if (m_kind == "env") {
             auto& r = m_env.rows[idx];
             const std::string name = getEdit(m_nameEdit);
-            const std::string value = m_listMode ? joinedPartsValue() : getEdit(m_valueEdit);
+            const std::string oldRef = r.scope + "/" + r.name;
+            std::string value = m_listMode ? r.value : getEdit(m_valueEdit);
+            auto candidate = m_partSessions.find(oldRef);
+            if (!m_listMode && candidate != m_partSessions.end()) {
+                if (value != partValue(candidate->second.current)) {
+                    m_valueParts = envh::edit::splitDelimited(value, m_listDelimiter, true);
+                    resetPartState();
+                    rememberPartChange();
+                }
+                value = r.value;
+            }
             std::string type = getEdit(m_typeEdit);
             if (type.empty())
                 type = envh::envTypeForValue(value);
@@ -2594,6 +2860,14 @@ private:
             if (!m_editActive) {
                 m_env.pushUndo();
                 m_editActive = true;
+            }
+            if (r.name != name) {
+                auto node = m_partSessions.extract(oldRef);
+                if (!node.empty()) {
+                    node.key() = r.scope + "/" + name;
+                    m_partSessions.insert(std::move(node));
+                }
+                m_partRef = r.scope + "/" + name;
             }
             r.name = name;
             r.value = value;
@@ -2956,7 +3230,7 @@ private:
         tabs[1] += L" (" + std::to_wstring(nSecond) + L")";
         // v0.7.1: the backup count lives in the tab itself - the separate
         // "备份 (N)" pill in the detail header is gone.
-        tabs[2] += L" (" + std::to_wstring(m_backupIds.size()) + L")";
+        tabs[2] += L" (" + std::to_wstring(m_backupTotal) + L")";
         for (int i = 0; i < 3; ++i) {
             const bool active = i == m_tab;
             HBRUSH tb = CreateSolidBrush(active ? accent : (th().kTabBg));
@@ -3046,8 +3320,9 @@ private:
                     : m_hosts.rowState(static_cast<std::size_t>(mi));
                 const bool over = m_kind == "env"
                     && envh::envValueOverlength(m_env.rows[mi].value) > 0;
-                const bool marked = over || st != envh::edit::RowState::Unchanged;
-                const COLORREF dirtyBg = over ? th().kOverBg : th().kDirtyBg;
+                const bool pending = m_kind == "env" && envRowPending(static_cast<std::size_t>(mi));
+                const bool marked = pending || over || st != envh::edit::RowState::Unchanged;
+                const COLORREF dirtyBg = over ? th().kOverBg : pending ? th().kWarnBg : th().kDirtyBg;
                 const COLORREF bg = v == m_sel ? selBg
                     : multi ? multiBg
                     : marked ? dirtyBg
@@ -3057,7 +3332,7 @@ private:
                 DeleteObject(rb);
                 if (marked) {
                     RECT bar {row.left, row.top, row.left + 3, row.bottom};
-                    HBRUSH db = CreateSolidBrush(th().kDanger);
+                    HBRUSH db = CreateSolidBrush(pending && !over ? th().kWarnText : th().kDanger);
                     FillRect(mem, &bar, db);
                     DeleteObject(db);
                 }
@@ -3072,7 +3347,9 @@ private:
                 drawRow(mem, fg, v, row);
                 if (marked) {
                     const wchar_t* tag = nullptr;
-                    if (over)
+                    if (m_kind == "env" && (pending || st != envh::edit::RowState::Unchanged))
+                        tag = envStateLabel(st, pending);
+                    else if (over)
                         tag = m_args.zh ? L"⚠ 超限" : L"⚠ OVER";
                     else if (st == envh::edit::RowState::Added)
                         tag = m_args.zh ? L"+ 新增" : L"+ NEW";
@@ -3089,7 +3366,7 @@ private:
                         HBRUSH lb = CreateSolidBrush(bg);
                         FillRect(mem, &lr, lb);
                         DeleteObject(lb);
-                        SetTextColor(mem, th().kOverText);
+                        SetTextColor(mem, pending ? th().kWarnText : th().kOverText);
                         HGDIOBJ otf = SelectObject(mem, smallFont);
                         DrawTextW(mem, tag, -1, &lr,
                                   DT_RIGHT | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX);
@@ -3145,7 +3422,7 @@ private:
                 RECT valueLabel {lx, m_rcDetail.top + 74, m_rcDetail.right - 4, m_rcDetail.top + 88};
                 DrawTextW(mem, m_args.zh ? L"名称" : L"Name", -1, &a, DT_LEFT | DT_SINGLELINE);
                 DrawTextW(mem, m_args.zh ? L"类型" : L"Type", -1, &b, DT_LEFT | DT_SINGLELINE);
-                if (currentRowDeleted()) {
+                if (currentRowDeleted() && !m_listMode) {
                     // A deleted row is read-only until restored; say so instead
                     // of leaving greyed controls unexplained.
                     SetTextColor(mem, th().kDeleted);
@@ -3154,12 +3431,8 @@ private:
                                         : L"Whole row marked deleted: saving removes this variable and ALL its split items · press Del to restore",
                               -1, &valueLabel, DT_LEFT | DT_SINGLELINE | DT_END_ELLIPSIS);
                     SetTextColor(mem, dim);
-                } else {
-                    DrawTextW(mem,
-                              m_listMode
-                                  ? (m_args.zh ? L"双击编辑 · × 标记删除（可再点恢复）· 提交修改后生效"
-                                               : L"Double-click to edit · x stages a delete (x again restores) · Commit applies")
-                                  : (m_args.zh ? L"原文 · Ctrl+R 分隔项" : L"Raw value · Ctrl+R items"),
+                } else if (!m_listMode) {
+                    DrawTextW(mem, m_args.zh ? L"原文 · Ctrl+R 分隔项" : L"Raw value · Ctrl+R items",
                               -1, &valueLabel, DT_LEFT | DT_SINGLELINE | DT_END_ELLIPSIS);
                 }
             } else {
@@ -3223,14 +3496,15 @@ private:
             drawFlatButton(mem, smallFont, m_rcApply,
                            m_args.zh ? L"+ 新增项" : L"+ Add item",
                            enabled, false, kFlatPartInsert, fg, dim);
-            // v0.7.0: green 提交修改 button - applies staged item deletions
-            // (and rejoin). Enabled only while something is actually staged.
+            // Apply this variable's candidates; registry writes still require Save.
             {
                 const int n = stagedPartCount();
+                const auto pending = m_partSessions.find(currentRowRef());
+                const bool canCommit = pending != m_partSessions.end() && partPending(pending->second);
                 std::wstring label = m_args.zh ? L"提交修改" : L"Commit";
                 if (n > 0)
                     label += L" (" + std::to_wstring(n) + L")";
-                drawCommitButton(mem, smallFont, m_rcCommitBtn, label, m_listMode && n > 0);
+                drawCommitButton(mem, smallFont, m_rcCommitBtn, label, canCommit && rowEditable(m_sel));
             }
             // The counter is a parent-painted label. Paint its own opaque panel
             // strip first so a child-control repaint cannot cut through it.
@@ -3266,7 +3540,7 @@ private:
                 // difference must not hide the last glyph.
                 const std::wstring shortText = (m_args.zh ? L"合计 " : L"") + counts;
                 SIZE need {};
-                GetTextExtentPoint32W(mem, full.c_str(), -1, &need);
+                GetTextExtentPoint32W(mem, full.c_str(), static_cast<int>(full.size()), &need);
                 const bool fullFits = need.cx <= hint.right - hint.left;
                 const wchar_t* text = fullFits ? full.c_str() : shortText.c_str();
                 DrawTextW(mem, text, -1, &hint,
@@ -3298,8 +3572,14 @@ private:
     }
 
     bool isDirty() const { return m_kind == "env" ? m_envDirty() : (m_hostsDirty() || rawDirty()); }
-    bool canUndo() const { return m_kind == "env" ? m_env.canUndo() : m_hosts.canUndo(); }
-    bool canRedo() const { return m_kind == "env" ? m_env.canRedo() : m_hosts.canRedo(); }
+    bool canUndo() const {
+        auto it = m_partSessions.find(currentRowRef());
+        return m_kind == "env" ? (m_env.canUndo() || (it != m_partSessions.end() && !it->second.undo.empty())) : m_hosts.canUndo();
+    }
+    bool canRedo() const {
+        auto it = m_partSessions.find(currentRowRef());
+        return m_kind == "env" ? (m_env.canRedo() || (it != m_partSessions.end() && !it->second.redo.empty())) : m_hosts.canRedo();
+    }
 
     // ---- multi-selection ---------------------------------------------------
     std::size_t modelRowCount() const
@@ -3449,14 +3729,22 @@ private:
             for (int i = 0; i < static_cast<int>(m_valueParts.size()); ++i) {
                 const bool added = i < static_cast<int>(m_partNew.size())
                                    && m_partNew[static_cast<std::size_t>(i)];
-                if (added || partChanged(i))
+                if (added || partChanged(i) || partStaged(i))
                     ++unsaved;
             }
+            const auto candidate = m_partSessions.find(currentRowRef());
+            const bool pending = candidate != m_partSessions.end() && partPending(candidate->second);
             const std::size_t used = envh::utf16Units(joinedPartsValue());
-            std::string s = unsaved > 0
-                ? (zh ? "● " + std::to_string(unsaved) + " 项未保存"
-                      : "● " + std::to_string(unsaved) + " unsaved item(s)")
-                : (zh ? "○ 无未保存项" : "○ no unsaved items");
+            const bool changed = !m_visible.empty()
+                && m_env.rowState(m_visible[m_sel]) != envh::edit::RowState::Unchanged;
+            std::string s = pending
+                ? (zh ? "● 有未提交的分隔项修改" : "● Uncommitted item changes")
+                : changed ? (zh ? "● 当前变量未保存" : "● Current variable unsaved")
+                          : (zh ? "○ 当前变量无修改" : "○ Current variable unchanged");
+            if (pending && unsaved > 0)
+                s += " (" + std::to_string(unsaved) + ")";
+            if (pending && changed)
+                s += zh ? " · 未保存" : " · Unsaved";
             if (stagedPartCount() > 0)
                 s += zh ? " · " + std::to_string(stagedPartCount()) + " 项待删除"
                         : " · " + std::to_string(stagedPartCount()) + " staged";
@@ -3564,6 +3852,8 @@ private:
         case kChipRedo: return zh ? L"Ctrl+Y 重做" : L"Ctrl+Y redo";
         case kChipSave: return zh ? L"Ctrl+S 保存" : L"Ctrl+S save";
         case kChipClose: return zh ? L"Esc 关闭" : L"Esc close";
+        case kChipPartUp: return zh ? L"上移 Alt+↑" : L"Up Alt+↑";
+        case kChipPartDown: return zh ? L"下移 Alt+↓" : L"Down Alt+↓";
         }
         return L"";
     }
@@ -3581,6 +3871,11 @@ private:
         case kChipRedo: return canRedo();
         case kChipSave: return isDirty();
         case kChipClose: return true;
+        case kChipPartUp:
+        case kChipPartDown:
+            return m_kind == "env" && m_tab != 2 && m_listMode && rowEditable(m_sel)
+                && m_partSel >= 0 && m_partSel < static_cast<int>(m_valueParts.size())
+                && (id == kChipPartUp ? m_partSel > 0 : m_partSel + 1 < static_cast<int>(m_valueParts.size()));
         }
         return false;
     }
@@ -3610,14 +3905,14 @@ private:
             return kFlatModeRaw;
         if (rectHasPoint(m_rcModeList, p))
             return kFlatModeList;
-        if (m_listMode && rectHasPoint(m_rcCommitBtn, p))
+        if (rectHasPoint(m_rcCommitBtn, p))
             return kFlatCommit;
         if (m_listMode && rowEditable(m_sel) && rectHasPoint(m_rcApply, p))
             return kFlatPartInsert; // the "+ Add item" toolbar button
         if (!m_delimCustom && m_listMode && rowEditable(m_sel) && rectHasPoint(m_rcDelimiter, p))
             return kFlatDelim;
         // v0.6.0: no side strip any more; the per-row × lives in the item table
-        // and is handled by the list box subclass. Up/Down stay on Alt+Up/Down.
+        // and is handled by the list box subclass.
         return 0;
     }
     // Rounded pill helper. The two pills it used to draw (备份 (N) in the
@@ -3801,6 +4096,9 @@ private:
             SetTextColor(dc, en ? fg : dim);
             DrawTextW(dc, chipLabel(c.id), -1, &c.rc, DT_CENTER | DT_VCENTER | DT_SINGLELINE);
         }
+        SetTextColor(dc, dim);
+        DrawTextW(dc, m_args.zh ? L"分隔项：" : L"Items:", -1, &m_rcPartGroup,
+                  DT_LEFT | DT_VCENTER | DT_SINGLELINE);
         SelectObject(dc, of);
     }
 
@@ -4530,6 +4828,8 @@ private:
             commitPartEdit();
         commitDetail();
         endEdit();
+        if (m_kind == "env")
+            applyPartSessions(true);
         if (m_kind == "hosts" && m_tab == 1) {
             commitRaw();
             loadRaw(); // show the applied text so the box and the model agree
@@ -4736,6 +5036,7 @@ private:
             clearDraft();
             setStatus(m_args.zh ? "已保存 hosts" : "Saved hosts", 3);
         }
+        refreshBackups();
         rebuildVisible();
         selectRow(m_sel);
     }
@@ -4761,7 +5062,9 @@ private:
         m_backupHasSystem.clear();
         envh::native::BackupStore backups(m_args.dataDir, m_args.backupCount);
         if (m_kind == "env") {
-            for (const auto& b : backups.listEnv()) {
+            const auto all = backups.listEnv();
+            m_backupTotal = all.size();
+            for (const auto& b : all) {
                 // Row count and scope presence per backup, cached: reading the
                 // snapshot in the paint path would hit the disk on every
                 // repaint. The backup JSON stores the scope of every var.
@@ -4775,9 +5078,9 @@ private:
                 }
                 // A backup with neither scope carries nothing useful for the
                 // current filter, so it is skipped entirely.
-                if (m_backupScope == kScopeUser && system == 0)
+                if (m_backupScope == kScopeUser && user == 0)
                     continue;
-                if (m_backupScope == kScopeSystem && user == 0)
+                if (m_backupScope == kScopeSystem && system == 0)
                     continue;
                 m_backupIds.push_back(b.id);
                 m_backupCounts.push_back(static_cast<int>(snap.vars.size()));
@@ -4785,7 +5088,9 @@ private:
                 m_backupHasSystem.push_back(system > 0 ? 1 : 0);
             }
         } else {
-            for (const auto& b : backups.listHosts()) {
+            const auto all = backups.listHosts();
+            m_backupTotal = all.size();
+            for (const auto& b : all) {
                 m_backupIds.push_back(b.id);
                 const std::string content = backups.readHosts(b.id);
                 int n = 0;
@@ -4803,6 +5108,7 @@ private:
 
     void loadBackupIntoWork(const std::string& id)
     {
+        clearPartSessions(); // restoring a backup explicitly replaces the working copy
         envh::native::BackupStore backups(m_args.dataDir, m_args.backupCount);
         if (m_kind == "env") {
             const std::string path = m_args.dataDir + "/backups/env/" + id + ".json";
@@ -5011,9 +5317,14 @@ private:
         const bool restoring = allDeleted && !allNew;
         const bool target = !restoring;
         std::vector<std::size_t> wide(idx.begin(), idx.end());
-        if (m_kind == "env")
+        if (m_kind == "env") {
+            if (target) {
+                for (int i : idx)
+                    m_partSessions.erase(m_env.rows[i].scope + "/" + m_env.rows[i].name);
+                m_partRef.clear();
+            }
             m_env.setDeletedMany(wide, target);
-        else
+        } else
             m_hosts.setDeletedMany(wide, target);
         m_skippedSelected = skipped;
         rebuildVisible();
@@ -5090,6 +5401,9 @@ private:
     void doUndo()
     {
         endEdit();
+        if (m_kind == "env" && undoPartChange(false))
+            return;
+        m_partRef.clear();
         if (m_kind == "hosts" && m_tab == 1) {
             SendMessageW(m_rawEdit, EM_UNDO, 0, 0); // text-level undo inside the raw box
             return;
@@ -5106,6 +5420,9 @@ private:
     void doRedo()
     {
         endEdit();
+        if (m_kind == "env" && undoPartChange(true))
+            return;
+        m_partRef.clear();
         if (m_kind == "env")
             m_env.redo();
         else
@@ -5134,12 +5451,17 @@ private:
         case kChipRedo: doRedo(); break;
         case kChipSave: save(); break;
         case kChipClose: PostMessageW(m_hwnd, WM_CLOSE, 0, 0); break;
+        case kChipPartUp: movePart(-1); break;
+        case kChipPartDown: movePart(1); break;
         }
     }
     void switchTab(int i)
     {
         if (m_tab == i)
             return;
+        stashPartView();
+        m_lastG = m_lastD = 0;
+        m_vimCount = -1;
         // Leaving the raw tab applies its text to the model (like any other
         // edit in this window, nothing reaches the file before Ctrl+S).
         if (m_kind == "hosts" && m_tab == 1)
@@ -5343,6 +5665,60 @@ private:
             case 6: return pack(m_rcDelimiter);
             case 7: return pack(m_rcModeRaw);
             case 8: return pack(m_rcModeList);
+            case 12: return pack(m_rcPartUp);
+            case 13: return pack(m_rcPartDown);
+            case 14: return pack(m_rcStatus);
+            case 15: return lp >= 0 && static_cast<std::size_t>(lp) < m_chips.size()
+                ? pack(m_chips[lp].rc) : 0;
+            case 16: {
+                if (lp < 0 || static_cast<std::size_t>(lp) >= m_chips.size()) return 0;
+                HDC dc = GetDC(m_hwnd);
+                HFONT font = makeFont(11, false, L"Microsoft YaHei UI", DEFAULT_PITCH | FF_DONTCARE);
+                HGDIOBJ old = SelectObject(dc, font);
+                const wchar_t* label = chipLabel(m_chips[lp].id);
+                SIZE size {};
+                GetTextExtentPoint32W(dc, label, lstrlenW(label), &size);
+                SelectObject(dc, old);
+                DeleteObject(font);
+                ReleaseDC(m_hwnd, dc);
+                return pack(RECT {0, 0, size.cx, size.cy});
+            }
+            case 17: return static_cast<LRESULT>(m_backupTotal);
+            case 18: return static_cast<LRESULT>(m_backupIds.size());
+            case 19: return m_env.isDirty();
+            case 20: return pendingPartChanges();
+            case 21: return lp >= 0 && lp < 3 ? pack(m_rcBackupScope[lp]) : 0;
+            case 22: return m_kind == "env" && !m_visible.empty()
+                ? static_cast<LRESULT>(m_env.rows[m_visible[m_sel]].value.size()) : 0;
+            case 23: return pack(m_rcDetail);
+            case 24: return pack(m_rcSplitter);
+            case 25: {
+                if (m_kind != "env" || m_tab == 2 || m_visible.empty()) return 0;
+                const auto index = static_cast<std::size_t>(m_visible[m_sel]);
+                const auto state = m_env.rowState(index);
+                return (envRowPending(index) ? 1 : 0)
+                    | (state != envh::edit::RowState::Unchanged ? 2 : 0)
+                    | (state == envh::edit::RowState::Added ? 4 : 0)
+                    | (state == envh::edit::RowState::Deleted ? 8 : 0);
+            }
+            case 26: { // Actual row-label dimensions with the painting font.
+                if (m_kind != "env" || m_tab == 2 || m_visible.empty()) return 0;
+                const auto index = static_cast<std::size_t>(m_visible[m_sel]);
+                const wchar_t* label = envStateLabel(m_env.rowState(index), envRowPending(index));
+                HDC dc = GetDC(m_hwnd);
+                HFONT font = makeFont(11, false, L"Microsoft YaHei UI", DEFAULT_PITCH | FF_DONTCARE);
+                HGDIOBJ old = SelectObject(dc, font);
+                SIZE size {};
+                GetTextExtentPoint32W(dc, label, lstrlenW(label), &size);
+                SelectObject(dc, old);
+                DeleteObject(font);
+                ReleaseDC(m_hwnd, dc);
+                return pack(RECT {0, 0, size.cx, size.cy});
+            }
+            case 27: return pack(RECT {m_colX[3], 0, m_colX[4], m_rowH});
+            case 28: return static_cast<LRESULT>(m_chips.size());
+            case 29: return (chipEnabled(kChipPartUp) ? 1 : 0) | (chipEnabled(kChipPartDown) ? 2 : 0);
+            case 30: return pack(m_rcPartGroup);
             case 9: {
                 // Notice band i: left | top<<16 | right<<32 | bottom<<48.
                 const int i = static_cast<int>(lp);
@@ -5803,6 +6179,8 @@ private:
             || (GetKeyState(VK_SHIFT) & 0x8000) != 0;
         const bool alt = (extraMods & 4) != 0 || (GetKeyState(VK_MENU) & 0x8000) != 0;
         const bool tableFocus = GetFocus() == m_hwnd;
+        if ((wp != 'G' && wp != 'g') || ctrl || alt) m_lastG = 0;
+        if ((wp != 'D' && wp != 'd') || ctrl || alt) m_lastD = 0;
         // While the diff panel is open it owns the keyboard: no row command,
         // save or tab switch can silently act on a stale view.
         if (m_diffOpen) {
@@ -5842,8 +6220,12 @@ private:
             const bool partsNear = GetFocus() == m_partsList || GetFocus() == m_partEdit;
             if (partsNear && m_listMode && m_kind == "env") {
                 if (wp == 'N' || wp == 'n') { addPart(); return 0; }
-                if (wp == 'J' || wp == 'j') { movePartCaret(-1); return 0; }
-                if (wp == 'K' || wp == 'k') { movePartCaret(1); return 0; }
+                if (wp == 'J' || wp == 'j') { movePartCaret(1); return 0; }
+                if (wp == 'K' || wp == 'k') { movePartCaret(-1); return 0; }
+            }
+            if (tableFocus && (wp == 'J' || wp == 'K')) {
+                selectRow(m_sel + (wp == 'J' ? 1 : -1));
+                return 0;
             }
             if (wp == 'R' || wp == 'r') {
                 toggleListMode();
@@ -5917,16 +6299,49 @@ private:
             }
         }
         if (m_kind == "env" && m_listMode && partsFocus) {
-            if (alt && (wp == 'J' || wp == 'j' || wp == VK_UP)) { movePart(-1); return 0; }
-            if (alt && (wp == 'K' || wp == 'k' || wp == VK_DOWN)) { movePart(1); return 0; }
+            if (alt && (wp == 'K' || wp == 'k' || wp == VK_UP)) { movePart(-1); return 0; }
+            if (alt && (wp == 'J' || wp == 'j' || wp == VK_DOWN)) { movePart(1); return 0; }
         }
         // Bare j/k move the caret, matching the table vim keys. (Ctrl+J/K are
         // the explicit keymap bindings and land in the ctrl branch above; the
         // floating part EDIT never forwards letters, so typing "j" into an
         // item stays native text input.)
-        if (m_kind == "env" && m_listMode && partsFocus && !alt) {
-            if (wp == 'J' || wp == 'j') { movePartCaret(-1); return 0; }
-            if (wp == 'K' || wp == 'k') { movePartCaret(1); return 0; }
+        if (m_kind == "env" && m_listMode && GetFocus() == m_partsList && !alt) {
+            if (wp >= '0' && wp <= '9') {
+                m_vimCount = std::min(100000, std::max(0, m_vimCount) * 10 + static_cast<int>(wp - '0'));
+                return 0;
+            }
+            const int count = m_vimCount;
+            m_vimCount = -1;
+            if (wp == 'J') { movePartCaret(std::max(1, count)); return 0; }
+            if (wp == 'K') { movePartCaret(-std::max(1, count)); return 0; }
+            if (wp == 'G') {
+                if (shift || count > 0) {
+                    movePartCaret((count > 0 ? count - 1 : static_cast<int>(m_valueParts.size()) - 1) - m_partSel);
+                    m_lastG = 0;
+                    return 0;
+                }
+                const ULONGLONG now = GetTickCount64();
+                if (m_lastG && now - m_lastG < 600) {
+                    movePartCaret(-m_partSel);
+                    m_lastG = 0;
+                } else {
+                    m_lastG = now;
+                }
+                return 0;
+            }
+            if (wp == 'D') {
+                const ULONGLONG now = GetTickCount64();
+                if (m_lastD && now - m_lastD < 600) {
+                    deletePart();
+                    m_lastD = 0;
+                } else {
+                    m_lastD = now;
+                }
+                return 0;
+            }
+            if (wp == 'X') { deletePart(); return 0; }
+            if (wp == 'U') { doUndo(); return 0; }
         }
         // v0.7.1 vim-style navigation on the main table (table focus only, no
         // modifier): j/k one row, gg first row, G last row, x or dd marks the
@@ -5941,7 +6356,7 @@ private:
                 return c;
             };
             if (wp >= '0' && wp <= '9') {
-                m_vimCount = std::max(0, m_vimCount) * 10 + (static_cast<int>(wp) - '0');
+                m_vimCount = std::min(100000, std::max(0, m_vimCount) * 10 + (static_cast<int>(wp) - '0'));
                 return 0;
             }
             if (wp == 'J' || wp == 'j') { selectRow(m_sel + std::max(1, consumeCount())); return 0; }
@@ -5958,7 +6373,7 @@ private:
                     return 0;
                 }
                 const ULONGLONG now = GetTickCount64();
-                if (now - m_lastG < 600) { // gg: first row
+                if (m_lastG && now - m_lastG < 600) { // gg: first row
                     m_lastG = 0;
                     selectRow(0);
                     return 0;
@@ -5969,7 +6384,7 @@ private:
             if (wp == 'D' || wp == 'd') { // dd: stage-delete, same as x
                 consumeCount();
                 const ULONGLONG now = GetTickCount64();
-                if (now - m_lastD < 600) {
+                if (m_lastD && now - m_lastD < 600) {
                     m_lastD = 0;
                     doDelete();
                     return 0;

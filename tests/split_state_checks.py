@@ -38,6 +38,8 @@ def run(context):
         g.time.sleep(0.2)
 
     def reset():
+        # Finish this test's candidate explicitly before installing a fresh fixture.
+        g.click_at(h, *g.center(g.layout_rect(h, 4)))
         mode(False)
         g.focus_row(h, "user/Path")
         g.time.sleep(0.3)
@@ -56,17 +58,18 @@ def run(context):
     g.check(g.get_text(raw) == ";".join(expected),
             "undo restores the model value without reapplying stale controls")
     key(ord("Y"), ctrl=True)
-    g.check(items() == expected[1:], "redo deletes exactly one item", items())
+    g.check(items() == expected and staged() == 1,
+            "redo restores exactly one pending deletion", items())
 
     reset()
     choose(1)
     key(g.VK_DELETE)
     g.focus_row(h, "user/Path")
     g.time.sleep(0.4)
-    g.check(items() == [expected[0], expected[2]],
-            "reopening the same row applies the pending delete only once", items())
-    g.check(g.get_text(raw) == ";".join(items()),
-            "reopened row list and raw value agree")
+    g.check(items() == expected and staged() == 1,
+            "reopening the same row preserves its pending deletion", items())
+    g.check(g.get_text(raw) == ";".join([expected[0], expected[2]]),
+            "raw preview excludes the pending deletion without committing it")
 
     reset()
     key(g.VK_DELETE)
@@ -78,21 +81,24 @@ def run(context):
 
     reset()
     key(g.VK_DELETE)
-    # Changing the delimiter re-splits the value with the staged item excluded.
-    g.user32.PostMessageW(h, g.WM_COMMAND, 201, 0)  # comma
+    # Reinterpreting item boundaries must not silently accept pending deletes.
+    g.user32.PostMessageW(h, g.WM_COMMAND, 201, 0)
     g.time.sleep(0.4)
-    g.check(items() == [";".join(expected[1:])],
-            "delimiter change never applies an old deletion to the new split", items())
-    g.user32.PostMessageW(h, g.WM_COMMAND, 200, 0)  # semicolon
+    g.check(items() == expected and staged() == 1,
+            "delimiter change preserves pending deletions until explicitly committed", items())
+    g.click_at(h, *g.center(g.layout_rect(h, 4)))
+    g.user32.PostMessageW(h, g.WM_COMMAND, 201, 0)
     g.time.sleep(0.4)
-    g.check(items() == expected[1:], "delimiter round trip preserves remaining items", items())
+    g.user32.PostMessageW(h, g.WM_COMMAND, 200, 0)
+    g.time.sleep(0.4)
+    g.check(items() == expected[1:], "delimiter round trip preserves committed remaining items", items())
 
     reset()
     key(ord("N"), ctrl=True)
     g.check(g.user32.IsWindowVisible(inline), "Ctrl+N opens the new item's inline editor")
     g.send(inline, g.WM_KEYDOWN, 0x1B)  # real child key dispatch
     choose(1)
-    key(ord("J"), alt=True)  # move the new item above alpha
+    key(ord("K"), alt=True)  # move the new item above alpha
     g.check(items() == [""] + expected, "new item can move before an existing item", items())
     key(g.VK_DELETE)
     g.check(items() == expected and staged() == 0,

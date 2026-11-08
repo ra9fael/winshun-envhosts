@@ -1,5 +1,11 @@
 # ra9fael.envhosts — interactive editor window (v0.2 → v0.5 design)
 
+Current interaction contract: [Native interaction fixes](NATIVE_INTERACTION_FIXES.md).
+用户本轮明确要求切换时不提交；下述 0.7.3 历史设计中的“候选即时进入工作模型”
+已经由按变量保留的独立候选缓冲取代。
+The historical 0.7.3 immediate-model semantics below are superseded by per-variable
+candidate buffers: navigation preserves candidates; Commit / Save applies them.
+
 ### Native editor continuation — split-item state (2026-11-08)
 
 The existing two-stage delete interaction remains unchanged. The working model

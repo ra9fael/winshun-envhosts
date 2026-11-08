@@ -53,6 +53,14 @@ upstream as a separate commit.
 
 ## Tests
 
+`python tests/gui_preview.py --interaction-check --no-hold` covers the native
+interaction contract in `NATIVE_INTERACTION_FIXES.md`: item candidates, navigation,
+Vim bindings, footer geometry, backup counts and recovery. It uses real windows
+with isolated fixture data; run GUI suites sequentially because focus is shared.
+
+中文：上述专项检查覆盖候选保留、键位、按钮布局、备份计数和恢复；使用隔离假数据，
+GUI 套件应顺序运行，避免窗口焦点互相影响。
+
 The focused native-editor regressions are `python tests/gui_preview.py
 --split-state-check --no-hold` and `python tests/gui_preview.py --dialog-check
 --no-hold` (also `--english --dark`). CTest additionally runs `dialog_layout`
