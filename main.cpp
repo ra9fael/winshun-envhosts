@@ -14,8 +14,10 @@
 // x64 is mandatory: a 32-bit build is redirected by the file-system redirector
 // to SysWOW64 and would silently edit the wrong hosts file.
 #include "winshun.h"
+#include "build_info.h"
 
 #include <cstdint>
+#include <iostream>
 #include <string>
 #include <vector>
 
@@ -851,6 +853,11 @@ struct EnvHosts : winshun::Plugin {
 
 int main(int argc, char** argv)
 {
+    if(argc==2&&std::string(argv[1])=="--build-info") {
+        std::cout << "{\"id\":\"ra9fael.envhosts\",\"version\":\"" << ENVHOSTS_VERSION
+                  << "\",\"backend\":\"" << ENVHOSTS_BACKEND << "\"}\n";
+        return 0;
+    }
 #ifdef ENVHOSTS_QML_EDITOR
     // Qt Quick requires the GUI thread, so the Qt loop owns the main thread and
     // the JSON-RPC loop moves to a worker. stdio stays owned by the protocol

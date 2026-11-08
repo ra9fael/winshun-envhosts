@@ -25,7 +25,7 @@ environment values) before posting.
 
 ```powershell
 cmake -S . -B build -A x64                 # MSVC; for MinGW use -G "MinGW Makefiles"
-cmake --build build --config Release       # writes envhosts.exe next to plugin.json
+cmake --build build --config Release       # GDI: envhosts.exe; QML: build/bin/envhosts.exe
 ctest --test-dir build -C Release --output-on-failure
 ```
 
@@ -98,9 +98,8 @@ assert state; do not route them through JSON-RPC or use them for writes.
 
 ## Pull requests
 
-1. Fork, create a branch from `main`.
-2. Keep a pull request to one topic. Follow the existing style: C++17, no
-   third-party libraries, no runtime DLLs, all code and comments in English.
+1. Fork, create a topic branch from the relevant `gdi` or `qml` branch.
+2. Keep a pull request to one topic. Follow the existing style: C++17; GDI has no extra runtime, QML bundles its Qt runtime. Code and comments stay in English.
    Documentation is bilingual: `README.md` is the Chinese default and
    `README.en.md` its English counterpart (see "Documentation languages").
    User-facing strings in plugin.json stay bilingual zh/en.
@@ -153,64 +152,24 @@ English.
 
 ## Releasing (maintainers)
 
-The version in `plugin.json` is the single source of truth. Versions follow
-[Semantic Versioning](https://semver.org/).
+Maintain `gdi` and `qml` independently. Port common storage/protocol fixes to
+both; keep interface changes on their own branch. Read [DUAL_EDITIONS.md](docs/DUAL_EDITIONS.md)
+for build, package, migration and release acceptance requirements.
 
-1. Bump `version` in `plugin.json` and anything that echoes it in the code.
-2. In `CHANGELOG.md`, rename `## [Unreleased]` to `## [x.y.z] - YYYY-MM-DD`,
-   add a fresh empty `## [Unreleased]` above it, and update the links at the end.
-3. Check locally:
-   ```powershell
-   cmake --build build --config Release
-   ctest --test-dir build -C Release --output-on-failure
-   python tests/integration.py
-   python tests/gui_preview.py --no-hold
-   python tools/package.py --tag vx.y.z
-   ```
-   Then verify the **package**, not the working tree: a development junction
-   makes the host load `envhosts.exe` straight from this clone, so it cannot
-   catch a missing or stale file in the archive. Remove the junction, unpack the
-   `.wsplugin` into `%LOCALAPPDATA%\WinShun\plugins\ra9fael.envhosts`, and run
-   `python tests/verify_install.py` (see "Release verification" below).
-4. Commit (`chore(release): vx.y.z`), tag and push:
-   ```powershell
-   git tag -a vx.y.z -m "vx.y.z"
-   git push origin main vx.y.z
-   ```
-5. The `release` workflow builds with MSVC, runs the unit tests, checks that the
-   tag matches `plugin.json` and that the CHANGELOG has the section, and
-   publishes a GitHub Release with the `.wsplugin` and its `.sha256`. Confirm the
-   release is neither draft nor prerelease and that GitHub's asset digest equals
-   the local `.sha256` file.
-6. Offline registry pre-check (before opening the PR). Set `REG` to the folder
-   holding `WinShun-plugins/tools`, then run this as a single PowerShell line:
-   ```powershell
-   $env:REG='D:\dev\github\winshun-dev\WinShun-plugins\tools'; python -c "import sys,os,json; sys.path.insert(0,os.environ['REG']); import check; m=json.load(open('plugin.json',encoding='utf-8')); v=m['version']; f='dist/'+m['id']+'-'+v+'.wsplugin'; p=check.check_package(open(f,'rb').read(),m['id'],v,f,unreviewed_native=True); print('errors',p.errors); print('warnings',p.warnings); print('sha256',p.fields.get('sha256'))"
-   ```
-   A plain `check.py <folder>` is the script-package checker and will reject the
-   exe; `unreviewed_native=True` is required. `tests/verify_install.py` also
-   checks the archive limits and installed files.
-7. Submit the registry entry from a `WinShun-plugins` branch/worktree:
-   ```powershell
-   python tools/entry.py <release-asset-url> --unreviewed-native --print
-   ```
-   Commit only `plugins/ra9fael.envhosts.json` and open a PR against
-   `LingCore/WinShun-plugins`. The review marker is permanent; every install and
-   every update requires a separate confirmation in Win顺.
+`plugin.json` is the only version source. Tags are `gdi/vX.Y.Z` or `qml/vX.Y.Z`.
+The package tool checks the manifest, edition and executable before writing an
+immutable package and SHA-256. QML bundles its dynamic Qt/VC dependencies;
+GDI remains a standalone executable. Never replace published release assets.
 
-### Release verification
+Run CI, create/push the reviewed tag, and dispatch the release workflow once
+for that tag. Local verified assets may instead be published with
+`gh release create --verify-tag --notes-file ...`; never use both publishing
+paths for the same tag. GDI is the default Latest release; QML uses `--latest=false`.
+Operate GitHub sequentially, inspect each result, and avoid bulk/repeated requests.
 
-`tests/verify_install.py` drives the real user-install path. It refuses to run
-while the target is a junction, verifies the unpacked manifest and executable,
-then runs the JSON-RPC handshake and the GUI assertions against the installed
-copy. It never writes to the repository. To remove a development junction, use
-`cmd /c rmdir` on the link only — uninstalling a linked plugin from the settings
-page deletes the clone recursively.
-
-A tag that does not match `plugin.json` fails the workflow before anything is
-published. To redo a failed release, delete the tag locally and remotely, fix,
-and tag again. Never replace the assets of a published release; publish a new
-patch version instead.
+The registry currently accepts only a single package URL for an ID. Keep its
+entry on GDI; adding backend-aware installation/updates needs host and index
+changes. Library submission is separate from publishing GitHub Releases.
 
 ## License
 

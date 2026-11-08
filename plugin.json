@@ -3,10 +3,10 @@
   "manifest": 1,
   "id": "ra9fael.envhosts",
   "name": {
-    "zh": "环境变量 / hosts 编辑",
-    "en": "Env & hosts editor"
+    "zh": "环境变量 / hosts 编辑（GDI）",
+    "en": "Env & hosts editor (GDI)"
   },
-  "version": "0.7.4",
+  "version": "0.7.5",
   "description": {
     "zh": "可视化编辑用户环境变量与 hosts 条目：交互窗口支持多选批量、分隔项编辑与中英文界面；改写前自动备份，系统级目标未提权时明确降级",
     "en": "Visual editor for user env vars and hosts: multi-select batch commands, split-item editing and a zh/en UI; auto-backup before writes; honest degradation for admin-only targets"

@@ -8,6 +8,8 @@
 直接在 Win顺 启动器里浏览、筛选、编辑**用户环境变量**和 **hosts 文件条目**。
 每次写入前都会先备份；只有管理员才能改的目标会如实报错，而不是假装成功。
 
+本分支维护 **GDI 版**。两种界面均可选装，功能与快捷键以各自版本说明为准。
+
 ## 设计目的
 
 - `env` —— 列出用户环境变量（可选含系统变量），按名称或值筛选，行内编辑，
@@ -15,45 +17,47 @@
 - `hosts` —— 列出 hosts 条目，筛选，切换注释，复制行，删除行（双击 Enter 确认），
   新增条目，恢复备份。
 - **交互式编辑窗口** —— `env` 和 `hosts` 的第一条结果永远是
-  "进入交互式编辑界面"（Enter 打开独立的 GDI 窗口）：全键盘操作、撤销 / 重做、
+  "进入交互式编辑界面"（Enter 打开所安装版本的编辑窗口）：全键盘操作、撤销 / 重做、
   冲突检测、草稿自动保存到 `WS_DATA_DIR/drafts/`。
 
 ## 安装
 
-1. 从 [最新 Release](https://github.com/ra9fael/winshun-envhosts/releases/latest)
-   下载 `ra9fael.envhosts-<version>.wsplugin`。可选：用旁边的 `.sha256` 文件核对
-   SHA-256（`Get-FileHash <file> -Algorithm SHA256`）。
-2. 在 Win顺 里打开 **设置 → 插件 → 已安装 → 添加插件 → 压缩包（.zip / .wsplugin）**，
-   选中该文件。
-3. 从本地安装包安装的插件**不会自动启用**。请在列表里打开开关；启用这一步就是你
-   在确认它申请的权限（见 [权限说明](#权限说明)）。
+两版均维护和发布，请按界面偏好选择：
 
-**更新：** 用同样方式安装新版的 `.wsplugin`。Win顺 认出是同一个 id，会先询问是否
-替换旧版本，并保留插件的数据目录。
+| 版本 | 下载 | 分支 |
+|---|---|---|
+| GDI 原生界面 | [GDI 0.7.5](https://github.com/ra9fael/winshun-envhosts/releases/tag/gdi%2Fv0.7.5) | `gdi` |
+| QML 界面 | [QML 0.8.0](https://github.com/ra9fael/winshun-envhosts/releases/tag/qml%2Fv0.8.0) | `qml` |
 
-**卸载：** 在 **设置 → 插件 → 已安装** 里移除。
+1. 下载对应 `.wsplugin`，可用同页 `.sha256` 核对文件。
+2. 打开 **设置 → 插件 → 已安装 → 添加插件 → 压缩包（.zip / .wsplugin）**。
+3. 确认安装和权限，并按需启用。
 
-本插件是原生 exe，以「未审核原生插件」身份收录在 Win顺 应用内的**插件库**
-（条目由 [WinShun-plugins](https://github.com/LingCore/WinShun-plugins) 维护，
-需维护者合并 PR），也可以从本仓库的 Release 下载 `.wsplugin` 手动安装。
-要求 Win顺 ≥ 0.22.0：宿主从该版本起才会显示原生包的安装风险确认。**首次安装
-和每次更新都要单独确认**，这类包不会进入「全部更新」。「未审核」表示没有经过
-代码安全审核，不代表已认证。已发布的包不要替换内容，改动请发新版本。
+**安装互斥：** 两版的 ID 都是 `ra9fael.envhosts`。安装另一版会提示替换，
+不是额外安装第二个插件；无需先卸载。切换前请保存或关闭编辑窗口。
+较低版本可能显示降级确认，插件设置与备份保留，草稿按后端隔离。
+
+**更新：** 从所选版本的发布页安装对应更新。当前插件库只有一个后端的下载地址，
+若接受其中的 GDI 更新可能切回 GDI；QML 用户请使用 QML 发布页。
+本仓库新建后的插件库收录需单独提交，不能以 Release 发布代表已经收录。
+要求 WinShun ≥ 0.22.0。原生插件安装及更新需要宿主确认。
+
+详见[双版本、数据迁移和验收说明](docs/DUAL_EDITIONS.md)。
 
 ## 从源码构建
 
-环境要求：Windows 10/11 x64、CMake 3.21+，以及 Visual Studio 2022 及以上（MSVC）
-或 MinGW-w64 GCC 13+。打包和集成测试需要 Python 3.10+。
+Windows 10/11 x64，CMake 3.21+、MSVC 2022+ 和 Python 3.10+。
+检出 `gdi` 或 `qml` 分支，`edition.json` 自动选择对应后端。
+QML 另需 Qt 6.8.3，配置时设置 `CMAKE_PREFIX_PATH`。
 
 ```powershell
-cmake -S . -B build -A x64                 # MSVC；MinGW 用 -G "MinGW Makefiles"
-cmake --build build --config Release       # 在 plugin.json 旁边生成 envhosts.exe
-ctest --test-dir build -C Release --output-on-failure
-python tools/package.py                    # dist/ra9fael.envhosts-<version>.wsplugin
+cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
+cmake --build build
+ctest --test-dir build --output-on-failure
 ```
 
-本地构建如何直接在 Win顺 里运行，以及测试和发版流程，见
-[CONTRIBUTING.md](CONTRIBUTING.md)。
+GDI 使用 `python tools/package.py`。QML 先部署 Qt 运行库，再打包；
+完整步骤见 [双版本说明](docs/DUAL_EDITIONS.md) 和 [贡献指南](CONTRIBUTING.md)。
 
 ## 关键词与示例
 
@@ -76,7 +80,7 @@ python tools/package.py                    # dist/ra9fael.envhosts-<version>.wsp
 
 - Windows 10/11、x64（编译期拒绝 32 位：否则 Wow64 文件系统重定向会让它改到
   `SysWOW64\drivers\etc\hosts`）。
-- 以静态链接的 `envhosts.exe` 发布；不需要运行库。
+- GDI 静态链接，无需额外运行库；QML 包自带 Qt 6.8.3 和 VC 运行库。
 - 常驻插件（`mode: resident`）、懒启动、`idleExitSec: 0` —— 一直驻留到 Win顺 退出，
   保证打开的编辑窗口不会被空闲回收杀掉。
 
@@ -117,7 +121,7 @@ python tools/package.py                    # dist/ra9fael.envhosts-<version>.wsp
   （保留数量由 `backupCount` 控制，默认 10）。
 - `backups/hosts/<timestamp>.hosts` —— 每次 hosts 写入前的逐字节原文（保留数量同样
   由 `backupCount` 控制）。
-- `drafts/env.json` / `drafts/hosts.json` —— 交互式编辑窗口里未保存的编辑，
+- `drafts/<gdi|qml>/env.json` / `drafts/<gdi|qml>/hosts.json` —— 交互式编辑窗口里未保存的编辑，
   每 30 s 及关闭 / 退出时自动写入。重新打开编辑器时会弹框询问「恢复 / 丢弃」，
   恢复后作为未保存的修改显示（仍需 Ctrl+S 才写回），丢弃则删除草稿文件。只有编辑器
   写草稿，这里不发生任何注册表 / hosts 写入。
@@ -147,7 +151,7 @@ python tools/package.py                    # dist/ra9fael.envhosts-<version>.wsp
   被挡住时用 Alt+Tab 找回来。
 - 在按下 **Ctrl+S** 之前，编辑器不写任何东西：它会重新读取目标、比较内容指纹，
   若窗口打开期间底层 env / hosts 被改过，则中止并给出冲突提示。写前备份是恢复路径。
-  未保存的编辑每 30 s 及关闭时刷入 `drafts/env.json` / `drafts/hosts.json`。
+  未保存的编辑每 30 s 及关闭时刷入 `drafts/<gdi|qml>/env.json` / `drafts/<gdi|qml>/hosts.json`。
 - 窗口运行在自己的 GUI 线程上；启动器对同一目标的写入会 `PostMessage` 通知重载
   （让打开的窗口反映外部改动）。两者由 `native::g_writeLock` 串行化。
 

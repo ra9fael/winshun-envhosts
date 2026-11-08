@@ -1,46 +1,57 @@
-# Build, test and publish a GitHub Release when a version tag is pushed.
-# The tag must equal "v" + plugin.json "version" (tools/package.py checks it),
-# and CHANGELOG.md must have a matching "## [x.y.z]" section.
+# Deliberate dispatch avoids publishing when a maintenance tag is merely pushed.
 name: release
-
 on:
-  push:
-    tags: ["v*.*.*"]
-
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Existing tag: gdi/vX.Y.Z or qml/vX.Y.Z'
+        required: true
+        type: string
 permissions:
-  contents: write   # create the release and upload assets
-
-defaults:
-  run:
-    shell: bash
-
+  contents: read
 jobs:
-  release:
-    runs-on: windows-latest
+  verify:
+    runs-on: ubuntu-latest
+    outputs:
+      backend: ${{ steps.tag.outputs.backend }}
     steps:
       - uses: actions/checkout@v4
-
-      - uses: actions/setup-python@v5
         with:
-          python-version: "3.12"
-
-      # MSVC x64 with the static CRT (see CMakeLists.txt): the exe depends on
-      # system DLLs only.
-      - name: Configure
-        run: cmake -S . -B build -A x64
-
-      - name: Build
-        run: cmake --build build --config Release
-
-      - name: Unit tests
-        run: ctest --test-dir build -C Release --output-on-failure
-
-      - name: Package
-        run: python tools/package.py --tag "${GITHUB_REF_NAME}"
-
-      - name: Publish release
+          fetch-depth: 0
+      - id: tag
+        env:
+          RELEASE_TAG: ${{ inputs.tag }}
+        run: |
+          if [[ ! "$RELEASE_TAG" =~ ^(gdi|qml)/v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then exit 1; fi
+          backend="${RELEASE_TAG%%/*}"
+          git rev-parse --verify "refs/tags/$RELEASE_TAG^{commit}"
+          git merge-base --is-ancestor "refs/tags/$RELEASE_TAG" "refs/remotes/origin/$backend"
+          echo "backend=$backend" >> "$GITHUB_OUTPUT"
+  build:
+    needs: verify
+    uses: ./.github/workflows/build.yml
+    with:
+      ref: refs/tags/${{ inputs.tag }}
+      tag: ${{ inputs.tag }}
+  publish:
+    needs: [verify, build]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: edition-package
+          path: dist
+      - name: Publish one release
         env:
           GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          RELEASE_TAG: ${{ inputs.tag }}
+          BACKEND: ${{ needs.verify.outputs.backend }}
         run: |
-          gh release create "${GITHUB_REF_NAME}" dist/*.wsplugin dist/*.wsplugin.sha256 \
-            --title "${GITHUB_REF_NAME}" --notes-file dist/release-notes.md
+          latest=false
+          if [[ "$BACKEND" == gdi ]]; then latest=true; fi
+          gh release create "$RELEASE_TAG" --verify-tag --latest="$latest" \
+            --title "${BACKEND^^} ${RELEASE_TAG#*/v}" --notes-file dist/release-notes.md \
+            dist/*.wsplugin dist/*.sha256

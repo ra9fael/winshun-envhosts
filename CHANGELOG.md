@@ -3,9 +3,22 @@
 All notable changes to this plugin. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions follow
 [Semantic Versioning](https://semver.org/). The version in `plugin.json` is the
-single source of truth; release tags are `v<version>`.
+single source of truth; release tags are `<gdi|qml>/v<version>`.
 
 ## [Unreleased]
+
+## [0.7.5] - 2026-11-09
+
+### Added
+
+- Maintained GDI/QML branches and mutually exclusive packages sharing one plugin ID.
+- Backend/version verification before packaging, separate release tags and bilingual download choices.
+
+### Fixed
+
+- Isolate GDI drafts, route legacy drafts by format and archive original bytes without overwriting newer drafts.
+- Refuse incompatible QML multi-string/raw backups and preserve user/system scope boundaries when restoring shared snapshots.
+
 
 ## [0.7.4] - 2026-11-08
 
@@ -430,7 +443,7 @@ First public release.
 - A backup before every write, with a configurable `backupCount`.
 - Byte-exact hosts round trip (UTF-8 BOM, CRLF, section comments preserved).
 
-[Unreleased]: https://github.com/ra9fael/winshun-envhosts/compare/v0.7.4...HEAD
+[Unreleased]: https://github.com/ra9fael/winshun-envhosts/compare/gdi/v0.7.5...gdi
 [0.7.4]: https://github.com/ra9fael/winshun-envhosts/releases/tag/v0.7.4
 [0.7.3]: https://github.com/ra9fael/winshun-envhosts/releases/tag/v0.7.3
 [0.7.2]: https://github.com/ra9fael/winshun-envhosts/releases/tag/v0.7.2
@@ -438,3 +451,5 @@ First public release.
 [0.7.0]: https://github.com/ra9fael/winshun-envhosts/releases/tag/v0.7.0
 [0.4.0]: https://github.com/ra9fael/winshun-envhosts/releases/tag/v0.4.0
 [0.1.0]: https://github.com/ra9fael/winshun-envhosts/releases/tag/v0.1.0
+
+[0.7.5]: https://github.com/ra9fael/winshun-envhosts/releases/tag/gdi%2Fv0.7.5

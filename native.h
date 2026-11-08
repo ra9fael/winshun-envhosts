@@ -33,6 +33,7 @@
 
 #include "winshun.h"
 #include "logic.h"
+#include "backup_format.h"
 
 namespace envh {
 namespace native {
@@ -411,6 +412,10 @@ public:
             vars.push_back(winshun::Json(std::move(o)));
         }
         root["vars"] = winshun::Json(std::move(vars));
+        root["schemaVersion"] = 1;
+        winshun::Json::Array scopes{"user"};
+        if (includeSystem) scopes.push_back("system");
+        root["scopes"] = winshun::Json(std::move(scopes));
         const std::string path = m_dir + "/backups/env/" + id + ".json";
         writeFile(path, root.empty() ? std::string("{\"vars\":[]}") : winshun::Json(std::move(root)).dump());
         prune(m_dir + "/backups/env");
@@ -467,14 +472,23 @@ public:
 
     EnvSnapshot readEnv(const std::string& id)
     {
+        EnvSnapshot snapshot;
+        std::set<std::string> scopes;
+        std::string error;
+        readEnvChecked(id, snapshot, scopes, error);
+        return snapshot;
+    }
+
+    bool readEnvChecked(const std::string& id, EnvSnapshot& snapshot, std::set<std::string>& scopes, std::string& error)
+    {
         const std::string path = backupPath("env", id);
-        if (path.empty())
-            return {};
-        std::ifstream in(path, std::ios::binary);
-        if (!in)
-            return {};
-        return parseEnvBackup(std::string((std::istreambuf_iterator<char>(in)),
-                                          std::istreambuf_iterator<char>()));
+        if (path.empty()) { error="E_BACKUP_ID";return false; }
+        std::ifstream in(std::filesystem::u8path(path), std::ios::binary);
+        if (!in) { error="E_BACKUP_READ";return false; }
+        const std::string text((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
+        const auto root=winshun::Json::parse(text);
+        if (!root) { error="E_BACKUP_FORMAT";return false; }
+        return decodeGdiBackup(*root, snapshot, scopes, error);
     }
 
     std::string readHosts(const std::string& id)
@@ -521,8 +535,8 @@ public:
     // Restore user-scope vars to a backup (system scope needs elevated, skipped).
     bool restoreEnv(const std::string& id, EnvStore& env)
     {
-        const EnvSnapshot backup = readEnv(id);
-        if (backup.vars.empty() && backupPath("env", id).empty())
+        EnvSnapshot backup;std::set<std::string> scopes;std::string error;
+        if (!readEnvChecked(id, backup, scopes, error) || !scopes.count("user"))
             return false;
         EnvSnapshot current = env.read(false).snap;
         // Apply backup vars.

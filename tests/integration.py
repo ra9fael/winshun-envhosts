@@ -330,9 +330,9 @@ def main():
     print("== P5 editor draft path uses per-kind files under WS_DATA_DIR ==")
     editor_src = open(os.path.join(HERE, "..", "editor_win.h"), "r", encoding="utf-8").read()
     # Must check the actual path expression, not a comment: drafts are written
-    # to <dataDir>/drafts/<kind>.json (env.json / hosts.json).
-    check('m_args.dataDir + "/drafts/" + m_kind + ".json"' in editor_src,
-          "editor_win.h writes drafts to <dataDir>/drafts/<kind>.json")
+    # to <dataDir>/drafts/gdi/<kind>.json (env.json / hosts.json).
+    check('envh::drafts::path(m_args.dataDir, "gdi", m_kind)' in editor_src,
+          "editor_win.h writes drafts to <dataDir>/drafts/gdi/<kind>.json")
     check("fromDraft" in editor_src and "readDraft" in editor_src,
           "editor_win.h auto-loads a leftover draft on open")
 

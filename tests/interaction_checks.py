@@ -166,7 +166,7 @@ def run(context):
     g.send(inline, g.WM_KEYDOWN, 0x0D)
     g.check(probe(25) == 1, "editing alone shows Pending on the variable row")
     g.send(h, 0x0113, 1)  # ordinary draft timer
-    draft = g.json.loads((Path(g.DATA) / "drafts/env.json").read_text(encoding="utf-8"))
+    draft = g.json.loads((Path(g.DATA) / "drafts/gdi/env.json").read_text(encoding="utf-8"))
     entries = {entry["ref"]: entry for entry in draft.get("itemCandidates", [])}
     g.check(set(entries) == {"user/Path", "user/LANG"}, "draft keeps candidates for both variables", list(entries))
     g.check(not probe(19), "draft persistence never commits candidates")

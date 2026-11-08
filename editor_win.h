@@ -42,6 +42,7 @@
 #include "native.h"
 #include "editor_model.h"
 #include "editor_common.h"
+#include "draft_storage.h"
 #include "editor_theme.h"
 #include "editor_dialog.h"
 
@@ -652,7 +653,10 @@ private:
 
     std::string readDraft()
     {
-        const std::string path = m_args.dataDir + "/drafts/" + m_kind + ".json";
+        std::string error;
+        if (!envh::drafts::migrate(m_args.dataDir, m_kind, error))
+            winshun::debug("draft migration: " + error);
+        const auto path = envh::drafts::path(m_args.dataDir, "gdi", m_kind);
         std::ifstream in(path, std::ios::binary);
         if (!in)
             return {};
@@ -660,7 +664,7 @@ private:
     }
     void writeDraft(const winshun::Json& d)
     {
-        const std::string dir = m_args.dataDir + "/drafts";
+        const std::string dir = m_args.dataDir + "/drafts/gdi";
         std::error_code ec;
         std::filesystem::create_directories(std::filesystem::u8path(dir), ec);
         std::ofstream out(std::filesystem::u8path(dir + "/" + m_kind + ".json"), std::ios::binary);
@@ -670,7 +674,7 @@ private:
     void clearDraft()
     {
         std::error_code ec;
-        std::filesystem::remove(std::filesystem::u8path(m_args.dataDir + "/drafts/" + m_kind + ".json"), ec);
+        std::filesystem::remove(envh::drafts::path(m_args.dataDir, "gdi", m_kind), ec);
     }
 
     bool m_envDirty() const { return m_hasEnv && (m_env.isDirty() || pendingPartChanges()); }
@@ -4681,7 +4685,11 @@ private:
         envh::native::BackupStore backups(m_args.dataDir, m_args.backupCount);
         const std::string lf = envh::toLower(m_filterText);
         if (m_kind == "env") {
-            const envh::EnvSnapshot snap = backups.readEnv(id);
+            envh::EnvSnapshot snap;std::set<std::string> scopes;std::string error;
+            if (!backups.readEnvChecked(id, snap, scopes, error)) {
+                out.push_back({"!", error, m_args.zh ? "请使用生成此备份的版本恢复" : "Restore with the edition that created this backup", ""});
+                return out;
+            }
             std::map<std::string, envh::EnvVar> current;
             for (const auto& r : m_env.rows)
                 if (!r.deleted && !r.name.empty()) {
@@ -5108,35 +5116,21 @@ private:
 
     void loadBackupIntoWork(const std::string& id)
     {
-        clearPartSessions(); // restoring a backup explicitly replaces the working copy
         envh::native::BackupStore backups(m_args.dataDir, m_args.backupCount);
         if (m_kind == "env") {
-            const std::string path = m_args.dataDir + "/backups/env/" + id + ".json";
-            std::ifstream in(path, std::ios::binary);
-            if (!in)
+            envh::EnvSnapshot snap;std::set<std::string> scopes;std::string error;
+            if (!backups.readEnvChecked(id, snap, scopes, error)) {
+                setStatus(error + (m_args.zh ? "：请使用生成此备份的版本恢复" : ": restore with the edition that created this backup"), 2);
                 return;
-            std::string text((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
-            const auto j = winshun::Json::parse(text);
-            if (!j)
-                return;
+            }
+            clearPartSessions();
             // The backup is the target state for the scopes it holds; scopes it
             // does not hold (system, in a user-only backup) come from a live
             // read, so loading it never marks them deleted.
             envh::native::EnvStore store(m_args.userSubkey, m_args.sysSubkey);
             const envh::EnvSnapshot live = store.read(m_args.showSystem).snap;
-            envh::EnvSnapshot snap;
-            bool hasSystem = false;
-            for (const winshun::Json& v : (*j)["vars"].toArray()) {
-                envh::EnvVar e;
-                e.scope = v["scope"].toString();
-                e.name = v["name"].toString();
-                e.type = v["type"].toString();
-                e.value = v["value"].toString();
-                hasSystem = hasSystem || e.scope == "system";
-                snap.vars.push_back(std::move(e));
-            }
             for (const envh::EnvVar& v : live.vars)
-                if (v.scope == "system" && !hasSystem)
+                if (!scopes.count(v.scope))
                     snap.vars.push_back(v);
             const envh::edit::EnvModel liveModel = envh::edit::EnvModel::fromSnapshot(live);
             m_env = liveModel;

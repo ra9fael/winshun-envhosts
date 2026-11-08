@@ -1,0 +1,78 @@
+name: build-edition
+on:
+  workflow_call:
+    inputs:
+      ref:
+        type: string
+        default: ''
+      tag:
+        type: string
+        default: ''
+permissions:
+  contents: read
+jobs:
+  build:
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref }}
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Read edition
+        id: edition
+        run: |
+          $edition = Get-Content edition.json -Raw | ConvertFrom-Json
+          if ($edition.backend -notin @('gdi','qml')) { throw 'Invalid backend' }
+          "backend=$($edition.backend)" >> $env:GITHUB_OUTPUT
+          "qt=$($edition.qtVersion)" >> $env:GITHUB_OUTPUT
+      - uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: x64
+      - name: Install Qt
+        if: steps.edition.outputs.backend == 'qml'
+        uses: jurplel/install-qt-action@v4
+        with:
+          version: ${{ steps.edition.outputs.qt }}
+          arch: win64_msvc2022_64
+          cache: true
+      - name: Configure and build
+        run: |
+          cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
+          if ($LASTEXITCODE) { throw 'Configure failed' }
+          cmake --build build --parallel 2
+          if ($LASTEXITCODE) { throw 'Build failed' }
+      - name: Tests
+        env:
+          QT_QUICK_BACKEND: software
+          QT_QPA_PLATFORM: windows:fontengine=gdi
+        run: |
+          New-Item -ItemType Directory -Path build-qml/evidence -Force | Out-Null
+          ctest --test-dir build --output-on-failure
+          if ($LASTEXITCODE) { throw 'Tests failed' }
+      - name: Deploy Qt runtime
+        if: steps.edition.outputs.backend == 'qml'
+        run: |
+          $qtRoot = Split-Path -Parent (Split-Path -Parent (Get-Command windeployqt.exe).Source)
+          ./tools/deploy_qml.ps1 -Exe build/bin/envhosts.exe -Out build/deploy -QtDir $qtRoot
+      - name: Package
+        env:
+          RELEASE_TAG: ${{ inputs.tag }}
+        run: |
+          $arguments = @('tools/package.py')
+          if ('${{ steps.edition.outputs.backend }}' -eq 'qml') { $arguments += @('--runtime-dir','build/deploy') }
+          if ($env:RELEASE_TAG) { $arguments += @('--tag',$env:RELEASE_TAG) }
+          python @arguments
+          if ($LASTEXITCODE) { throw 'Packaging failed' }
+      - uses: actions/upload-artifact@v4
+        with:
+          name: edition-package
+          path: |
+            dist/*.wsplugin
+            dist/*.sha256
+            dist/release-notes.md
+          if-no-files-found: error
