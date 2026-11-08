@@ -122,6 +122,13 @@ enable_testing()
 add_test(NAME envhosts_logic COMMAND envhosts_tests)
 add_test(NAME editor_model COMMAND editor_model_tests)
 
+find_package(Python3 COMPONENTS Interpreter QUIET)
+if(WIN32 AND Python3_Interpreter_FOUND AND NOT ENVHOSTS_QML_EDITOR)
+    add_test(NAME window_lifecycle COMMAND "${Python3_EXECUTABLE}"
+        "${CMAKE_SOURCE_DIR}/tests/window_lifecycle.py" "$<TARGET_FILE:envhosts>")
+    set_tests_properties(window_lifecycle PROPERTIES TIMEOUT 30)
+endif()
+
 # Native dialog measurement, including 100/150/200% font sizes. Hidden windows
 # use the same GDI/control code as restore/save confirmations.
 if(WIN32)

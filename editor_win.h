@@ -6637,6 +6637,9 @@ inline void closeAllEditors(unsigned timeoutMs)
         }
         std::unique_lock<std::mutex> lk(ctx->m);
         const bool closed = ctx->cv.wait_for(lk, std::chrono::milliseconds(timeoutMs), [&] { return !ctx->running; });
+        // WM_DESTROY marks the window closed before the worker finishes run().
+        // Its final bookkeeping takes ctx->m again; never join while owning it.
+        lk.unlock();
         if (closed && ctx->worker.joinable())
             ctx->worker.join();
     }
