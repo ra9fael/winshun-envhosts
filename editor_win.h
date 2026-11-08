@@ -3208,7 +3208,12 @@ private:
                     label += L" (" + std::to_wstring(n) + L")";
                 drawCommitButton(mem, smallFont, m_rcCommitBtn, label, m_listMode && n > 0);
             }
+            // The counter is a parent-painted label. Paint its own opaque panel
+            // strip first so a child-control repaint cannot cut through it.
             RECT hint = m_rcItemHint;
+            HBRUSH hintBg = CreateSolidBrush(th().kPanel);
+            FillRect(mem, &hint, hintBg);
+            DeleteObject(hintBg);
             hint.left += 4;
             HGDIOBJ of = SelectObject(mem, smallFont);
             if (!m_visible.empty() && m_sel >= 0 && m_sel < static_cast<int>(m_visible.size())) {
@@ -3232,15 +3237,17 @@ private:
                 // Right-aligned into a squeezed strip it used to lose the
                 // "共 N 项 · 合计 " prefix and show only "9 / 32,767 字符".
                 // If the full line still does not fit, the character count
-                // wins - it is the number to read before saving.
+                // wins - it is the number to read before saving. Do not apply
+                // ellipsis to the complete form: a one-pixel rounding
+                // difference must not hide the last glyph.
                 const std::wstring shortText = (m_args.zh ? L"合计 " : L"") + counts;
                 SIZE need {};
                 GetTextExtentPoint32W(mem, full.c_str(), -1, &need);
-                const std::wstring text =
-                    (need.cx <= hint.right - hint.left) ? full : shortText;
-                DrawTextW(mem, text.c_str(), -1, &hint,
+                const bool fullFits = need.cx <= hint.right - hint.left;
+                const wchar_t* text = fullFits ? full.c_str() : shortText.c_str();
+                DrawTextW(mem, text, -1, &hint,
                           DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX
-                              | DT_END_ELLIPSIS);
+                              | (fullFits ? 0 : DT_END_ELLIPSIS));
             }
             SelectObject(mem, of);
             SetTextColor(mem, fg);

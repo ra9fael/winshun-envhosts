@@ -7,6 +7,17 @@ single source of truth; release tags are `v<version>`.
 
 ## [Unreleased]
 
+## [0.7.2] - 2026-11-08
+
+### Fixed
+
+- **Split-item counter occlusion.** The parent-painted
+  `共 N 项 · 合计 X / 32,767 字符` counter now fills its strip with an opaque
+  panel background before drawing, so a child-control repaint (delimiter combo
+  or commit-button hover) can no longer cut through the glyphs. The complete
+  line is drawn without ellipsis; only the short character-count fallback is
+  ellipsized when a narrow window cannot fit it.
+
 ## [0.7.1] - 2026-11-08
 
 ### Added
@@ -357,7 +368,8 @@ First public release.
 - A backup before every write, with a configurable `backupCount`.
 - Byte-exact hosts round trip (UTF-8 BOM, CRLF, section comments preserved).
 
-[Unreleased]: https://github.com/ra9fael/winshun-envhosts/compare/v0.7.1...HEAD
+[Unreleased]: https://github.com/ra9fael/winshun-envhosts/compare/v0.7.2...HEAD
+[0.7.2]: https://github.com/ra9fael/winshun-envhosts/releases/tag/v0.7.2
 [0.7.1]: https://github.com/ra9fael/winshun-envhosts/releases/tag/v0.7.1
 [0.7.0]: https://github.com/ra9fael/winshun-envhosts/releases/tag/v0.7.0
 [0.4.0]: https://github.com/ra9fael/winshun-envhosts/releases/tag/v0.4.0
