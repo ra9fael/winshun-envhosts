@@ -1,11 +1,24 @@
 # Changelog
 
+[English](CHANGELOG.en.md)
+
 All notable changes to this plugin. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions follow
 [Semantic Versioning](https://semver.org/). The version in `plugin.json` is the
 single source of truth; release tags are `v<version>`.
 
 ## [Unreleased]
+
+## [0.7.5] - 2026-11-09
+
+### Fixed
+
+- 修复可执行文件图标，补齐打包中的 ICO 和资源脚本。 为窗口显式设置大小图标，随 DPI 更新并释放图标句柄。
+
+### Notes
+
+- 本次仅生成本地标签与安装包。实际验证范围见 docs/icon-validation.md；未进行 GitHub 发布。更新后需重新启动插件进程。
+
 
 ## [0.7.4] - 2026-11-08
 

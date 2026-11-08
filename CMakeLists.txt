@@ -13,7 +13,7 @@ endif()
 
 # The generated C++ template builds the exe straight into the plugin folder,
 # because plugin.json names it as runtime.program. Keep that convention.
-add_executable(envhosts main.cpp)
+add_executable(envhosts main.cpp envhosts.rc)
 target_compile_definitions(envhosts PRIVATE UNICODE _UNICODE NOMINMAX WIN32_LEAN_AND_MEAN)
 # Registry (advapi32) for environment writes, user32 for the launcher window glue,
 # gdi32 for the interactive editor window's GDI double-buffered painting.
@@ -49,6 +49,20 @@ if(ENVHOSTS_QML_EDITOR)
     target_compile_definitions(envhosts PRIVATE ENVHOSTS_QML_EDITOR)
     target_sources(envhosts PRIVATE qt/qt_editor.cpp qt/qt_editor.h)
     target_link_libraries(envhosts PRIVATE Qt6::Core Qt6::Gui Qt6::Qml Qt6::Quick Qt6::QuickControls2)
+
+# Generated app.ico frames, also embedded in the GUI binary.
+qt_add_resources(envhosts "plugin_window_icon"
+    PREFIX /plugin-icons BASE "${CMAKE_CURRENT_SOURCE_DIR}/icons"
+    FILES
+        icons/app-16.png
+        icons/app-20.png
+        icons/app-24.png
+        icons/app-32.png
+        icons/app-40.png
+        icons/app-48.png
+        icons/app-64.png
+        icons/app-256.png
+)
     qt_add_qml_module(envhosts
         URI EnvHosts.Editor
         VERSION 1.0

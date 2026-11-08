@@ -26,6 +26,7 @@
 #include "native.h"
 #ifdef ENVHOSTS_QML_EDITOR
 #include <QGuiApplication>
+#include "qt_window_icon.h"
 #include <QMetaObject>
 #include <thread>
 #include "qt/qt_editor.h"
@@ -856,6 +857,7 @@ int main(int argc, char** argv)
     // the JSON-RPC loop moves to a worker. stdio stays owned by the protocol
     // thread; the GUI thread never writes to it.
     QGuiApplication app(argc, argv);
+    setPluginWindowIcon();
     app.setQuitOnLastWindowClosed(false);
     editorwin::initialize();
     std::thread protocol([] {

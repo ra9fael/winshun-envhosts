@@ -24,6 +24,7 @@
 #ifdef _WIN32
 
 #include <windows.h>
+#include "window_icons.h"
 
 #include <algorithm>
 #include <atomic>
@@ -89,6 +90,7 @@ struct ThreadCtx {
 
 // ---- the window --------------------------------------------------------------
 class EditorWindow {
+    WindowIcons m_windowIcons;
 public:
     explicit EditorWindow(OpenArgs args) : m_args(std::move(args)), m_kind(m_args.kind)
     {
@@ -135,6 +137,7 @@ public:
             m_ctx->visible = true;
             m_ctx->cv.notify_all();
         }
+        m_windowIcons.update(m_hwnd);
         m_editFont = makeFont(13, false, L"Microsoft YaHei UI", DEFAULT_PITCH | FF_DONTCARE);
         createControls();
         applyLayout();
@@ -161,6 +164,7 @@ public:
                 winshun::debug("ra9fael.envhosts: loop: unknown");
             }
         }
+        m_windowIcons.clear();
         persistDraftIfDirty();
     }
 
@@ -5550,6 +5554,9 @@ private:
     LRESULT onMessage(UINT msg, WPARAM wp, LPARAM lp)
     {
         switch (msg) {
+        case WM_DPICHANGED:
+            m_windowIcons.update(m_hwnd, HIWORD(wp));
+            return DefWindowProcW(m_hwnd, msg, wp, lp);
         case WM_PAINT:
             paint();
             return 0;
