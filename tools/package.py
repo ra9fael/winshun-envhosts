@@ -49,6 +49,7 @@ def main() -> int:
         raise ValueError("Unexpected runtime.program")
     paths = {name: ROOT / name for name in ("plugin.json", "edition.json", "LICENSE", "README.md", "README.en.md")}
     paths["DUAL_EDITIONS.md"] = ROOT / "docs/DUAL_EDITIONS.md"
+    paths["app.ico"] = ROOT / "app.ico"
     if backend == "qml":
         if not args.runtime_dir or args.exe:
             raise ValueError("QML requires --runtime-dir containing the matching exe and Qt DLLs")

@@ -28,6 +28,7 @@
 #include "native.h"
 #ifdef ENVHOSTS_QML_EDITOR
 #include <QGuiApplication>
+#include "qt_window_icon.h"
 #include <QMetaObject>
 #include <thread>
 #include "qt/qt_editor.h"
@@ -938,6 +939,7 @@ int main(int argc, char** argv)
     if(qEnvironmentVariableIsEmpty("QT_QPA_PLATFORM"))
         qputenv("QT_QPA_PLATFORM", "windows:fontengine=gdi");
     QGuiApplication app(argc, argv);
+    setPluginWindowIcon();
     app.setQuitOnLastWindowClosed(false);
     editorwin::initialize();
     std::thread protocol([] {
