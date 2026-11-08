@@ -166,11 +166,12 @@ The package tool checks the manifest, edition and executable before writing an
 immutable package and SHA-256. QML bundles its dynamic Qt/VC dependencies;
 GDI remains a standalone executable. Never replace published release assets.
 
-Run CI, create/push the reviewed tag, and dispatch the release workflow once
-for that tag. Local verified assets may instead be published with
-`gh release create --verify-tag --notes-file ...`; never use both publishing
-paths for the same tag. GDI is the default Latest release; QML uses `--latest=false`.
-Operate GitHub sequentially, inspect each result, and avoid bulk/repeated requests.
+Dispatch `release.yml` with `ref` and `publish=false` for verification. A new
+`gdi/vX.Y.Z` or `qml/vX.Y.Z` tag runs the complete build and publishes it. To
+publish an existing tag manually, set `ref` to that tag and `publish=true`.
+Branch pushes and pull requests do not trigger Actions. GDI is Latest; QML is not.
+Use English Angular commit subjects and bodies. See [WORKFLOWS.md](WORKFLOWS.md).
+Operate GitHub sequentially and avoid repeated requests.
 
 The registry currently accepts only a single package URL for an ID. Keep its
 entry on GDI; adding backend-aware installation/updates needs host and index

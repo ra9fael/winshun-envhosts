@@ -72,11 +72,11 @@ QML: deploy with `tools/deploy_qml.ps1 -Exe build/bin/envhosts.exe -Out build/de
 -QtDir <QtRoot> -VcRedistDir <x64-CRT>`, then
 `python tools/package.py --runtime-dir build/deploy --tag qml/v0.8.0`.
 
-Push one reviewed branch/tag at a time. The release workflow is explicitly
-dispatched for an existing tag and verifies that it belongs to its maintenance
-branch; pushing a tag alone never publishes. Alternatively publish already
-verified local assets once with `gh release create --verify-tag --notes-file ...`.
-Do not use both paths for the same release or replace published asset bytes.
+Push a new edition version tag to build, test and publish automatically. Updated
+or deleted tags do not build. For verification, dispatch `release.yml` with a
+source `ref` and `publish=false`. Manual publication requires an existing tag
+and `publish=true`. Both routes verify edition identity and branch ancestry;
+existing release assets are never replaced. See [WORKFLOWS.md](../WORKFLOWS.md).
 
 ## Acceptance
 

@@ -40,6 +40,8 @@ jobs:
           version: ${{ steps.edition.outputs.qt }}
           arch: win64_msvc2022_64
           cache: true
+          setup-python: false
+          aqtsource: git+https://github.com/miurahr/aqtinstall.git@5a49f2b391ae8ee1d3c0dd87f8b33c1d49a4deb7
       - name: Configure and build
         run: |
           cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
@@ -63,16 +65,18 @@ jobs:
         env:
           RELEASE_TAG: ${{ inputs.tag }}
         run: |
-          $arguments = @('tools/package.py')
+          $arguments = @('tools/package.py', '--out', 'dist/ci')
           if ('${{ steps.edition.outputs.backend }}' -eq 'qml') { $arguments += @('--runtime-dir','build/deploy') }
           if ($env:RELEASE_TAG) { $arguments += @('--tag',$env:RELEASE_TAG) }
           python @arguments
           if ($LASTEXITCODE) { throw 'Packaging failed' }
+      - name: Verify package and checksum
+        run: python tools/ci_release.py dist/ci
       - uses: actions/upload-artifact@v4
         with:
-          name: edition-package
+          name: verified-package
           path: |
-            dist/*.wsplugin
-            dist/*.sha256
-            dist/release-notes.md
+            dist/ci/*.wsplugin
+            dist/ci/*.sha256
+            dist/ci/release-notes.md
           if-no-files-found: error
