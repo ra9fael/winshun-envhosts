@@ -733,11 +733,9 @@ private:
     void selectRow(int idx)
     {
         endEdit(); // changing rows ends the current edit session
-        // Two-stage item deletes: fold staged deletions into the OLD row while
-        // m_sel still points at it (commitDetail joins the parts WITHOUT the
-        // staged items), so switching rows never loses an x the user clicked.
-        if (m_kind == "env" && m_listMode && stagedPartCount() > 0)
-            commitDetail();
+        // Detail changes, including staged item deletes, already live in the
+        // model. Callers may have replaced it (undo/reload) or rebuilt visible
+        // indices (filter/tab); stale controls must never write into that row.
         if (m_tab == 2) {
             const int n = static_cast<int>(m_backupIds.size());
             m_sel = n == 0 ? 0 : std::max(0, std::min(idx, n - 1));
@@ -883,16 +881,18 @@ private:
             const bool outside = HIWORD(hit) != 0;
             if (!outside && idx >= 0 && idx < static_cast<int>(self->m_valueParts.size())
                 && self->partActionHit(x)) {
-                const bool added = idx < static_cast<int>(self->m_partNew.size())
-                                   && self->m_partNew[static_cast<std::size_t>(idx)];
                 // v0.7.0 two-stage delete: x stages a row (red, "− 待删除")
                 // and x on a staged row RESTORES it. Added rows still vanish
                 // at once - they never existed in the value.
-                if (!added) {
-                    self->m_partSel = idx;
-                    self->deletePart();
-                    return 0;
-                }
+                self->commitPartEdit();
+                if (self->m_partInline >= 0)
+                    self->endPartInline(true);
+                self->m_partSel = idx;
+                self->partSelectionClear(); // the row's own x targets that row
+                self->showCurrentPart();
+                SetFocus(h);
+                self->deletePart();
+                return 0;
             }
             // v0.7.1 multi-select: Ctrl+Click toggles, Shift+Click ranges.
             // The modifiers come from MK_* in wParam (injected mouse messages
@@ -903,7 +903,12 @@ private:
             const bool shift = (wp & MK_SHIFT) != 0
                 || (GetKeyState(VK_SHIFT) & 0x8000) != 0;
             if (!outside && (ctrl || shift)) {
+                self->commitPartEdit();
+                if (self->m_partInline >= 0)
+                    self->endPartInline(true);
                 self->partSelectionGesture(idx, ctrl, shift);
+                self->showCurrentPart();
+                SetFocus(h);
                 return 0; // keep the list box from moving its own caret
             }
         }
@@ -930,7 +935,7 @@ private:
                 return r;
             }
         }
-        if (self && msg == WM_KEYDOWN) {
+        if (self && (msg == WM_KEYDOWN || msg == WM_SYSKEYDOWN)) {
             const bool ctrl = (GetKeyState(VK_CONTROL) & 0x8000) != 0;
             const bool shift = (GetKeyState(VK_SHIFT) & 0x8000) != 0;
             if (h == self->m_rawEdit) {
@@ -975,6 +980,12 @@ private:
                 return CallWindowProcW(old, h, msg, wp, lp);
             }
             if (h == self->m_partEdit) {
+                const bool alt = (GetKeyState(VK_MENU) & 0x8000) != 0;
+                if ((ctrl && (wp == 'N' || wp == 'J' || wp == 'K' || wp == 'U'
+                              || wp == 'S' || wp == 'Z' || wp == 'Y' || wp == 'R'
+                              || wp == VK_TAB))
+                    || (alt && (wp == 'J' || wp == 'K' || wp == VK_UP || wp == VK_DOWN)))
+                    return self->onKey(wp);
                 // The floating in-place edit box sits over one LISTBOX row.
                 // Enter commits, Esc restores the text captured on open, and a
                 // Tab commits before moving on. EN_CHANGE already writes the
@@ -1031,7 +1042,7 @@ private:
                 const bool ctrl = (GetKeyState(VK_CONTROL) & 0x8000) != 0;
                 if (wp == VK_INSERT || wp == VK_DELETE || wp == VK_BACK)
                     return self->onKey(wp);
-                if (alt && (wp == VK_UP || wp == VK_DOWN))
+                if (alt && (wp == VK_UP || wp == VK_DOWN || wp == 'J' || wp == 'K'))
                     return self->onKey(wp);
                 if (ctrl && (wp == 'N' || wp == 'n' || wp == 'J' || wp == 'j'
                              || wp == 'K' || wp == 'k'))
@@ -1873,9 +1884,8 @@ private:
         InvalidateRect(m_partsList, nullptr, FALSE);
         return true;
     }
-    // The value the parts list MEANS once staged deletions are applied. Used by
-    // commitDetail / syncRawValueEdit so a staged x does not change the model
-    // until a commit runs, and can still be undone by clicking x again.
+    // Staged deletes are already reflected in the working model, but remain
+    // visible/restorable in this view. Only Save writes to the registry.
     std::string joinedPartsValue() const
     {
         if (!m_listMode)
@@ -1889,9 +1899,8 @@ private:
                 live.push_back(m_valueParts[i]);
         return envh::edit::joinDelimited(live, m_listDelimiter);
     }
-    // Erase every staged item from the view list. Called by the 提交修改
-    // button and by rebuildPartsList (a rebuild always reflects a context
-    // change - the model value was already updated by the last commitDetail).
+    // Erase staged items from the current view only. Never call this after
+    // replacing m_valueParts: the flags belong to the old list's indices.
     void applyStagedPartDeletions()
     {
         if (stagedPartCount() == 0)
@@ -1908,8 +1917,11 @@ private:
             // Deleting everything leaves an empty item, mirroring deletePart.
             m_valueParts.emplace_back();
             m_partNew.assign(1, 1);
+            m_partDeleted.assign(1, 0);
         }
         m_partSel = std::max(0, std::min(m_partSel, static_cast<int>(m_valueParts.size()) - 1));
+        m_partMulti.assign(m_valueParts.size(), 0);
+        m_partAnchor = m_partSel;
     }
     // The 提交修改 button: apply staged item operations into the row value
     // (still model-staged; the registry write remains behind Ctrl+S).
@@ -2125,8 +2137,18 @@ private:
             SetFocus(m_partsList);
         InvalidateRect(m_hwnd, nullptr, TRUE);
     }
-    // Rebuild only when the delimiter, row, mode or live model changed. A normal
-    // selection is handled by updatePartRow/LB_SETCURSEL and must preserve top.
+    // A new model value/delimiter invalidates every index in the old view.
+    void resetPartState()
+    {
+        m_partNew.assign(m_valueParts.size(), 0);
+        m_partDeleted.assign(m_valueParts.size(), 0);
+        m_partMulti.assign(m_valueParts.size(), 0);
+        m_partAnchor = m_partSel;
+        m_partInline = -1;
+        m_partInlineOriginal.clear();
+    }
+    // Rendering must not mutate the value or its metadata. It is also used
+    // after removing new items from a mixed selection, with other items staged.
     void rebuildPartsList(bool preserveTop = false)
     {
         if (!m_partsList)
@@ -2136,13 +2158,6 @@ private:
             ? std::max(0, static_cast<int>(SendMessageW(m_partsList, LB_GETTOPINDEX, 0, 0)))
             : 0;
         SendMessageW(m_partsList, LB_RESETCONTENT, 0, 0);
-        // A rebuild always means a context change (row / mode / delimiter).
-        // Fold staged deletions into the list first so they are not silently
-        // lost - the model value was already updated by the last commitDetail.
-        applyStagedPartDeletions();
-        m_partNew.assign(m_valueParts.size(), 0);
-        m_partDeleted.assign(m_valueParts.size(), 0);
-        m_partMulti.assign(m_valueParts.size(), 0);
         for (const auto& part : m_valueParts) {
             const std::wstring wide = wideFromUtf8(part);
             SendMessageW(m_partsList, LB_ADDSTRING, 0, reinterpret_cast<LPARAM>(wide.c_str()));
@@ -2196,6 +2211,8 @@ private:
         if (insertAt <= static_cast<int>(m_partDeleted.size()))
             m_partDeleted.insert(m_partDeleted.begin() + insertAt, 0);
         m_partSel = insertAt;
+        m_partMulti.assign(m_valueParts.size(), 0);
+        m_partAnchor = m_partSel;
         if (m_partsList) {
             const std::wstring empty;
             SendMessageW(m_partsList, LB_INSERTSTRING, insertAt, reinterpret_cast<LPARAM>(empty.c_str()));
@@ -2205,8 +2222,7 @@ private:
         invalidatePartChrome();
         syncRawValueEdit();
         commitDetail();
-        showCurrentPart();
-        SetFocus(m_partEdit);
+        beginPartInline(m_partSel);
     }
     void deletePart()
     {
@@ -2259,11 +2275,10 @@ private:
             m_partDeleted.assign(1, 0);
         }
         m_partSel = std::max(0, std::min(m_partSel, static_cast<int>(m_valueParts.size()) - 1));
-        partSelectionClear();
-        // NOTE: no rebuildPartsList here when only staging toggled - a rebuild
-        // folds staged deletions away (applyStagedPartDeletions), which would
-        // erase the rows the user just staged. The list content is unchanged;
-        // only the paint must refresh.
+        m_partMulti.assign(m_valueParts.size(), 0);
+        m_partAnchor = m_partSel;
+        // Existing items remain staged even when new items are erased in the
+        // same batch. Rebuild only when the number of visible rows changed.
         if (addedErased > 0)
             rebuildPartsList(true);
         InvalidateRect(m_partsList, nullptr, FALSE);
@@ -2312,6 +2327,7 @@ private:
         partSelectionClear();
         if (m_partMulti.size() == m_valueParts.size())
             m_partMulti[static_cast<std::size_t>(m_partSel)] = 1;
+        m_partAnchor = m_partSel;
         invalidatePartChrome();
         InvalidateRect(m_partsList, nullptr, FALSE);
         showCurrentPart();
@@ -2333,7 +2349,11 @@ private:
         const PartsGuard g {this};
         commitPartEdit();
         std::swap(m_valueParts[from], m_valueParts[to]);
+        std::swap(m_partNew[from], m_partNew[to]);
         m_partSel = to;
+        m_partMulti.assign(m_valueParts.size(), 0);
+        m_partMulti[static_cast<std::size_t>(to)] = 1;
+        m_partAnchor = to;
         updatePartRow(from);
         updatePartRow(to);
         if (m_partsList) {
@@ -2360,6 +2380,7 @@ private:
             m_valueParts = envh::edit::splitDelimited(joined, m_listDelimiter, true);
             m_partBase = m_valueParts;
             m_partSel = 0;
+            resetPartState();
             syncRawValueEdit();
             rebuildPartsList(false);
             syncDelimiterComboText();
@@ -2367,7 +2388,7 @@ private:
             SetFocus(m_partsList);
         } else {
             m_valueParts.clear();
-            m_partDeleted.clear();
+            resetPartState();
             // Write the rejoined value back into the raw box before dropping the
             // parts; syncing from an empty part list would blank the field.
             m_loading = true;
@@ -2449,6 +2470,7 @@ private:
             // is no longer comparable: start from the re-split value.
             m_partBase = m_valueParts;
             m_partSel = 0;
+            resetPartState();
             syncRawValueEdit();
             rebuildPartsList(false);
             syncDelimiterComboText();
@@ -2496,12 +2518,14 @@ private:
                     m_valueParts.clear();
                     m_partBase.clear();
                     m_partSel = 0;
+                    resetPartState();
                     rebuildPartsList(false);
                 } else {
                     m_listDelimiter = preferredDelimiter(name, value);
                     m_valueParts = envh::edit::splitDelimited(value, m_listDelimiter, true);
                     m_partBase = m_valueParts; // snapshot for item-level dirty dots
                     m_partSel = 0;
+                    resetPartState();
                     rebuildPartsList(false);
                 }
                 syncDelimiterComboText();
@@ -5414,14 +5438,14 @@ private:
             if (HIWORD(wp) == LBN_SELCHANGE && reinterpret_cast<HWND>(lp) == m_partsList) {
                 if (m_partsGuard > 0)
                     return 0;
-                if (m_partInline >= 0)
-                    endPartInline(true);
                 // The list already moved its own caret and scroll position. Read
                 // the new index first: commitPartEdit() re-asserts the previous
                 // selection, which would otherwise snap the list back and make a
                 // click look like a jump to the top.
                 const int sel = static_cast<int>(SendMessageW(m_partsList, LB_GETCURSEL, 0, 0));
                 commitPartEdit();
+                if (m_partInline >= 0)
+                    endPartInline(true);
                 if (sel >= 0 && sel < static_cast<int>(m_valueParts.size()))
                     m_partSel = sel;
                 SendMessageW(m_partsList, LB_SETCURSEL, m_partSel, 0);
@@ -5431,6 +5455,7 @@ private:
                 if (m_partMulti.size() == m_valueParts.size() && m_partSel >= 0
                     && m_partSel < static_cast<int>(m_valueParts.size()))
                     m_partMulti[static_cast<std::size_t>(m_partSel)] = 1;
+                m_partAnchor = m_partSel;
                 showCurrentPart();
                 invalidatePartChrome();
                 InvalidateRect(m_partsList, nullptr, FALSE);

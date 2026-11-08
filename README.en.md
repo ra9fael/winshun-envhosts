@@ -306,6 +306,16 @@ All data stays local under `WS_DATA_DIR`:
 
 ## Tests
 
+- `tests/gui_preview.py --split-state-check --no-hold`: pending-delete
+  undo/redo, row/filter/delimiter changes, adding items and mixed deletion;
+  registry values must remain unchanged before Save.
+- `tests/gui_preview.py --dialog-check --no-hold`: reproduces draft recovery
+  and checks that the body and both buttons fit; add `--english --dark` for
+  the English dark-theme variant.
+- CTest `dialog_layout` checks consistent height before/after child creation
+  and complete buttons at 100%, 150%, and 200% font sizes. This does not replace
+  physical multi-monitor DPI transition testing.
+
 - `tests/test_envhosts_logic.cpp` — 69 OS-free unit checks (hosts byte-exact
   round-trip on a sanitised captured file, section comments, env model, grammar,
   validation, stable ids, UTF-16 length and the 32767 limit boundary).
@@ -325,7 +335,7 @@ All data stays local under `WS_DATA_DIR`:
   refusal, **and the editor suite** (P1/P2 pinned first row, P3 openEditor wiring,
   P4 manifest fields, P5 draft location, P6 external-change path, T2.9 host
   locale / plugin override / live `appearance` switching). 37 assertions.
-- `tests/gui_preview.py --no-hold` — 103 assertions against the real window on the
+- `tests/gui_preview.py --no-hold` — 145 assertions against the real window on the
   desktop, driven over JSON-RPC with a fake 28-segment `Path` in an isolated
   registry key: split-pane layout, page scrolling, `Ins`/`Del`, the full-width
   item list, in-place editing by double-click, per-item dirty markers, a custom

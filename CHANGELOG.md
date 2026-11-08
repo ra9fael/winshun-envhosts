@@ -7,6 +7,30 @@ single source of truth; release tags are `v<version>`.
 
 ## [Unreleased]
 
+### Fixed / 修复
+
+- **恢复草稿弹窗按钮被截断。** 无明细区的弹窗现在也按实际正文高度计算窗口与
+  按钮位置；深色按钮圆角补齐背景，正文遵循主题色，英文按钮宽度按文字测量。
+  Restore-draft and other confirmations now measure the body before creating
+  controls and use that height for the complete window, including dialogs
+  without a detail block. Dark button corners/body backgrounds follow the
+  theme and button widths accommodate their labels.
+- **分隔项删除后的撤销及切换状态。** 撤销/重做、重开当前变量、切换变量、筛选和
+  分隔符不再重复套用旧删除下标；混选新增项和已有项时保留已有项的待删除标记。
+  Split-list rebuilds no longer apply old deletion indices to a new value;
+  undo/redo, refocus, row/filter/delimiter changes preserve the correct items.
+  Mixed batches immediately remove new items while existing items stay staged.
+- **新增和多选操作。** 新增项直接进入行内编辑；移动时同步新增状态，多选及单行
+  × 操作不会把旧编辑框的内容写入其它项；行内编辑正确转发窗口快捷键。
+  Adding an item opens its inline editor. Reordering preserves new-item
+  metadata, modifier clicks and row actions keep the correct edit value, and
+  inline editing forwards window shortcuts and Alt reorder keys.
+- GUI/RPC regression runs use unique scratch registry keys; GUI cleanup also
+  runs after exceptions. Added focused split-state, restore-dialog, and
+  100/150/200% font-size layout regressions.
+  GUI/协议测试使用每次运行独立的临时注册表键，GUI 异常退出也清理进程和数据；
+  新增分隔项状态、恢复弹窗及 100/150/200% 字体尺寸的布局回归。
+
 ## [0.7.2] - 2026-11-08
 
 ### Fixed

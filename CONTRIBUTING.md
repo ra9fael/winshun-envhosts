@@ -53,6 +53,12 @@ upstream as a separate commit.
 
 ## Tests
 
+The focused native-editor regressions are `python tests/gui_preview.py
+--split-state-check --no-hold` and `python tests/gui_preview.py --dialog-check
+--no-hold` (also `--english --dark`). CTest additionally runs `dialog_layout`
+at three font sizes. GUI/RPC runs use unique scratch registry keys; GUI
+scratch data and its child process are cleaned on normal and exceptional exit.
+
 - `ctest --test-dir build --output-on-failure` runs `envhosts_tests` (69 checks)
   and `editor_model_tests` (155 checks). Both are OS-free: hosts parsing with a
   byte-exact round trip on `tests/fixtures/hosts.sample`, the env model, the
@@ -65,7 +71,7 @@ upstream as a separate commit.
   System32 hosts is refused for a normal user. Run it before a PR that touches
   `main.cpp`, `native.h` or the locale resolution.
 - `python tests/gui_preview.py --no-hold` opens both real windows, captures PNGs
-  under `tests/fixtures/` and runs 103 Win32 assertions (layout, scrolling, the
+  under `tests/fixtures/` and runs 145 Win32 assertions (layout, scrolling, the
   full-width item list, in-place editing, per-item dirty markers, multi-select,
   batch commands, the external-change watcher and read-only diff panel, the
   two-pane backup page, the space delimiter, the over-long `Path` sequence and

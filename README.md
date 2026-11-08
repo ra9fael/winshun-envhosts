@@ -245,6 +245,13 @@ python tools/package.py                    # dist/ra9fael.envhosts-<version>.wsp
 
 ## 测试
 
+- `tests/gui_preview.py --split-state-check --no-hold`：检查分隔项待删除时的
+  撤销/重做、切换变量/筛选/分隔符、新增与混选删除，保存前注册表保持不变。
+- `tests/gui_preview.py --dialog-check --no-hold`：复现恢复草稿弹窗并核对正文及
+  按钮完全位于窗口内；加 `--english --dark` 验证英文深色界面。
+- CTest 的 `dialog_layout` 用 100%、150%、200% 字体尺寸检查创建控件前后
+  高度一致、按钮完整可见；这不代替多显示器实机 DPI 切换测试。
+
 - `tests/test_envhosts_logic.cpp` —— 69 项不依赖操作系统的单元检查
   （脱敏的真实 hosts 样本逐字节往返、段落注释、env 模型、语法、校验、稳定 id，
   含 UTF-16 长度与 32767 边界）。
@@ -262,7 +269,7 @@ python tools/package.py                    # dist/ra9fael.envhosts-<version>.wsp
   （P1/P2 固定首行、P3 openEditor 接线、P4 manifest 字段、P5 草稿位置、
   P6 外部改动路径、T2.9 宿主语言 / 插件设置覆盖 / 运行中 `appearance` 切换），
   共 37 项断言。
-- `tests/gui_preview.py --no-hold` —— 真机 GUI 回归（103 项断言）：用一个 28 段的
+- `tests/gui_preview.py --no-hold` —— 真机 GUI 回归（145 项断言）：用一个 28 段的
   假 `Path` 在隔离注册表键上驱动真实窗口，校验分栏布局、翻页滚动、`Ins / Del`、
   全宽分隔项列表、双击行内编辑、分隔项级标红、自定义分隔符来回切换、原文回填、
   拖动分栏条、点「保存」写盘并回读、系统变量行存活、外部冲突的只读差异面板

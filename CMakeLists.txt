@@ -107,3 +107,18 @@ endforeach()
 enable_testing()
 add_test(NAME envhosts_logic COMMAND envhosts_tests)
 add_test(NAME editor_model COMMAND editor_model_tests)
+
+# Native dialog measurement, including 100/150/200% font sizes. Hidden windows
+# use the same GDI/control code as restore/save confirmations.
+if(WIN32)
+    add_executable(dialog_layout_tests tests/test_dialog_layout.cpp)
+    target_include_directories(dialog_layout_tests PRIVATE "${CMAKE_SOURCE_DIR}")
+    target_compile_definitions(dialog_layout_tests PRIVATE UNICODE _UNICODE NOMINMAX WIN32_LEAN_AND_MEAN)
+    target_link_libraries(dialog_layout_tests PRIVATE user32 gdi32)
+    if(MSVC)
+        target_compile_options(dialog_layout_tests PRIVATE /utf-8 /W4 /permissive-)
+    else()
+        target_compile_options(dialog_layout_tests PRIVATE -finput-charset=UTF-8 -fexec-charset=UTF-8 -Wall -Wextra)
+    endif()
+    add_test(NAME dialog_layout COMMAND dialog_layout_tests)
+endif()

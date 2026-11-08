@@ -1,5 +1,40 @@
 # ra9fael.envhosts — interactive editor window (v0.2 → v0.5 design)
 
+### Native editor continuation — split-item state (2026-11-08)
+
+The existing two-stage delete interaction remains unchanged. The working model
+already receives the joined value whenever an item is staged. A list rebuild
+must only render that value; it must never apply deletion indices from the
+previous row, delimiter or undo snapshot. Reset per-item metadata when loading
+a new value, and move/remove metadata together with its own item. Mixed
+existing/new selections remove only new items immediately; existing items stay
+visible and restorable until Commit. Adding an item opens the inline editor.
+
+Failure cases and regression plan: undo/redo before Commit, refocusing the same
+row, changing rows/filter/delimiter, moving a new item, and deleting a mixed
+selection. `tests/gui_preview.py --split-state-check --no-hold` drives real
+windows against unique scratch keys. Registry values must remain unchanged
+until Save. The original executable reproduces failures in these paths; the
+post-fix results and untested boundaries will be recorded with validation.
+
+The reported restore-draft clipping was reproduced independently: a 196 px
+dialog placed buttons at y=188..218. The old initial measurement used a 40 px
+body fallback; its second pass discarded the new height whenever `detail` was
+empty. Measurement now uses the real font on the dialog DC before children
+exist, and window/control placement shares that one result (236 px for this
+fixture). The body and rounded button corners use the theme background.
+
+中文：继续完善原生编辑器，保留两阶段删除交互。工作模型已经记录分隔项删除后的
+值，因此列表重建只能显示当前值，不能再次套用上一变量、分隔符或撤销快照的删除
+下标。加载新值时重置逐项状态；移动和删除条目时同步移动、删除其状态。混选新增项
+与已有项时，新增项立即移除，已有项继续保留为可恢复的待删除状态；新增后直接进入
+行内编辑。回归覆盖撤销/重做、重新打开、切换变量/筛选/分隔符、移动新增项与混选删除，
+通过唯一临时注册表键验证保存前不写入。修复后的实测结果和未测边界另行留痕。
+
+恢复草稿弹窗的遮挡已复现：窗口高 196 像素，按钮却位于 y=188..218。首次测量
+使用 40 像素正文占位，第二次测量在没有明细时丢弃新高度。现在先用实际字体测量，
+窗口与控件共用同一结果（样例高度 236 像素），正文和按钮圆角使用对应主题背景。
+
 Status: **implemented (v0.5.0).** Coded in `editor_win.h` (window + GUI thread),
 `editor_model.h` (pure data model, 124 unit checks), `i18n.h` (locale resolution),
 wired into `main.cpp` (pinned first row + `openEditor` action + external-change +

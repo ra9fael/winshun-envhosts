@@ -9,15 +9,18 @@ Preview-only data lives in the isolated HKCU\\Software\\WinShunTest\\EnvHosts
 subkey and tests/fixtures/hosts.sample; the real Environment key and the real
 hosts file are never written.
 """
+import atexit
 import ctypes
 import json
 import os
+import shutil
 import struct
 import subprocess
 import sys
 import tempfile
 import threading
 import time
+import uuid
 import winreg
 import zlib
 from ctypes import wintypes
@@ -31,11 +34,34 @@ EXE = os.environ.get("WS_ENVHOSTS_EXE") or os.path.join(ROOT, "envhosts.exe")
 PLUGIN_DIR = os.environ.get("WS_ENVHOSTS_PLUGIN_DIR") or ROOT
 OUTDIR = os.environ.get("WS_ENVHOSTS_OUTDIR") or os.path.join(HERE, "fixtures")
 os.makedirs(OUTDIR, exist_ok=True)
-DATA = tempfile.mkdtemp(prefix="ws-envhosts-preview-")
-SUBKEY = r"Software\WinShunTest\EnvHosts"
+os.makedirs(os.path.join(ROOT, "build"), exist_ok=True)
+DATA = tempfile.mkdtemp(prefix="gui-preview-", dir=os.path.join(ROOT, "build"))
+RUN_ID = uuid.uuid4().hex
+SUBKEY = r"Software\WinShunTest\EnvHostsGui_" + RUN_ID
 # The system scope is redirected too: without this the 系统 tab would screenshot
 # this machine's real HKLM variables into the repository.
-SYS_SUBKEY = r"Software\WinShunTest\EnvHostsSystem"
+SYS_SUBKEY = r"Software\WinShunTest\EnvHostsGuiSystem_" + RUN_ID
+proc = None
+log_stream = None
+
+
+def cleanup():
+    # Only this invocation owns these keys, process and scratch directory.
+    # Also run after an assertion/exception, before another build needs the exe.
+    if proc is not None and proc.poll() is None:
+        proc.kill()
+        proc.wait(timeout=5)
+    if log_stream is not None:
+        log_stream.close()
+    for sub in (SUBKEY, SYS_SUBKEY):
+        try:
+            winreg.DeleteKey(winreg.HKEY_CURRENT_USER, sub)
+        except FileNotFoundError:
+            pass
+    shutil.rmtree(DATA)
+
+
+atexit.register(cleanup)
 # EnvStore takes the root from an explicit "HKCU\" prefix, so the 系统 tab reads
 # these fake rows instead of this machine's real HKLM variables.
 SYS_OVERRIDE = "HKCU\\" + SYS_SUBKEY
@@ -89,8 +115,9 @@ env["WS_ENVHOSTS_TEST_SYSTEM_SUBKEY"] = SYS_OVERRIDE
 env["WS_ENVHOSTS_TEST_HOSTS"] = HOSTS
 
 LOG = os.path.join(DATA, "plugin.log")
+log_stream = open(LOG, "w", encoding="utf-8", errors="replace")
 proc = subprocess.Popen([EXE], stdin=subprocess.PIPE, stdout=subprocess.PIPE,
-                        stderr=open(LOG, "w", encoding="utf-8", errors="replace"),
+                        stderr=log_stream,
                         env=env, text=True, bufsize=1, cwd=os.path.dirname(os.path.abspath(EXE)),
                         encoding="utf-8", errors="replace")
 buf = []
@@ -148,6 +175,23 @@ def log(*args):
 _, init = call("initialize", {"settings": {}, "locale": "zh", "theme": "light",
                               "pluginDir": PLUGIN_DIR, "dataDir": DATA})
 log("INIT", (init or "").strip()[:300])
+
+if "--dialog-check" in sys.argv:
+    # Offer the actual restore-draft dialog without touching a user draft.
+    rows = []
+    for scope, subkey in (("user", SUBKEY), ("system", SYS_SUBKEY)):
+        with winreg.OpenKey(winreg.HKEY_CURRENT_USER, subkey) as key:
+            for i in range(winreg.QueryInfoKey(key)[1]):
+                name, value, kind = winreg.EnumValue(key, i)
+                rows.append(dict(scope=scope, name=name,
+                                 value="draft value" if name == "LANG" else value,
+                                 type="REG_EXPAND_SZ" if kind == winreg.REG_EXPAND_SZ else "REG_SZ",
+                                 inBase=True, isNew=False, deleted=False))
+    os.makedirs(os.path.join(DATA, "drafts"), exist_ok=True)
+    with open(os.path.join(DATA, "drafts", "env.json"), "w", encoding="utf-8") as draft:
+        json.dump({"rows": rows}, draft)
+    call("appearance", {"locale": "en" if "--english" in sys.argv else "zh",
+                        "theme": "dark" if "--dark" in sys.argv else "light"})
 
 for kind in ("env", "hosts"):
     qid = _id + 1
@@ -401,8 +445,9 @@ def send(hwnd, msg, wp=0, lp=0):
 
 def get_text(hwnd):
     """Read a field with WM_GETTEXT; cross-process GetWindowTextW truncates."""
-    buf = ctypes.create_unicode_buffer(16384)
-    send(hwnd, WM_GETTEXT, 16383, ctypes.byref(buf))
+    size = send(hwnd, WM_GETTEXTLENGTH) + 1
+    buf = ctypes.create_unicode_buffer(size)
+    send(hwnd, WM_GETTEXT, size, ctypes.byref(buf))
     return buf.value
 
 
@@ -511,7 +556,10 @@ def click_at(hwnd, x, y):
 
 
 def lb_text(list_hwnd, index):
-    buf = ctypes.create_unicode_buffer(4096)
+    size = send(list_hwnd, 0x018A, index)  # LB_GETTEXTLEN
+    if size < 0:
+        return None
+    buf = ctypes.create_unicode_buffer(size + 1)
     if send(list_hwnd, LB_GETTEXT, index, ctypes.byref(buf)) < 0:
         return None
     return buf.value
@@ -707,6 +755,39 @@ for hwnd, title in wins:
         env_hwnd = hwnd
     else:
         hosts_hwnd = hwnd
+
+if "--dialog-check" in sys.argv:
+    dlg = find_dialog(3)
+    check(dlg is not None, "restore-draft dialog opened")
+    if dlg:
+        cw, ch = client_size(dlg)
+        rects = []
+        for cid in (0xFFFF, IDNO, IDYES):
+            ctl, rect = child_client_rect(dlg, cid)
+            check(ctl and rect and 0 <= rect[0] < rect[2] <= cw
+                  and 0 <= rect[1] < rect[3] <= ch,
+                  "restore dialog control %d fits the client area" % cid,
+                  "control=%s client=%s" % (rect, (cw, ch)))
+            rects.append(rect)
+        check(rects[0][3] < min(r[1] for r in rects[1:]),
+              "restore body leaves space for the complete button row")
+        shot(dlg, "draft_dialog")
+        press_dialog_button(dlg, IDNO)
+        check(not user32.IsWindow(dlg), "discard closes the restore dialog")
+        check(user32.IsWindowEnabled(env_hwnd), "editor is enabled after dialog closes")
+        check(reg_value("LANG") == "C", "discard never applies the draft to registry")
+    log("CHECKS", "failures=%d" % len(FAILURES),
+        ",".join(FAILURES) if FAILURES else "all passed")
+    sys.exit(1 if FAILURES else 0)
+
+if "--split-state-check" in sys.argv:
+    from split_state_checks import run
+    run(globals())
+    log("CHECKS", "failures=%d" % len(FAILURES),
+        ",".join(FAILURES) if FAILURES else "all passed")
+    sys.exit(1 if FAILURES else 0)
+
+check(env_hwnd is not None and hosts_hwnd is not None, "both editor windows opened")
 
 if hosts_hwnd:
     cw, ch = client_size(hosts_hwnd)

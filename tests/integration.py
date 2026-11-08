@@ -19,13 +19,14 @@ import tempfile
 import threading
 import time
 import winreg
+import uuid
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 # WS_ENVHOSTS_EXE lets tests/verify_install.py drive the exe from a real
 # user install directory instead of the development checkout.
 EXE = os.environ.get("WS_ENVHOSTS_EXE") or os.path.join(HERE, "..", "envhosts.exe")
 FIXTURE = os.path.join(HERE, "fixtures", "hosts.sample")
-SUBKEY = r"Software\WinShunTest\EnvHosts"
+SUBKEY = r"Software\WinShunTest\EnvHostsRpc_" + uuid.uuid4().hex
 
 passed = 0
 failed = 0

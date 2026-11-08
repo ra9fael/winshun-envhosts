@@ -36,8 +36,6 @@
 #include <windows.h>
 #include <windowsx.h>
 #include <algorithm>
-#include <map>
-#include <mutex>
 #include <string>
 #include <vector>
 
@@ -74,37 +72,30 @@ struct State {
     bool tracking = false;
     RECT detailRect = {};
     HFONT ui = nullptr, small = nullptr, mono = nullptr;
+    HBRUSH background = nullptr;
     ~State()
     {
         if (ui) DeleteObject(ui);
         if (small) DeleteObject(small);
         if (mono) DeleteObject(mono);
+        if (background) DeleteObject(background);
     }
 };
 
-std::map<HWND, State*>& states()
-{
-    static std::map<HWND, State*> m;
-    static std::mutex mx;
-    struct Lock {
-        std::lock_guard<std::mutex> lk;
-        explicit Lock(std::mutex& m_)
-            : lk(m_) {}
-    } l { mx };
-    return m;
-}
-
 State* stateOf(HWND h)
 {
-    auto& m = states();
-    auto it = m.find(h);
-    return it == m.end() ? nullptr : it->second;
+    return reinterpret_cast<State*>(GetWindowLongPtrW(h, GWLP_USERDATA));
 }
 
 void drawButtonFace(HDC dc, const RECT& r, const std::wstring& label, int kind,
                     bool def, bool hovered, bool focused, const envh::theme::Th& th,
                     HFONT font)
 {
+    // Owner-drawn buttons must also paint the corners outside the rounded
+    // face; the native BUTTON background otherwise leaves white squares.
+    HBRUSH background = CreateSolidBrush(th.kBg);
+    FillRect(dc, &r, background);
+    DeleteObject(background);
     COLORREF bg, br, fg;
     if (kind == kDangerBtn) {
         bg = th.kDanger;
@@ -139,7 +130,11 @@ void drawButtonFace(HDC dc, const RECT& r, const std::wstring& label, int kind,
         SelectObject(dc, odp);
         DeleteObject(dp);
     }
-    (void)focused;
+    if (focused) {
+        RECT focus = r;
+        InflateRect(&focus, -4, -4);
+        DrawFocusRect(dc, &focus);
+    }
     SetBkMode(dc, TRANSPARENT);
     SetTextColor(dc, fg);
     HGDIOBJ of = SelectObject(dc, font);
@@ -157,21 +152,18 @@ int contentHeight(HWND hdlg, State& st, int w, RECT& bodyRc, RECT& detailRc,
 {
     const int pad = 24;
     const int headH = 84; // icon tile + title + subtitle (v2: no header band)
-    // Wrapped body: reuse the real static control for measurement so the
-    // painted layout and the control agree exactly.
-    HWND bodyCtl = GetDlgItem(hdlg, 0xFFFF);
+    // Measure before creating children using the SAME font and wrapping as
+    // the body control. Its existence must not change the window height.
     RECT meas = {0, 0, w - 2 * pad, 0};
-    if (bodyCtl) {
-        HDC dc = GetDC(bodyCtl);
+    {
+        HDC dc = GetDC(hdlg);
         HGDIOBJ of = SelectObject(dc, st.ui);
         RECT br = meas;
         DrawTextW(dc, st.spec.body.c_str(), -1, &br,
-                  DT_LEFT | DT_NOPREFIX | DT_WORDBREAK | DT_CALCRECT);
+                  DT_LEFT | DT_NOPREFIX | DT_WORDBREAK | DT_EDITCONTROL | DT_CALCRECT);
         SelectObject(dc, of);
-        ReleaseDC(bodyCtl, dc);
+        ReleaseDC(hdlg, dc);
         bodyRc = {pad, headH, pad + (w - 2 * pad), headH + (br.bottom - br.top)};
-    } else {
-        bodyRc = {pad, headH, w - pad, headH + 40};
     }
     int y = bodyRc.bottom;
     if (!st.spec.detail.empty()) {
@@ -192,12 +184,20 @@ int contentHeight(HWND hdlg, State& st, int w, RECT& bodyRc, RECT& detailRc,
     // Right-aligned button row.
     btnRects.clear();
     int x = w - pad;
+    HDC buttonDc = GetDC(hdlg);
+    HGDIOBJ oldFont = SelectObject(buttonDc, st.ui);
     for (std::size_t i = st.spec.buttons.size(); i-- > 0;) {
-        const int bw = st.spec.buttons[i].kind == kPlain ? 84 : 108;
+        SIZE label {};
+        GetTextExtentPoint32W(buttonDc, st.spec.buttons[i].label.c_str(),
+                             static_cast<int>(st.spec.buttons[i].label.size()), &label);
+        const int bw = std::max(st.spec.buttons[i].kind == kPlain ? 84 : 108,
+                                static_cast<int>(label.cx) + 24);
         x -= bw;
         btnRects.push_back({x, btnTop - btnH - 18, x + bw, btnTop - 18});
         x -= 10;
     }
+    SelectObject(buttonDc, oldFont);
+    ReleaseDC(hdlg, buttonDc);
     return btnTop;
 }
 
@@ -205,14 +205,17 @@ LRESULT CALLBACK dlgProc(HWND h, UINT msg, WPARAM wp, LPARAM lp)
 {
     State* st = stateOf(h);
     switch (msg) {
-    case WM_CREATE: {
+    case WM_NCCREATE: {
         auto* cs = reinterpret_cast<CREATESTRUCTW*>(lp);
         State* s = static_cast<State*>(cs->lpCreateParams);
-        states()[h] = s;
-        return 0;
+        SetWindowLongPtrW(h, GWLP_USERDATA, reinterpret_cast<LONG_PTR>(s));
+        return TRUE;
     }
-    case WM_DESTROY:
-        states().erase(h);
+    case WM_NCDESTROY:
+        SetWindowLongPtrW(h, GWLP_USERDATA, 0);
+        break;
+    case WM_CLOSE:
+        SendMessageW(h, WM_COMMAND, IDCANCEL, 0);
         return 0;
     case WM_COMMAND: {
         if (!st)
@@ -382,7 +385,7 @@ LRESULT CALLBACK dlgProc(HWND h, UINT msg, WPARAM wp, LPARAM lp)
             SelectObject(mem, st->ui);
         }
         // Hairline divider above the button row.
-        const int sep = cr.bottom - 72;
+        const int sep = cr.bottom - 60;
         if (sep > 0) {
             HPEN sp = CreatePen(PS_SOLID, 1, th.kBorderSoft);
             HGDIOBJ osp = SelectObject(mem, sp);
@@ -408,7 +411,7 @@ LRESULT CALLBACK dlgProc(HWND h, UINT msg, WPARAM wp, LPARAM lp)
             HDC dc = reinterpret_cast<HDC>(wp);
             SetBkMode(dc, TRANSPARENT);
             SetTextColor(dc, st ? st->th.kText : GetSysColor(COLOR_WINDOWTEXT));
-            return reinterpret_cast<LRESULT>(GetSysColorBrush(COLOR_WINDOW));
+            return reinterpret_cast<LRESULT>(st ? st->background : GetSysColorBrush(COLOR_WINDOW));
         }
         break;
     }
@@ -426,7 +429,8 @@ inline int show(HWND owner, const Spec& spec, const envh::theme::Th& th, bool da
     // The class name keeps test drivers that look for standard dialogs
     // (GetDlgItem / BM_CLICK / ctrl 0xFFFF) working unchanged.
     static const bool clsRegistered = [] {
-        WNDCLASSEXW wc {sizeof(wc)};
+        WNDCLASSEXW wc {};
+        wc.cbSize = sizeof(wc);
         wc.style = CS_SAVEBITS;
         wc.lpfnWndProc = dlgProc;
         wc.hInstance = GetModuleHandleW(nullptr);
@@ -442,6 +446,7 @@ inline int show(HWND owner, const Spec& spec, const envh::theme::Th& th, bool da
     st->spec = spec;
     st->th = th;
     st->dark = dark;
+    st->background = CreateSolidBrush(th.kBg);
     st->result = spec.buttons.empty() ? IDOK : spec.buttons[spec.defButton].id;
     st->ui = CreateFontW(-15, 0, 0, 0, FW_SEMIBOLD, 0, 0, 0, DEFAULT_CHARSET,
                          0, 0, CLEARTYPE_QUALITY, 0, L"Microsoft YaHei UI");
@@ -458,17 +463,29 @@ inline int show(HWND owner, const Spec& spec, const envh::theme::Th& th, bool da
     HWND h = CreateWindowExW(WS_EX_TOOLWINDOW, L"#32770", L"",
                              WS_POPUP | WS_CLIPCHILDREN, 0, 0, w, 200,
                              owner, nullptr, GetModuleHandleW(nullptr), st);
+    if (!h) {
+        delete st;
+        return IDCANCEL;
+    }
     RECT bodyRc {}, detailRc {};
     std::vector<RECT> btns;
     const int height = contentHeight(h, *st, w, bodyRc, detailRc, btns, false);
     st->detailRect = detailRc;
-    const int x = orc.left + ((orc.right - orc.left) - w) / 2;
-    const int y = orc.top + ((orc.bottom - orc.top) - height) / 3;
+    int x = orc.left + ((orc.right - orc.left) - w) / 2;
+    int y = orc.top + ((orc.bottom - orc.top) - height) / 3;
+    MONITORINFO monitor {};
+    monitor.cbSize = sizeof(monitor);
+    if (GetMonitorInfoW(MonitorFromWindow(owner, MONITOR_DEFAULTTONEAREST), &monitor)) {
+        x = std::max(static_cast<int>(monitor.rcWork.left),
+                     std::min(x, static_cast<int>(monitor.rcWork.right) - w));
+        y = std::max(static_cast<int>(monitor.rcWork.top),
+                     std::min(y, static_cast<int>(monitor.rcWork.bottom) - height));
+    }
     SetWindowPos(h, HWND_TOP, x, y, w, height, SWP_NOACTIVATE);
 
     // Body as a REAL static control (id 0xFFFF) so test drivers can read it.
     HWND bodyCtl = CreateWindowExW(0, L"STATIC", st->spec.body.c_str(),
-                                   WS_CHILD | WS_VISIBLE | SS_LEFT | SS_EDITCONTROL,
+                                   WS_CHILD | WS_VISIBLE | SS_LEFT | SS_EDITCONTROL | SS_NOPREFIX,
                                    bodyRc.left, bodyRc.top,
                                    bodyRc.right - bodyRc.left,
                                    bodyRc.bottom - bodyRc.top,
@@ -484,15 +501,7 @@ inline int show(HWND owner, const Spec& spec, const envh::theme::Th& th, bool da
                             static_cast<INT_PTR>(b.id)),
                         GetModuleHandleW(nullptr), nullptr);
     }
-    // Re-run the layout now that the real controls exist, then move them.
-    contentHeight(h, *st, w, bodyRc, detailRc, btns, true);
-    st->detailRect = detailRc;
-    // The first measurement ran before the body static existed (fixed-size
-    // fallback), so resize the window to the real content height.
-    const int height2 = detailRc.bottom > 0
-        ? static_cast<int>(btns.front().bottom) + 20
-        : height;
-    SetWindowPos(h, nullptr, x, y, w, height2, SWP_NOACTIVATE | SWP_NOZORDER);
+    // Position every child using the same measurement as the window itself.
     if (bodyCtl)
         MoveWindow(bodyCtl, bodyRc.left, bodyRc.top,
                    bodyRc.right - bodyRc.left, bodyRc.bottom - bodyRc.top, TRUE);
@@ -511,14 +520,14 @@ inline int show(HWND owner, const Spec& spec, const envh::theme::Th& th, bool da
     if (defBtn)
         SetFocus(defBtn);
 
-    MSG m;
-    while (GetMessageW(&m, nullptr, 0, 0) > 0) {
-        if (m.message == WM_QUIT) {
-            PostQuitMessage(static_cast<int>(m.wParam));
+    MSG m {};
+    while (!st->done) {
+        const BOOL got = GetMessageW(&m, nullptr, 0, 0);
+        if (got <= 0) {
+            if (got == 0)
+                PostQuitMessage(static_cast<int>(m.wParam));
             break;
         }
-        if (st->done)
-            break;
         // IsDialogMessage handles Tab (focus), Enter (default button) and
         // Esc (IDCANCEL command) with native dialog semantics.
         if (IsDialogMessageW(h, &m))
