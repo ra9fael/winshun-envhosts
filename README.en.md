@@ -189,30 +189,81 @@ All data stays local under `WS_DATA_DIR`:
   `Esc` returns focus to the table, `Ctrl+Z`/`Ctrl+Y` undo/redo. Four buttons on
   the right of the detail pane (`+ Add`, `- Del`, `Undo`, `Redo`) call the same
   commands as the keyboard.
+- **Multi-select and batch commands (0.5.0)**: `Ctrl+Click` toggles a row,
+  `Shift+Click` / `Shift+Up/Down` extends a contiguous range, `Ctrl+A` selects
+  every row in the current view, `Ctrl+C` copies the selection to the clipboard
+  (`NAME=value` for env, original lines for hosts), and `Esc` drops the
+  selection before it closes the window. The selection applies `Del` (delete /
+  restore) and, on hosts, `Space` / `Enter` (enable / disable) to every row at
+  once. Read-only rows, hosts group headings, the Raw tab and the backup tab are
+  skipped and the status bar reports how many were skipped. A whole batch is one
+  undo step, so one `Ctrl+Z` reverts all of it. The status bar shows `N selected`.
+- **UI language (0.5.0)**: a new `uiLanguage` setting (`auto` / `zh-CN` /
+  `en-US`) follows WinShun or pins one language. A host `appearance`
+  notification switches an **already open** window immediately: title, tabs,
+  headers, shortcut chips, status bar, dialogs and native child-control labels
+  all redraw without rebuilding the model or losing unsaved edits. A pinned
+  language wins over the host locale; `auto` follows it again. WinShun only
+  resolves `zh` / `en` and its manifest text is `{zh, en}`, so these are the two
+  supported languages.
+- **Over-long values and delete semantics (0.6.0)**: env values are measured in
+  Windows' 32767 UTF-16 code units and the detail boxes no longer truncate
+  silently at the default Win32 EDIT limit. Hard errors (empty / invalid name,
+  control characters) still block saving; a value beyond the process-environment
+  limit is now **saved with an explicit warning** (your call): a permanent
+  `X / 32,767 chars` counter in the detail pane (amber above 90%, red past the
+  cap), a red row, a persistent banner naming the variable and the excess, the
+  save confirmation calling out the risk, and the success status keeping the
+  warning. The protocol-level `env:set` still hard-rejects over-length values
+  because that path has no UI to show a warning. In item mode `Del` removes
+  **only the current split item**, never the whole variable. Use the `Del row`
+  chip / button to delete a variable: it confirms by name, and the save dialog
+  lists every variable that will be removed. A row marked for deletion
+  immediately shows an empty, disabled item list, so a deleted item can no
+  longer appear to still be there.
+- **Unsaved-change marking (0.6.0)**: every row is compared against the opened
+  snapshot — new rows get a green bar `+`, value edits an amber bar `●`, deleted
+  rows keep the red bar `−`. The item list marks edited items with an amber dot,
+  so changes made through either editing path are visible at a glance.
+- **Live external-change watcher (0.6.0)**: a 2 s poll (10 s when unfocused,
+  paused while a modal, an edit session or the diff panel is active)
+  fingerprints the registry / hosts file with the same logic as the save-time
+  conflict check. A clean window reloads silently; a dirty window shows an amber
+  band (`Target changed externally: N difference(s) · view diff`) and nothing is
+  merged automatically.
+- **Read-only three-snapshot diff panel (0.6.0)**: a save that hits an external
+  conflict no longer shows Abort / Retry / Ignore. It opens a read-only panel
+  classifying every entry as mine / theirs / conflict / same with the
+  base / mine / theirs values, offering exactly three whole-view actions:
+  reload (discard my edits), force overwrite (save mine), defer.
+- **Backup page (0.6.0)**: the Backup tab is now two panes — a timestamped list
+  with counts on the left, a searchable per-variable preview with diff markers
+  (`= same / ~ differs / + backup only / - current only`) on the right.
+  Actions: refresh preview / restore (auto-backup + confirm, loads as unsaved
+  changes) / delete (confirm) / export JSON.
 - **Two vertically split panes (env window only)**: a draggable splitter sits
   between the table and the detail editor; each pane keeps its minimum height
   (list 112px, detail 200px) and `WM_GETMINMAXINFO` refuses a window too small
   to hold both. The hosts window and the backup view keep the fixed detail strip.
-- **Delimited-item editing**: the `Edit items` button in the detail pane (or
-  `Ctrl+R`) splits a long value on a delimiter so you can work on one segment at
-  a time — `Ins` inserts after the current item, `Del` removes it, `Alt+Up`/`Alt+Down`
-  reorder, and the box beside the list edits it. Every change is rejoined into the
-  variable's value immediately and stays a single undo step. Picking an item keeps
-  the list where it is scrolled: updating an item in place never drags the viewport
-  back to the first row. `Path` is pinned to `;`. `Ctrl+R` again returns to raw text,
-  showing the rejoined string. Splitting is always explicit, so the raw value never
-  becomes unreachable.
-- **Resizable item pane**: a draggable vertical splitter separates the item list
-  from the action pane (minimum 180px / 200px). Hover shows a horizontal resize
-  cursor; drag to resize, or use `Ctrl+Shift+Left/Right` with the table focused to
-  move the split by 5%. The ratio survives a window resize.
+- **Delimited-item editing (0.6.0 full-width layout)**: the `Edit items` mode
+  (or `Ctrl+R`) splits a long value on a delimiter into a list that **spans the
+  whole detail pane** — double-click (or Enter) floats an in-place edit box over
+  the row, `Esc` restores the captured text, and the selected row shows trailing
+  `↑ ↓ ×` buttons (`Alt+Up`/`Alt+Down` still work). The toolbar keeps only the
+  `Raw | Items` toggle, the delimiter and `+ Add item`; a permanent counter
+  shows `N items · X / 32,767 chars`. Every change is rejoined into the
+  variable's value immediately and stays a single undo step. `Path` defaults to
+  `;`. The old four-button action pane and the vertical splitter are gone.
 - **Delimiter**: a self-drawn dropdown button next to the mode button (e.g.
-  `Semicolon (;) ▾`). Its menu offers `semicolon / comma / colon / Tab / pipe`,
-  applied as soon as you pick one. `Custom…` swaps the button for a text box that
-  takes any character or string (`=>`), applied with Enter or `Apply` and dropped
+  `Semicolon (;) ▾`). Its menu offers `semicolon / comma / colon / Tab / pipe /
+  space`, applied as soon as you pick one. `Custom…` swaps the button for a text
+  box that takes any character or string (`=>`), applied with Enter and dropped
   with `Esc`. Re-splitting first rejoins the items with the old delimiter, so no
-  value is lost. Separators inside `"quoted"` runs are not split points. The mode
-  button, the delimiter button and `Apply` share one flat self-drawn style.
+  value is lost. Separators inside `"quoted"` runs are not split points. The
+  **space** preset always asks first: on a PATH-like variable it warns that
+  `C:\Program Files\...` would be cut in half (default No); elsewhere it
+  explains that whitespace runs get normalised, and items containing spaces get
+  an amber marker.
 - **hosts entries tab**: the leading comment block (Microsoft's template text and
   its `rhino.acme.com` samples) folds into one "file header" row instead of
   showing up as disabled entries; the Raw tab shows it in full. A line that maps a
@@ -233,12 +284,15 @@ All data stays local under `WS_DATA_DIR`:
   clickable shortcut chips, greyed out when unavailable.
 - Inside the detail pane `Tab`/`Shift+Tab` move backwards and forwards between the
   fields, `Ctrl+Tab`/`Ctrl+Shift+Tab` switch tabs.
-- `Ctrl+S` lists the individual changes (add / modify / delete) before writing.
-  Only a change to the **user** scope (HKCU) after the window opened counts as a
-  conflict, and then the choice is Abort / Retry / Ignore: abort writes nothing,
-  retry re-reads the latest values, ignore overwrites with your edits. After a
-  save the model is reloaded with the current tab settings, so system-variable rows
-  survive it.
+- `Ctrl+S` lists the individual changes (add / modify / delete) before writing;
+  when there are deletions it also spells out `N variable(s) / hosts line(s)
+  will be DELETED` with their names, and an over-length value is called out as
+  "the registry accepts it, but new processes may not read the full value".
+  Only a change to the **user** scope (HKCU) after the window opened counts as
+  a conflict, and instead of a blind overwrite a read-only diff panel opens
+  with three choices: reload (discard my edits), force overwrite (save mine),
+  defer. After a save the model is reloaded with the current tab settings, so
+  system-variable rows survive it.
 
 ## Settings
 
@@ -248,33 +302,44 @@ All data stays local under `WS_DATA_DIR`:
 | `backupCount` | number | 10 | backups kept per target |
 | `maxResults` | number | 50 | max rows per query (capped at 200) |
 | `showSystemVars` | bool | true | include read-only system vars in `env` |
+| `uiLanguage` | choice | `auto` | UI language: follow WinShun / pin Chinese / pin English; open windows switch at once |
 
 ## Tests
 
 - `tests/test_envhosts_logic.cpp` — 69 OS-free unit checks (hosts byte-exact
   round-trip on a sanitised captured file, section comments, env model, grammar,
-  validation, stable ids).
-- `tests/test_editor_model.cpp` — 73 OS-free unit checks for the editor data model
+  validation, stable ids, UTF-16 length and the 32767 limit boundary).
+- `tests/test_editor_model.cpp` — 155 OS-free unit checks for the editor data model
   (dirty tracking, undo/redo cap at 200, validation, PATH split/join with quoted
-  segments, custom-delimiter round-trip and switching, system-scope edits leaving
-  the user-scope fingerprint untouched, multi-hostname hosts rows, byte-exact save
-  preserving BOM/CRLF, fingerprint sensitivity, draft serialisation round-trip,
-  backup loads as unsaved).
+  segments, custom-delimiter round-trip and switching, whitespace-delimiter
+  normalisation, the four row states, the five diff3 verdicts, system-scope edits
+  leaving the user-scope fingerprint untouched, multi-hostname hosts rows,
+  byte-exact save preserving BOM/CRLF, fingerprint sensitivity, draft
+  serialisation round-trip, backup loads as unsaved, one-undo batch delete /
+  restore / enable transactions, and a shortened over-long `Path` producing an
+  empty `toDelete`).
 - `tests/integration.py` — drives the real exe over JSON-RPC on real Windows:
   protocol round-trips, edit/delete/restore on a scratch registry key, 20-query
   side-effect audit (hosts bytes + registry must be untouched), real System32
   hosts write-denial, `settingsChanged` propagation, system-scope delete
   refusal, **and the editor suite** (P1/P2 pinned first row, P3 openEditor wiring,
-  P4 manifest fields, P5 draft location, P6 external-change path).
-- `tests/gui_preview.py --no-hold` — 30 assertions against the real window on the
+  P4 manifest fields, P5 draft location, P6 external-change path, T2.9 host
+  locale / plugin override / live `appearance` switching). 37 assertions.
+- `tests/gui_preview.py --no-hold` — 103 assertions against the real window on the
   desktop, driven over JSON-RPC with a fake 28-segment `Path` in an isolated
-  registry key: split-pane layout, page scrolling, `Ins`/`Del`, list-mode splitting,
-  selection keeping its scroll position, editing an item in place, a custom
-  delimiter round-trip, the rejoined raw value, splitter drag, saving through the
+  registry key: split-pane layout, page scrolling, `Ins`/`Del`, the full-width
+  item list, in-place editing by double-click, per-item dirty markers, a custom
+  delimiter round-trip, the rejoined raw value, pane drag, saving through the
   shortcut chip and reading the registry back, system rows surviving the save,
-  the Abort branch of an external conflict, and the `F5` reload prompt. Both the
-  user and the system scope point at isolated test keys, every sample value is
-  fake and both keys are deleted afterwards.
+  the read-only diff panel with its three whole-view actions on an external
+  conflict, the `F5` reload prompt, the space preset (PATH confirmation, then a
+  real two-address split), and the two-pane backup page. It also
+  covers `Ctrl/Shift+Click`, `Ctrl+A` / `Ctrl+C` / `Esc`, a two-row batch delete
+  with one-step undo, hosts batch enable/disable, the over-long `Path` sequence
+  (error banner, remove one item, clear the item list on row deletion, variable
+  still present after save), and live zh/en switching with a pinned override.
+  Both the user and the system scope point at isolated test keys, every sample
+  value is fake and both keys are deleted afterwards.
 
 ## License
 

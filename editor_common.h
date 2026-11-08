@@ -14,6 +14,7 @@
 
 #include "winshun.h"
 #include "native.h"
+#include "i18n.h"
 
 namespace editorwin {
 
@@ -28,7 +29,15 @@ struct OpenArgs {
     std::string filter;
     std::string select; // "user/NAME" (env) or 1-based line (hosts)
     winshun::Json draft; // empty => ignore
+    // Resolved UI language. `zh` is kept as the fast path for the existing
+    // two-language call sites; setLang() is the only way to change either.
     bool zh = true;
+    envh::i18n::Lang lang = envh::i18n::Lang::ZhCN;
+    void setLang(envh::i18n::Lang l)
+    {
+        lang = l;
+        zh = envh::i18n::chinese(l);
+    }
     bool dark = false;
     bool writable = true; // hosts writability probe at open time
     bool systemWritable = false; // env: HKLM writable (elevated plugin)

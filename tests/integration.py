@@ -129,10 +129,10 @@ class Driver:
             time.sleep(0.01)
         return None
 
-    def initialize(self, data_dir, settings):
+    def initialize(self, data_dir, settings, locale="zh", theme="light"):
         mid = self._next_id()
         self._send({"id": mid, "method": "initialize", "params": {
-            "settings": settings, "locale": "zh", "theme": "light",
+            "settings": settings, "locale": locale, "theme": theme,
             "pluginDir": HERE, "dataDir": data_dir}})
         line = self.recv()
         return line
@@ -158,6 +158,11 @@ class Driver:
         # settingsChanged has no reply; just send.
         self._send({"id": self._next_id(), "method": "settingsChanged",
                     "params": {"settings": settings}})
+
+    def notify_appearance(self, locale, theme="light"):
+        # Win顺 puts locale inside the appearance look object (App::pluginLook).
+        self._send({"id": self._next_id(), "method": "appearance",
+                    "params": {"locale": locale, "theme": theme}})
 
     def cancel(self, query_id):
         self._send({"id": self._next_id(), "method": "cancel",
@@ -394,6 +399,37 @@ def main():
                   "system var delete is refused (needs elevated)", note.get("text", ""))
     else:
         check(True, "no system var row to test (acceptable)")
+
+    print("== T2.9 locale: host language, plugin override, live appearance ==")
+
+    def pinned_title(dv):
+        r = parse(dv.query("env", "", "env"))
+        items = r["result"]["items"]
+        return items[0].get("title", "") if items else ""
+
+    en = Driver(data_dir, hosts_path)
+    en.initialize(data_dir, settings, locale="en")
+    check("Open interactive editor" in pinned_title(en),
+          "initialize locale=en gives English titles")
+    en.notify_appearance("zh")
+    time.sleep(0.1)
+    check("进入交互式编辑界面" in pinned_title(en),
+          "appearance locale=zh switches the running plugin without a restart")
+    en.notify_settings(dict(settings, uiLanguage="en-US"))
+    time.sleep(0.1)
+    check("Open interactive editor" in pinned_title(en),
+          "uiLanguage=en-US overrides the host's zh locale")
+    en.notify_appearance("zh")
+    time.sleep(0.1)
+    check("Open interactive editor" in pinned_title(en),
+          "the pinned language survives a later host appearance change")
+    en.shutdown()
+
+    zh = Driver(data_dir, hosts_path)
+    zh.initialize(data_dir, dict(settings, uiLanguage="zh-CN"), locale="en")
+    check("进入交互式编辑界面" in pinned_title(zh),
+          "uiLanguage=zh-CN pins Chinese even when the host is English")
+    zh.shutdown()
 
     d.shutdown()
     time.sleep(0.3)

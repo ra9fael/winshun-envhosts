@@ -7,6 +7,211 @@ single source of truth; release tags are `v<version>`.
 
 ## [Unreleased]
 
+## [0.7.1] - 2026-11-08
+
+### Added
+
+- **Split-item list multi-select.** `Ctrl+Click` and `Shift+Click` select
+  multiple items in the split-item list; Del stages ALL selected items in one
+  go and 提交修改 / Ctrl+S applies the batch (one undo transaction).
+- **Vim-style navigation** on the main table and the split-item list, with no
+  conflicts with the `Ctrl`-modifier keymap. Table (no modifiers): `j`/`k` move
+  the caret, `gg` first row, `G` last row, a digit run is a count prefix
+  (`3j`, `5G`), `x` or `dd` marks the row deleted, `u` undoes, `/` focuses the
+  filter, `l`/Enter opens the row, `h` returns focus to the table. Item list:
+  bare `j`/`k` move the caret (`Alt+J/K` still reorder, `Ctrl+J/K` remain the
+  explicit caret bindings). The caret row is exposed to the GUI driver in
+  `WM_APP_GETSTATE` bits 56-63 for regression assertions.
+
+### Fixed
+
+- **Readable always-on notice bands.** Hard-error, over-length and near-cap
+  bands now carry their own foreground colour (`kBandErrFg`, `kBandOverFg`,
+  `kBandWarnFg`) instead of reusing the amber warning text on dark saturated
+  backgrounds. The three band actions and relative timestamp use the same
+  readable foreground.
+- **Diff footer clipping.** The read-only external-change panel now reserves a
+  dedicated footer strip below its three actions; the explanatory line is no
+  longer reduced to a 2px rect and cut by the panel border.
+- **Split-item counter clipping.** The `共 N 项 · 合计 X / 32,767 字符` counter
+  has a guaranteed toolbar strip after `+ 新增项`, is left-aligned like the
+  design draft, and falls back to the character-count portion with ellipsis
+  when a narrow window cannot fit the complete line.
+- The backup-page scope switch (全部 / 用户 / 系统) ignored clicks on the
+  upper half of each segment (hit test used the wrong origin), making the
+  segmented control look dead.
+
+## [0.7.0] - 2026-11-08
+
+### Added
+
+- **Single-source theming.** All 82 colour roles and shared metrics now live in
+  `editor_theme.h` (one X-macro list holding light + dark values). The painter
+  reads `th().kRole` at runtime; `tools/gen_design_svg.py` parses the SAME file
+  to emit the SVG design drafts in `docs/design/` (`--check` fails when a draft
+  is stale). Draft and product physically cannot drift; the 113 inline
+  `RGB(...)` literals in the painter are gone.
+- **Backup page rework** (user-reported clicks landing on the wrong rows).
+  Painting and hit-testing now share one geometry source per region
+  (`backupListHit` / `backupPreviewHit`), so every click lands where the pixel
+  it sits on is drawn. Entries are two-line (id + time · count) with 用户 /
+  系统 scope chips, the preview table gained a 范围 column with per-row chips,
+  a segmented 备份范围：全部 / 用户 / 系统 switch in the tab strip filters both
+  the backup list and the preview, and the redundant 返回编辑 pill is gone
+  (the top tabs already switch).
+- **Two-stage split-item delete** (user request). The `×` on an item only
+  STAGES it: the row turns red with a strikethrough and `− 待删除`, the joined
+  value excludes it, and clicking `×` again restores it. A green 提交修改
+  button in the item toolbar (with a staged-count badge) applies staged
+  deletions; Ctrl+S applies them too. Added items still vanish at once (they
+  never existed in the value); inline editing of staged rows is blocked and
+  reordering waits until staged rows are committed.
+- **Themed modal dialogs** (`editor_dialog.h`, user request). All ten
+  `MessageBoxW` confirmations (draft restore, reload, space delimiter,
+  permissions, backup restore/delete, save confirmation with the change list
+  in a monospace detail block, whole-variable delete, close-with-unsaved
+  ×2) now render the design draft: icon bubble, title + dim subtitle, wrapped
+  body, optional monospace detail block and right-aligned plain / primary /
+  danger buttons. Enter presses the default button, Esc the cancel, Tab
+  cycles. The window uses a process-local `#32770` class so UI automation and
+  the GUI regression driver keep working unchanged.
+
+### Fixed
+
+- Backup page click-through: the left list drew from `top+24`, the preview
+  from `top+70`, but the hit tests assumed `top+4` / `top+24` - three
+  disagreeing origins made every click land on the wrong row or nothing at
+  all. Also fixes the preview search box overlapping the column header.
+- The tab strip on the backup page swallowed clicks (rows in the work area
+  returned before tab handling), which made it impossible to leave the page
+  by clicking the top tabs.
+
+## [0.6.0] - 2026-11-08
+
+### Added
+
+- **Full-width split-item list.** The PATH item list now owns the whole detail
+  pane; the old right-hand action pane (four wide buttons, a separate edit box
+  and the draggable vertical splitter) is gone. Editing is in place: double-click
+  (or Enter) floats an edit box over the row, `Esc` restores the captured text,
+  and the selected row shows trailing `↑ ↓ ×` buttons (`Alt+↑/↓` still reorder).
+  A live counter reports `共 N 项 · 合计 X / 32,767 字符`.
+- **Unsaved-change marking.** Every row is compared against the opened snapshot:
+  new rows get a green bar with `+`, modified rows an amber bar with `●`, deleted
+  rows keep the red bar with `−`. The same marking applies inside the split-item
+  list (per-item dot) so an edit made through either path is visible at a glance.
+- **Live external-change watcher.** A 2 s timer (10 s when unfocused, paused
+  while a modal, an edit session or the diff panel is active) fingerprints the
+  registry / hosts file with the same logic as the save-time conflict check.
+  A clean window reloads silently; a dirty window shows an amber band
+  (`目标已被外部修改：N 项差异 · 查看差异`) and nothing is merged automatically.
+- **Read-only three-snapshot diff panel.** Opens from the band or automatically
+  when a save hits a conflict (the old Abort/Retry/Ignore dialog is gone).
+  Entries are classified as 我改 / 外部改 / 冲突 / 一致 with `原 / 我 / 外`
+  values, and the panel offers exactly three whole-view actions:
+  重新载入（丢弃我的改动）, 强制覆盖（保存我的）, 暂不处理.
+- **Over-length values save with an explicit warning** (user decision). Hard
+  errors (empty/invalid name, control characters) still block the save; a value
+  above the 32,767 UTF-16-unit process-environment limit now only warns: the
+  length counter turns red, the row turns red, a persistent band names the
+  variable and the excess, the save confirmation lists the risk, and the
+  success status keeps the warning. The protocol-level `env:set` still
+  hard-rejects over-length values because it has no UI to show a warning.
+- **Two-pane backup page.** The 备份 tab now lists backups with counts on the
+  left and a searchable preview on the right with diff markers
+  (`= 相同 ~ 值不同 + 仅备份有 - 当前多出`). Actions: 刷新预览 / 恢复
+  (auto-backup + confirm, loads as unsaved changes) / 删除 (confirm) /
+  导出 JSON. `BackupStore::readEnv` / `remove` / `exportTo` back the page.
+- **Space delimiter preset** (`空格 (Space)`), command ids `200..205` with
+  自定义… at 206. Applying it always asks first: on a PATH-like variable the
+  dialog warns that `C:\Program Files\...` would be cut in half (default No);
+  elsewhere it explains that whitespace runs are normalised. Items containing
+  spaces get an amber marker in the list.
+
+### Fixed
+
+- `LB_GETITEMRECT` was compared against `LB_OKAY`, but modern list controls
+  return 1 for a visible item, so the in-place editor never opened and the
+  per-item dirty markers never painted. Only `LB_ERR` is a failure.
+- The hosts save-confirmation wording now says 行 instead of 变量.
+- The diff panel no longer has the detail EDIT controls cut into it: opening
+  the panel hides the detail children and closing restores them.
+- A modal MessageBox can swallow a synthetic click sent while it is still being
+  created; the GUI test now retries until the dialog actually closes.
+
+## [0.5.0] - 2026-11-07
+
+### Added
+
+- **Multi-select in both editor windows.** Click, `Ctrl+Click` and `Shift+Click`
+  select rows, `Shift+Up/Down` extends a range, `Ctrl+A` selects every row in
+  the current view and `Esc` drops the selection before it closes the window.
+  The selection is stored as model-row indices, so filtering, adding and deleting
+  rows cannot make a stale view index point at the wrong variable.
+- **Minimal batch commands.** `Del` marks / restores all selected rows,
+  `Space` / `Enter` on a hosts selection enables or disables them, `Ctrl+C`
+  copies the selected rows as `NAME=value` (env) or hosts lines to the Windows
+  clipboard. Read-only rows, hosts group headings, the hosts Raw tab and the
+  backup tab are skipped and the status bar reports how many were skipped.
+  Each batch is one undo step, so a single `Ctrl+Z` reverts all of it.
+- **Solid zh-CN / en-US UI language support.** A new `uiLanguage` setting
+  (`auto` / `zh-CN` / `en-US`) follows Win顺 or pins one language. The host's
+  `appearance` notification switches an already open window immediately:
+  title, tabs, headers, chips, status bar, dialogs and native child-control
+  labels all redraw in the new language without rebuilding the model. The
+  setting wins over the host locale; `auto` follows it again. Win顺 only ships
+  `{zh, en}` manifest text and resolves its own locale to `zh` / `en`, so those
+  are the two languages the plugin supports.
+- **Visible error banner.** Invalid names, values over the 32767 UTF-16-unit
+  limit and invalid hosts rows now produce a red, readable message in the
+  column-header band instead of a save that silently does nothing.
+
+### Fixed
+
+- **PATH over-length data loss (reported bug).** Deleting one split item from an
+  overlong `Path` used to leave the item visible in the item list, mark the
+  whole variable deleted, and remove `Path` from the registry on save. Causes
+  fixed together:
+  - `m_valueEdit`, `m_partEdit` and `m_rawEdit` now call `EM_SETLIMITTEXT, 0, 0`;
+    the default single-line EDIT limit silently truncated long values on
+    `SetWindowTextW`.
+  - `envh::isValidEnvValue()` measures UTF-16 code units (`envh::utf16Units()`),
+    not UTF-8 bytes, so CJK and long ASCII values are judged by the real
+    Windows limit.
+  - A deleted env row now shows an **empty, disabled** split-item list instead
+    of rebuilding it from the stale value; the detail text says the whole row
+    is marked for deletion.
+  - `Ins` / `Del` in a text field are no longer forwarded to the table: only
+    the split-item LISTBOX uses them as item commands. `Alt+Up/Down` still
+    reorders items.
+  - `deletePart()` re-checks `m_partSel` after committing a pending item edit,
+    so a stale index cannot erase out of bounds.
+  - Deleting an existing env variable now asks for confirmation by name (and by
+    split-item count in item mode); the delete chip is labelled "Del 删除整行" /
+    "Del row" in item mode. The save dialog lists every variable that will be
+    deleted before anything is written.
+  - The error banner is painted last, over the column-header band. Painting it
+    before the table left only a thin red line with unreadable text.
+- `appearance` and `settingsChanged` are no longer no-ops: both push a
+  `WM_APP_APPEARANCE` message to open editor windows.
+
+### Changed
+
+- `plugin.json` version is `0.5.0`; `minWinShun` stays `0.22.0`.
+- Tests: `editor_model` 124/124, `logic` 69/69, `integration.py` 37/37,
+  `gui_preview.py` 90 assertions. The GUI driver now covers multi-select,
+  batch delete/undo, hosts batch enable/disable, clipboard copy, the PATH
+  over-length sequence, and live language switching with a pinned override.
+- `editor_win.h` exposes two read-only test hooks (`WM_APP_KEY` for synthetic
+  keys with explicit modifiers, `WM_APP_GETSTATE` for a packed state snapshot).
+  Neither writes any data and neither is reachable through the JSON-RPC surface.
+
+### Not changed
+
+- The Qt Quick prototype (`qt/`, `ENVHOSTS_QML_EDITOR=ON`) is unchanged. The
+  shipped build remains the GDI editor (`ENVHOSTS_QML_EDITOR=OFF`).
+- No new permissions: the batch copy uses the existing `clipboard:write`.
+
 ## [0.4.0] - 2026-11-07
 
 ### Added
@@ -152,6 +357,8 @@ First public release.
 - A backup before every write, with a configurable `backupCount`.
 - Byte-exact hosts round trip (UTF-8 BOM, CRLF, section comments preserved).
 
-[Unreleased]: https://github.com/ra9fael/winshun-envhosts/compare/v0.4.0...HEAD
+[Unreleased]: https://github.com/ra9fael/winshun-envhosts/compare/v0.7.1...HEAD
+[0.7.1]: https://github.com/ra9fael/winshun-envhosts/releases/tag/v0.7.1
+[0.7.0]: https://github.com/ra9fael/winshun-envhosts/releases/tag/v0.7.0
 [0.4.0]: https://github.com/ra9fael/winshun-envhosts/releases/tag/v0.4.0
 [0.1.0]: https://github.com/ra9fael/winshun-envhosts/releases/tag/v0.1.0

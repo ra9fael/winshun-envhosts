@@ -1,15 +1,17 @@
-# ra9fael.envhosts — interactive editor window (v0.2 → v0.4 design)
+# ra9fael.envhosts — interactive editor window (v0.2 → v0.5 design)
 
-Status: **implemented (v0.4.0).** Coded in `editor_win.h` (window + GUI thread),
-`editor_model.h` (pure data model, 73 unit checks), wired into `main.cpp` (pinned
-first row + `openEditor` action + external-change + shutdown join), `plugin.json`
-(`ui` + `clipboard:write`, `idleExitSec: 0`), `README.md`, and `integration.py`
-(P1–P6). Verified on a real Windows host via `tests/integration.py` (32/32 pass),
-`editor_model.h` unit checks (73/73), `logic.h` unit tests (69/69) and the 30
-assertions of `tests/gui_preview.py`. The three passes below are the design
-history: v0.2.1 virtual scrolling and the status bar, v0.3.0 the split pane and
+Status: **implemented (v0.5.0).** Coded in `editor_win.h` (window + GUI thread),
+`editor_model.h` (pure data model, 124 unit checks), `i18n.h` (locale resolution),
+wired into `main.cpp` (pinned first row + `openEditor` action + external-change +
+settings/appearance + shutdown join), `plugin.json` (`ui` + `clipboard:write` +
+`uiLanguage`, `idleExitSec: 0`), `README.md`, and `integration.py` (P1–P6,
+T2.9). Verified on a real Windows host via `tests/integration.py` (37/37 pass),
+`editor_model.h` unit checks (124/124), `logic.h` unit tests (69/69) and the 90
+assertions of `tests/gui_preview.py`. The passes below are the design history:
+v0.2.1 virtual scrolling and the status bar, v0.3.0 the split pane and
 delimited-item editing, v0.4.0 the delimiter combo, the stable item viewport and
-the save-conflict fixes.
+the save-conflict fixes; section 12 records v0.5.0 (multi-select, zh-CN/en-US
+and the PATH data-loss fix).
 
 **GUI verification (corrected):** the window was opened on a real desktop and
 captured with GDI `PrintWindow` for both `env` and `hosts`. The first capture
@@ -173,7 +175,8 @@ line prints `分隔符: ;` instead), the item list has no row-number gutter (the
 shared shortcut row rather than a button in the status bar, so env and hosts
 keep one bottom band. The segmented labels are shortened to `原文│分隔项`.
 
-Verified with `tests/gui_preview.py`: 30 assertions over the real window — the
+Verified with `tests/gui_preview.py`: 30 assertions at the time (90 in v0.5.0)
+over the real window — the
 layout mirror matches the combo's own rect, a 28-segment `Path` splits into 28
 items, clicking the last visible item keeps `topindex` 8, editing it updates that
 row only, `=>` collapses the value to one item and `;` restores it byte-for-byte,
@@ -374,8 +377,12 @@ Rules carried over from binarylab:
 
 - The GUI thread writes nothing to stdout. Only the protocol thread talks
   JSON-RPC.
-- Settings, locale and theme are snapshotted into the spec. `appearance`
-  notifications are forwarded with `PostMessage(WM_APP_THEME)`.
+- Settings, locale and theme are snapshotted into the spec. The 0.22.0 SDK
+  raises `appearanceChanged()` after it updates `m_locale` / `m_theme`; the
+  plugin's `settingsChanged()` and `appearanceChanged()` overrides resolve the
+  language and post `WM_APP_APPEARANCE` to every open window. Each window keeps
+  its own copy of the locale, so the GUI thread never calls back into the
+  protocol thread's `settings()` / `locale()`.
 - On `shutdown` and in the destructor: post `WM_CLOSE` to each window, wait up
   to 1500 ms, join. Unsaved edits go to drafts (section 6.4), never to the
   registry or hosts.
@@ -405,9 +412,9 @@ table below is the authoritative description of each area.
 | Area | Behaviour |
 |---|---|
 | Tabs | 用户 (editable), 系统 (editable when the plugin runs elevated — i.e. `canWriteSystem` passes; otherwise greyed editors), 备份 (list of `backups/env/*.json`, newest first). `showSystemVars=false` hides the 系统 tab. |
-| Table | ListView report mode. Columns 名称 / 类型 / 值 (first line, truncated) / ● dirty marker. Sorted by name, case-insensitive. Filter matches name or value, the same rule as `envMatches`. |
+| Table | ListView report mode. Columns 名称 / 类型 / 值 (first line, truncated) / ● dirty marker. Sorted by name, case-insensitive. Filter matches name or value, the same rule as `envMatches`. Vim-style keys (v0.7.1, no modifiers, table focus): `j`/`k` move the caret, `gg` first row, `G` last row, a digit run is a count prefix (`3j`, `5G`), `x`/`dd` mark the row deleted, `u` undoes, `/` focuses the filter, `l` opens the row like Enter, `h` returns focus to the table. |
 | Detail pane | Edits the selected row. **List mode** is entered explicitly with `Ctrl+R` or the `原文│分隔项` segment (the value is never split silently, so the raw text always stays reachable); the delimiter comes from a preset menu or a custom text box (see "v0.4.1 fix pass" below). `Path`-named rows default to the `;` delimiter. Otherwise a multi-line Edit. |
-| List mode items | One row per segment, in order, with the selected row and the viewport preserved across an in-place edit. `上移 / 下移 / 插入 / 删除` (or `Alt+↑↓`, `Ins`, `Del`) act on that segment only, and `当前项 n / m` reports the position. A draggable vertical splitter (7px grip, `IDC_SIZEWE`) sits between the list and the action pane; the split is stored as a percent (default 42, clamp 20–80) with hard minimums of 180px / 200px, so resizing the window keeps the ratio and neither side can collapse. `Ctrl+Shift+←/→` is the keyboard equivalent. No expansion or existence marks — those were dropped as v0.1 sketch. |
+| List mode items | One row per segment, in order, with the selected row and the viewport preserved across an in-place edit. `上移 / 下移 / 插入 / 删除` (or `Alt+↑↓`, `Ins`, `Del`) act on that segment only, and `当前项 n / m` reports the position. Bare `j`/`k` move the caret like `Ctrl+J/K` (v0.7.1); `Alt+J/K` still reorder. A draggable vertical splitter (7px grip, `IDC_SIZEWE`) sits between the list and the action pane; the split is stored as a percent (default 42, clamp 20–80) with hard minimums of 180px / 200px, so resizing the window keeps the ratio and neither side can collapse. `Ctrl+Shift+←/→` is the keyboard equivalent. No expansion or existence marks — those were dropped as v0.1 sketch. |
 | 类型 | REG_SZ / REG_EXPAND_SZ. Auto-switches to EXPAND when `%X%` is typed (same as `envTypeForValue`), but the user can override. REG_MULTI_SZ rows are shown read-only (v0.1 also does not edit them). |
 | Validation | Live, from `isValidEnvName` / `isValidEnvValue`: red border and status text. Save is disabled while any row is invalid. Length counter turns amber above 1024 (a later `setx` by any other tool truncates there) and red above 32767 (the Windows limit for one variable). |
 | New / delete | Ins adds a blank row with the name focused. Del marks the row deleted (red text, `Del 恢复` chip, a red notice in the detail pane); the row stays read-only until Del is pressed again. An unsaved new row is removed outright. Nothing reaches the registry until `Ctrl+S`. |
@@ -482,15 +489,26 @@ hidden.
 
 ### 6.3 External changes and conflicts
 
+v0.6.0 replaced the v0.2 modal Abort / Retry / Ignore dialog with a watcher
+plus a read-only diff panel. The table below is the current behaviour; the
+old row is kept only as history.
+
 | Source | Detection | Behaviour |
 |---|---|---|
-| Inline v0.1 action in the launcher (same process) | The protocol thread posts `WM_APP_EXTERNAL_CHANGE` after its write. | If the window has no unsaved edits: reload silently. Otherwise: yellow bar `外部已修改，[重新载入] [查看差异]`. |
-| Another program edits env | `RegNotifyChangeKeyValue` on `HKCU\Environment` (event, waited on by the GUI thread with `MsgWaitForMultipleObjects`) | Same as above. |
-| Another program edits hosts | `FindFirstChangeNotificationW` on the `etc` folder, filtered by the fingerprint | Same as above. |
-| Missed notification | The fingerprint check in save step 4 | Conflict dialog: 重新载入（丢弃我的修改） / 查看差异 / 取消. There is no "overwrite anyway" in v0.2. |
+| Any writer (protocol thread, another program) | `kTimerWatch` every 2 s (10 s when unfocused, paused while a modal, an edit session or the diff panel is open), fingerprint compared with `base` like save step 4 | Window clean: `reloadFromDisk()` silently. Dirty: amber band `目标已被外部修改：N 项差异 · 查看差异`, nothing is merged. |
+| Save hits a conflict | The step-4 fingerprint check | The read-only diff panel opens instead of a dialog. Three whole-view actions: 重新载入（丢弃我的改动） / 强制覆盖（保存我的） / 暂不处理. The old Abort/Retry/Ignore is gone. |
+| Missed tick | The same check runs on save, so a missed timer cannot hide a conflict | Same panel. |
 
-Re-basing (merge the user's edits onto the new disk state) is out of scope.
-查看差异 shows `disk` and `work` side by side for the changed rows only.
+The panel classifies every key with the three snapshots `base` / `mine` /
+`theirs`: 我改 (only mine), 外部改 (only theirs), 冲突 (both, and different),
+一致 (same). Values are shown as `原 / 我 / 外`. The three whole-view actions
+sit above a dedicated footer strip containing the read-only policy hint; the
+hint is inside the panel bounds and remains visible at the minimum window size.
+Merging per row is
+deliberately out of scope — the user picks one whole-view action, so no
+half-merged state can ever be written. hosts diffs are summary-level
+(added / removed lines) because an external insertion shifts every line
+number and a row-aligned diff would be wrong.
 
 ### 6.4 Closing, shutdown, and drafts
 
@@ -504,11 +522,15 @@ Re-basing (merge the user's edits onto the new disk state) is out of scope.
 
 ### 6.5 Backups tab
 
-Same tab in both windows. Lists backups newest first with time, size, and
-the number of rows that differ from the current state. Enter on a backup
-loads it **into `work` as unsaved edits**, so the user sees exactly what
-restore will change and must still press 保存. This replaces v0.1's
-direct "restore" for the window path. The launcher path stays as it is.
+Same tab in both windows. v0.6.0 made it two panes: the left list keeps the
+timestamp and the row count, the right pane shows a searchable preview of the
+selected backup with diff markers (`= 相同 ~ 值不同 + 仅备份有 - 当前多出`)
+against the current state. Buttons: 刷新预览 / 恢复 / 删除 / 导出 JSON.
+恢复 auto-backs-up the current state first, then loads the backup **into
+`work` as unsaved edits**, so the user sees exactly what restore will change
+and must still press 保存. 删除 confirms and removes one file; 导出 writes the
+backup JSON to a path the user picks. This replaces v0.1's direct "restore"
+for the window path. The launcher path stays as it is.
 
 ---
 
@@ -520,19 +542,24 @@ direct "restore" for the window path. The launcher path stays as it is.
 | Tab | window | Next view (用户 / 系统 / 备份, or 条目 / 原文 / 备份) |
 | Ctrl+Tab / Ctrl+Shift+Tab | window | Next / previous tab (用户 / 系统 / 备份, or 条目 / 原文 / 备份) |
 | Ctrl+F | window | Focus the filter; Esc in the filter clears it, a second Esc goes back to the table |
-| ↑ ↓ PgUp PgDn Home End | table | Move selection |
-| Enter / F2 | table | Edit the selected row (env: focus value; hosts: focus hostname) |
-| Space | hosts table | Toggle 启用 |
-| Ins / Del | table | Add a row / toggle the deleted marker (Del again restores); an unsaved new row is removed outright |
+| ↑ ↓ PgUp PgDn Home End | table | Move the focus row; with Shift, extend the multi-selection |
+| Ctrl+Click / Shift+Click | table | Toggle one row / select a contiguous range (v0.5.0) |
+| Ctrl+A | table | Select every row in the current view (v0.5.0) |
+| Enter / F2 | table | Edit the focus row (env: focus value; hosts: focus hostname); on a hosts multi-selection, enable / disable all selected rows |
+| Space | hosts table | Enable / disable all selected rows (v0.5.0) |
+| Ins / Del | table | Add a row / delete or restore all selected rows (Del again restores; an unsaved new row is removed outright). Deleting an existing env variable asks for confirmation. |
+| Ins / Del | env item list | Insert / delete **one split item** — never the whole row (v0.5.0) |
 | Alt+↑ / Alt+↓ | env list mode | Move a PATH segment |
-| Ctrl+Shift+← / → | env list mode | Move the item list / action pane splitter by 5% (mouse: drag the vertical grip) |
+| Double-click / Enter | env item list | Float the in-place edit box over that item (v0.6.0) |
+| ← / → after the × | env item list | `↑ ↓ ×` on the selected row: move up / down / delete one item (v0.6.0) |
 | Ctrl+R | env detail | List mode ↔ raw text |
-| Ctrl+C | table | Copy the value (env) or the full line (hosts) |
+| Ctrl+C | table | Copy all selected rows as `NAME=value` / hosts lines (v0.5.0) |
 | Ctrl+Shift+C | env table | Copy the expanded value |
-| Ctrl+Z / Ctrl+Y | window | Undo / redo |
-| Ctrl+S | window | Save (opens the change list) |
+| Ctrl+Z / Ctrl+Y | window | Undo / redo; one step reverts a whole batch operation |
+| Ctrl+S | window | Save (opens the change list; names every variable about to be deleted) |
 | F5 | window | Reload from disk (asks first when dirty) |
-| Esc | table | Close the window (asks first when dirty) |
+| Esc | diff panel / table | Close the diff panel (defer) / drop a multi-selection, then close the window (asks first when dirty) |
+| Esc | in-place item box | Restore the text captured when the box opened |
 | Esc | detail / filter | Return focus to the table; in the filter it also clears the text |
 | Alt+underlined letter | dialogs | Buttons (保存(&S) 不保存(&N)) |
 
@@ -622,6 +649,11 @@ harness, then against the real host.
 | W7 | Read-only hosts (deny ACE on the temp file for the test user) | Banner, controls disabled, Ctrl+C still works |
 | W8 | DPI 100 / 150 / 200 %, monitor move | No clipped controls (screenshot per step) |
 | W9 | Dark / light switch while open | Colours update without reopening |
+| W10 | Ctrl/Shift+Click, Ctrl+A, Ctrl+C, batch Del, one Ctrl+Z (v0.5.0) | Exact selection count, clipboard lines, whole batch restored in one undo |
+| W11 | Over-long `Path`, delete one split item, shorten, save (v0.5.0) | Readable banner, item count drops by one, `Path` still exists with the shorter value |
+| W12 | `appearance` locale switch + `uiLanguage` override (v0.5.0) | Window title and native control text switch on an open window; a pin wins over the host |
+
+W10–W12 are implemented in `tests/gui_preview.py`; see section 12.
 
 ### 10.4 Four required situations
 
@@ -658,9 +690,228 @@ temp files removed by the harness.
 - Whether the job object or UI restrictions block `RegNotifyChangeKeyValue`
   or `FindFirstChangeNotificationW` for a `normal` sandbox plugin. Not
   measured; save-time fingerprint check (6.2 step 4) is the backstop.
-- The local `winshun.h` exposes `theme()` (light / dark) but no
-  `appearanceChanged()` hook or `shuttingDown()`. Live theme switching (W9)
-  needs either an SDK upgrade or handling the raw `appearance` notification;
-  shutdown cleanup goes in the destructor, as in binarylab.
+- **Resolved (v0.5.0):** `winshun.h` was synced to the Win顺 0.22.0 SDK, which
+  does expose `appearanceChanged()`. The `appearance` method updates
+  `m_locale` / `m_theme` / `m_appearance` before calling it, so live language
+  and theme switching (the old W9 gap) is implemented and covered by
+  `integration.py` T2.9 and `gui_preview.py`. `shuttingDown()` is still absent;
+  cleanup stays in the destructor, as in binarylab.
+- The host only resolves its locale to `zh` / `en` (`App.h: m_language`,
+  `Manifest.cpp Text::pick`) and manifest text is `{zh, en}`. A third language
+  can only come from a plugin-owned setting; this version deliberately ships
+  only zh-CN / en-US.
+- The Qt Quick prototype (`qt/`) is not synchronised with v0.5.0. The shipped
+  build is still the GDI editor (`ENVHOSTS_QML_EDITOR=OFF`).
 - `pywinauto` is not installed in the current Python; L4 needs it.
 - The ListView dark-mode gaps in section 8 are expected, not measured.
+
+---
+
+## 12. v0.5.0 — multi-select, two languages, and the PATH data-loss fix
+
+Scope was fixed by the user: *"只把 zh-CN / en-US 做扎实"*, batch features limited
+to *"删除/恢复、启用/禁用、复制"*, and *"qml先不管了"*. A reported bug took
+priority over the new features: an over-long `Path`, deleting one split item,
+and after save the whole variable disappeared.
+
+### 12.1 The PATH bug: five independent causes
+
+| Cause | Fix |
+|---|---|
+| Default single-line Win32 `EDIT` limit silently truncated values on `SetWindowTextW`, so item mode committed a shorter value than the registry held. | `EM_SETLIMITTEXT, 0, 0` on `m_valueEdit`, `m_partEdit`, `m_rawEdit`. Validation, not the control, decides what is too long. |
+| `isValidEnvValue()` compared UTF-8 **bytes** against 32767. | `envh::utf16Units()` counts UTF-16 code units; CJK and long ASCII values are judged by the real Windows limit. Boundaries 32767 / 32768 are unit-tested. |
+| `m_errorBanner()` was a stub returning `{}`: an invalid value blocked save with no visible reason. | Reports the row name, used / cap units and the remediation. Painted **last** over the column-header band — drawing it first left only a 3px red line underneath the header. |
+| `refreshDetail()` rebuilt the split-item list from the stale `r.value` of a deleted row, so a just-deleted item seemed to reappear. | A deleted row clears `m_valueParts`, empties and disables the LISTBOX, and the detail text says the whole row is marked for deletion. |
+| `doDelete()` marked the whole row deleted, and `EnvModel::delta()` → `EnvStore::deleteVar()` removed the variable on save. `editProc` forwarded `Ins`/`Del` from every text EDIT to the table, so a keystroke inside the value box could trigger a row deletion. | Only `m_partsList` forwards `Ins`/`Del` (as item commands); the delete chip is labelled `Del 删除整行` / `Del row` in item mode; `confirmWholeRowDelete()` names the variable and its split-item count; `save()` lists every variable that will be deleted. `deletePart()` re-checks `m_partSel` after `commitPartEdit()`. |
+
+Regression test: `gui_preview.py` writes a 3000-segment (56999-unit) value into
+the isolated test key, checks the banner, deletes one item, checks that the item
+is gone from both the list and the rejoined raw value, checks the ghost-item
+behaviour of a whole-row delete, then shortens the value and saves — `Path`
+must still exist with the shortened value.
+
+### 12.2 Multi-select
+
+- `m_sel` stays the focus / anchor. `std::vector<std::uint8_t> m_selected` is
+  indexed by **model row**, not view row, so filtering, adding and deleting
+  cannot repoint the selection. `ensureSelection()` resizes it, and every path
+  that replaces the model (`undo`, `redo`, `add`, `reload`, `loadDraft`,
+  `switchTab`) clears the selection.
+- `m_rangeAnchor` (a visible index) drives `Shift+Click` and `Shift+arrow`.
+  `selectedModelIndices()` intersects visible ∩ selected ∩ writable, and falls
+  back to the focus row when nothing is selected.
+- `EnvModel::setDeletedMany()`, `HostsModel::setDeletedMany()` and
+  `HostsModel::setEnabledMany()` call `pushUndo()` **once** and erase new rows
+  in descending index order, so one `Ctrl+Z` restores an entire batch.
+- `Ctrl+C` uses `OpenClipboard` / `SetClipboardData(CF_UNICODETEXT)` on the GUI
+  thread — nothing is written to `stdout`, and the existing
+  `clipboard:write` permission is reused.
+- Two read-only Win32 test hooks: `WM_APP_KEY` (`lParam` = explicit Ctrl / Shift
+  bits, because injected `WM_KEYDOWN` cannot set `GetAsyncKeyState`) and
+  `WM_APP_GETSTATE` (packed selected / deleted / disabled counts). They are not
+  reachable through JSON-RPC.
+
+### 12.3 Language
+
+Only the host facts from `WinShun` / `WinShun-plugins` were used:
+`App.h` resolves `m_language` to `zh` or `en`, `Manifest.cpp Text::pick()`
+treats `en*` as English and everything else as Chinese, and
+`plugin.schema.json` allows only `{zh, en}` text. Consequently:
+
+- `i18n.h` has `Lang::{ZhCN, EnUS}`, `parse(host)`, and
+  `resolve(host, override)` where the plugin setting `zh-CN` / `en-US` wins and
+  anything else (including `auto`) follows the host.
+- `OpenArgs` owns `lang` + `zh` (set together through `setLang()`), so the GUI
+  thread draws from its own snapshot. All user-visible strings remain inline
+  zh/en pairs selected at draw time; a language change therefore needs only a
+  repaint, not a model rebuild.
+- `main.cpp` overrides `settingsChanged()` and `appearanceChanged()`; both call
+  `editorwin::onAppearanceChanged(lang, dark)`, which posts
+  `WM_APP_APPEARANCE` (owning a `new AppearanceArgs`) to each open HWND. The
+  window updates its title and the native `启用` / `Enabled` checkbox label and
+  clears any flash message in the old language.
+- `integration.py` T2.9 checks host language, a pinned override, a pin surviving
+  a later host change, and live switching. `gui_preview.py` checks the real
+  window title and native child-control text through the same transitions.
+
+### 12.4 Deliberately out of scope
+
+- A full table-driven `t(Key)` resource file and all-string extraction were
+  considered but not implemented: the existing inline zh/en pairs already cover
+  every string, and a runtime switch is verified end to end. Adding a key table
+  without a lint that enforces it would be churn, not correctness.
+- QML (`qt/`) was left untouched per the user's instruction; the shipped build
+  keeps `ENVHOSTS_QML_EDITOR=OFF`.
+- No third language, because the host cannot signal one.
+
+## 13. v0.6.0 — readable state, live external changes, backups you can inspect
+
+Five problems reported from real use drove this pass. Each one is mapped to
+the mechanism that fixes it.
+
+### 13.1 Full-width item list (the list should dominate)
+
+The v0.3–v0.5 layout gave the PATH item list 42% of the detail pane and put a
+four-button action pane, a separate edit box and a vertical splitter on the
+right. In practice the list — the thing the user actually works in — was the
+smaller half, and the right-hand controls duplicated keyboard commands.
+
+v0.6.0 removes the action pane entirely:
+
+- the list spans `valueW - 96px`; the remaining 96px strip is only for the
+  per-row dirty dot and the selected row's `↑ ↓ ×` buttons;
+- editing is in place: double-click or Enter floats `m_partEdit` over the row
+  via `LB_GETITEMRECT` + `MapWindowPoints`, `Esc` restores the text captured
+  on open, `Tab` commits;
+- the toolbar keeps three controls: `原文 | 分隔项`, the delimiter, `+ 新增项`;
+- the single counter `共 N 项 · 合计 X / 32,767 字符` replaces the three
+  conflicting numbers ("当前项 1/42", "共 18 行", the length). It owns a
+  guaranteed strip immediately after `+ 新增项`, is left-aligned, and keeps
+  the character-count portion as a readable fallback in a narrow window;
+- the toolbar geometry is computed as mode segment + delimiter + add-item
+  action + counter strip + commit button, so the counter can never overlap
+  `提交修改` or lose its left-hand item-count prefix in the normal layout.
+
+`m_partsSplitPct`, `m_rcPartsSplitter`, `m_dragPartsSplitter`,
+`m_rcPartUp/Down/Insert/Delete` and the 应用 button are deleted, not hidden.
+
+### 13.2 Unsaved changes are marked on the row
+
+`EnvModel::rowState()` / `HostsModel::rowState()` return
+`new / modified / deleted / unchanged` by comparing a row with the `base`
+snapshot (env: name+scope key, then value and type; hosts: `origin` line).
+`drawRow()` paints a 3px bar and a `+ ● −` state glyph from that value, and
+`updatePartRow()` marks a split item whose text differs from `m_partBase`
+(the snapshot taken in `refreshDetail()`), so an edit made through the item
+list is just as visible as one made in the raw box.
+
+### 13.3 External changes are watched, not just checked at save time
+
+`watchExternal()` runs from `kTimerWatch` (2 s). It reuses
+`EnvModel::computeFingerprint` / `computeUserFingerprint` and
+`HostsModel::contentFingerprint`, i.e. exactly the comparison `save()` makes,
+so the watcher and the save path can never disagree. The timer is paused
+while a modal dialog, an edit session or the diff panel is open — recomputing
+during typing flickers and can steal focus. A clean window adopts the new
+state; a dirty one only reports it.
+
+`RegNotifyChangeKeyValue` / `FindFirstChangeNotificationW` were rejected:
+they need a waiter thread per target for a handful of keys and one file, and
+polling keeps the "query has no side effects" property trivially true.
+
+### 13.4 Over-length values: block hard errors, warn about soft ones
+
+The user's decision: a value beyond the 32,767 UTF-16-unit process
+environment limit may still be saved, with an explicit warning.
+
+| Layer | Before | After |
+|---|---|---|
+| `isValidEnvValue()` | length + control characters in one bool | control characters only; `envValueOverlength()` is the soft check |
+| `EnvModel::hasInvalid()` | any over-length row returned true | hard errors only; `warnings()` lists over-length rows and the excess |
+| `save()` | refused | allowed; confirmation names the risk and the success status keeps the warning |
+| `m_errorBanner()` | one red band, borrowed from the header strip | hard errors only; over-length gets a separate band, painted last, without `DT_END_ELLIPSIS` |
+| `env:set` (protocol) | refused | **still refused** — that path has no UI to show the warning |
+
+The window paints a permanent counter (`X / 32,767`), amber above 90% and red
+past the cap, turns the row red, and the save dialog spells out that the
+registry accepts the value but new processes may not read it back.
+
+### 13.5 Backups are inspectable
+
+`BackupStore` gained `readEnv(id)`, `remove(id)`, `exportTo(path)`.
+The 备份 tab is two panes: timestamp list (with row count) on the left,
+searchable preview on the right with `= ~ + -` markers against the current
+state, plus 刷新预览 / 恢复 / 删除 / 导出 JSON. Restore still lands in `work`
+as unsaved edits after an automatic backup of the current state.
+
+### 13.6 The space delimiter, with the trap called out
+
+`Path` is full of `C:/Program Files\...`, so splitting on spaces is a
+data-loss shape identical to the 0.5.0 PATH bug. The preset therefore always
+asks first: on a PATH-like variable the dialog says one entry would be cut in
+half and defaults to No; on any other variable it explains that whitespace
+runs collapse to one separator and rejoins with a single space, so the raw
+text is normalised. `splitDelimited(value, " ", …)` treats a run of spaces as
+one delimiter, keeps `"quoted"` runs intact and trims the ends;
+`joinDelimited` emits one space. Command ids are `200..205` for the six
+presets with 自定义… at 206.
+
+### 13.7 Defects found while verifying
+
+- **`LB_GETITEMRECT` return value.** The code compared it with `LB_OKAY`
+  (0), but a list control returns 1 for a visible item. Consequently the
+  in-place editor never appeared and the per-item dirty markers were never
+  painted. Only `LB_ERR` means failure.
+- **Diff panel z-order.** Child EDIT controls always paint over the parent
+  DC, so the detail fields cut holes into the panel and visually buried its
+  buttons. `openDiff()` hides the detail children, `closeDiff()` calls
+  `applyLayout()` to restore them.
+- **The test-side modal race.** A `BM_CLICK` sent while a MessageBox is still
+  being created can be swallowed; the save would then look like a no-op. The
+  GUI driver now retries until the dialog actually closes.
+- **Test helper order.** `state()`, `post_key()`, `dialog_text()` and
+  `diff_button_center()` were defined after the section that used them, which
+  is why the suite used to die with `NameError` instead of reporting.
+
+### 13.8 Verified for this pass
+
+| Suite | Result |
+|---|---|
+| `cmake --build build` | ok, only the two pre-existing warnings |
+| `ctest` / logic / editor_model | 2/2, 69/69, 155/155 |
+| `tests/integration.py` | 37 passed, 0 failed |
+| `tests/gui_preview.py --no-hold` | **103 assertions, 0 failures** |
+
+Screenshots written by the GUI run and worth looking at:
+`editor_env_list_fullwidth.png`, `editor_env_multiselect.png`,
+`editor_env_conflict_diff.png`, `editor_env_backup_page.png`,
+`editor_env_space_delim.png`, `editor_env_path_overlong.png`.
+
+### 13.9 Still not verified
+
+- The real WinShun host switching language / theme while the new banner and
+  diff panel are on screen; DPI 150%; the `elevated` end-to-end path.
+- `env:set`'s over-length refusal is covered by unit tests, not by a live
+  protocol call in this pass.
+- The watcher's 10 s unfocused interval is implemented but not timed in a
+  test; only the 2 s focused path is asserted (within 5 s).

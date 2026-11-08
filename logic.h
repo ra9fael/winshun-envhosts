@@ -478,17 +478,59 @@ inline bool isValidEnvName(const std::string& name)
     return true;
 }
 
-// A value may contain anything except control characters (NUL cannot even be
-// carried by JSON, so it is rejected here). The 32767 cap is the OS block limit.
-inline bool isValidEnvValue(const std::string& value)
+// Windows counts the environment block in UTF-16 code units, not UTF-8 bytes.
+// A CJK path segment costs three bytes but one or two units; validating the
+// byte length rejected valid PATH values and let byte-heavy ones slip through.
+inline std::size_t utf16Units(const std::string& value)
 {
-    if (value.size() > kMaxEnvValue)
-        return false;
+    std::size_t n = 0;
+    for (std::size_t i = 0; i < value.size(); ++i) {
+        const unsigned char c = static_cast<unsigned char>(value[i]);
+        if (c < 0x80) {
+            ++n;
+        } else if ((c & 0xE0) == 0xC0) {
+            ++n;
+            i += 1;
+        } else if ((c & 0xF0) == 0xE0) {
+            ++n;
+            i += 2;
+        } else if ((c & 0xF8) == 0xF0) {
+            n += 2; // surrogate pair
+            i += 3;
+        } else {
+            ++n; // invalid lead byte: count as one replacement unit
+        }
+    }
+    return n;
+}
+
+// A value may contain anything except control characters (NUL cannot even be
+// carried by JSON, so it is rejected here). The 32767 cap is the OS block limit,
+// measured in UTF-16 units.
+//
+// v0.6.0: the cap is a SOFT warning in the editor (the user chose "save anyway
+// with an explicit warning"), while control characters stay a HARD error.
+// `isValidEnvValue()` keeps its original meaning (both) because the protocol
+// `env:set` path has no UI to surface a warning and must keep hard-rejecting.
+inline bool envValueHardErrorOk(const std::string& value)
+{
     for (unsigned char c : value) {
         if (c < 0x20 || c == 0x7F)
             return false;
     }
     return true;
+}
+
+// Number of UTF-16 units beyond the Windows environment-block limit, or 0.
+inline std::size_t envValueOverlength(const std::string& value)
+{
+    const std::size_t n = utf16Units(value);
+    return n > kMaxEnvValue ? n - kMaxEnvValue : 0;
+}
+
+inline bool isValidEnvValue(const std::string& value)
+{
+    return envValueHardErrorOk(value) && envValueOverlength(value) == 0;
 }
 
 inline std::string envTypeForValue(const std::string& value)

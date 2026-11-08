@@ -53,14 +53,34 @@ upstream as a separate commit.
 
 ## Tests
 
-- `ctest` runs `envhosts_tests`: hosts parsing with a byte-exact round trip
-  on `tests/fixtures/hosts.sample`, the env model, the query grammar,
-  validation and stable ids. It has no OS dependency.
-- `python tests/integration.py` drives the built `envhosts.exe` over JSON-RPC.
-  It edits a scratch registry key and a temporary hosts copy, never your real
-  environment or hosts file, and checks that a write to the real System32
-  hosts is refused for a normal user. Run it before a PR that touches
-  `main.cpp` or `native.h`.
+- `ctest --test-dir build --output-on-failure` runs `envhosts_tests` (69 checks)
+  and `editor_model_tests` (155 checks). Both are OS-free: hosts parsing with a
+  byte-exact round trip on `tests/fixtures/hosts.sample`, the env model, the
+  query grammar, validation, UTF-16 length limits, split/join (including the
+  whitespace delimiter), row states, the three-snapshot diff, drafts and
+  one-undo batch transactions.
+- `python tests/integration.py` drives the built `envhosts.exe` over JSON-RPC
+  (37 assertions). It edits a scratch registry key and a temporary hosts copy,
+  never your real environment or hosts file, and checks that a write to the real
+  System32 hosts is refused for a normal user. Run it before a PR that touches
+  `main.cpp`, `native.h` or the locale resolution.
+- `python tests/gui_preview.py --no-hold` opens both real windows, captures PNGs
+  under `tests/fixtures/` and runs 103 Win32 assertions (layout, scrolling, the
+  full-width item list, in-place editing, per-item dirty markers, multi-select,
+  batch commands, the external-change watcher and read-only diff panel, the
+  two-pane backup page, the space delimiter, the over-long `Path` sequence and
+  live language switching). It uses isolated HKCU test subkeys and a temporary
+  hosts copy and deletes both subkeys afterwards. Without `--no-hold` it keeps
+  the windows open for manual inspection; **always** use `--no-hold` in CI.
+- `python tests/verify_install.py` checks an unpacked, real-install `.wsplugin`
+  (no junction). Use it after packaging, not on the working tree.
+
+UI changes need both language variants. Every user-visible string in
+`editor_win.h` is an inline `m_args.zh ? "中文" : "English"` pair resolved at
+draw time; `i18n.h` only decides which language is active. The two read-only
+Win32 hooks `WM_APP_KEY` (explicit modifier mask) and `WM_APP_GETSTATE` (packed
+selection / deletion / disabled counts) exist solely so the GUI driver can
+assert state; do not route them through JSON-RPC or use them for writes.
 
 ## Pull requests
 
@@ -130,7 +150,7 @@ The version in `plugin.json` is the single source of truth. Versions follow
    cmake --build build --config Release
    ctest --test-dir build -C Release --output-on-failure
    python tests/integration.py
-   python tests/gui_preview.py
+   python tests/gui_preview.py --no-hold
    python tools/package.py --tag vx.y.z
    ```
    Then verify the **package**, not the working tree: a development junction

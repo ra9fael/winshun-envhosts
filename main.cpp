@@ -20,6 +20,7 @@
 #include <vector>
 
 #include "logic.h"
+#include "i18n.h"
 
 #ifdef _WIN32
 #include "native.h"
@@ -42,6 +43,7 @@ struct Settings {
     int backupCount = 10;
     int maxResults = 50;
     bool showSystem = true;
+    std::string uiLanguage = "auto"; // auto | zh-CN | en-US
 };
 
 Settings readSettings(const winshun::Json& s)
@@ -56,6 +58,7 @@ Settings readSettings(const winshun::Json& s)
         return fallback;
     };
     st.hostsPath = text("hostsPath", st.hostsPath);
+    st.uiLanguage = text("uiLanguage", st.uiLanguage);
     const std::string bc = text("backupCount", "10");
     st.backupCount = std::stoi(bc);
     const std::string mr = text("maxResults", "50");
@@ -314,9 +317,17 @@ struct EnvHosts : winshun::Plugin {
         return s.empty() ? expandPathVars(st.hostsPath) : s;
     }
 
+    // Host locale (zh / en) plus the plugin's own override. Everything visible
+    // is resolved from this at query time, so a language change needs no restart.
+    envh::i18n::Lang uiLang() const
+    {
+        return envh::i18n::resolve(locale(), readSettings(settings()).uiLanguage);
+    }
+    bool uiChinese() const { return envh::i18n::chinese(uiLang()); }
+
     winshun::Items query(const winshun::Query& q) override
     {
-        const bool zh = chinese();
+        const bool zh = uiChinese();
         const Settings st = readSettings(settings());
         std::string command = q.command;
         std::string text = winshun::trim(q.text);
@@ -513,7 +524,7 @@ struct EnvHosts : winshun::Plugin {
 
     winshun::Effects action(const winshun::ActionRequest& a) override
     {
-        const bool zh = chinese();
+        const bool zh = uiChinese();
         const Settings st = readSettings(settings());
         const winshun::Json data = a.item["data"];
         const std::string kind = data["kind"].toString();
@@ -532,7 +543,7 @@ struct EnvHosts : winshun::Plugin {
             oa.showSystem = st.showSystem;
             oa.filter = data["filter"].toString();
             oa.select = data["select"].toString();
-            oa.zh = chinese();
+            oa.setLang(uiLang());
             oa.dark = (theme() == "dark");
             oa.elevated = envh::native::processElevated();
             if (target == "hosts") {
@@ -802,7 +813,21 @@ struct EnvHosts : winshun::Plugin {
         return winshun::Json::Object {{"items", winshun::itemsJson(query(q))}, {"cache", 0}};
     }
 
-    void settingsChanged(const winshun::Json& s) override { (void)s; winshun::debug("ra9fael.envhosts: settingsChanged"); }
+    void settingsChanged(const winshun::Json& s) override
+    {
+        winshun::debug("ra9fael.envhosts: settingsChanged");
+        const auto lang = envh::i18n::resolve(locale(), readSettings(s).uiLanguage);
+        editorwin::onAppearanceChanged(lang, theme() == "dark");
+    }
+
+    // WinShun sends `appearance` (with locale inside the look object) when its
+    // language or theme changes. Push it to windows already open on their own
+    // GUI threads; a new window picks up the same values from uiLang().
+    void appearanceChanged() override
+    {
+        editorwin::onAppearanceChanged(uiLang(), theme() == "dark");
+    }
+
 
     void cancel(long long queryId) override { winshun::debug("ra9fael.envhosts: cancel " + std::to_string(queryId)); }
 };

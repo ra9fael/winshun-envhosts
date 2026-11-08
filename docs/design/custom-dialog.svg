@@ -1,0 +1,48 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="960" height="620" viewBox="0 0 960 620" font-family="Segoe UI, Microsoft YaHei, sans-serif">
+<title>envhosts 自定义弹窗 v2</title>
+<defs><style>
+    .bg { fill: #ffffff; }
+    .panel { fill: #ffffff; stroke: #c8ced6; stroke-width: 1; }
+    .panel-alt { fill: #fbfbfc; stroke: #e2e5ea; stroke-width: 1; }
+    .head { fill: #f1efe8; stroke: #e2e5ea; }
+    .field { fill: #ffffff; stroke: #c8ced6; }
+    .tab { fill: #ffffff; stroke: #c8ced6; }
+    .tab-on { fill: #58a6ff; }
+    .txt { fill: #1f2328; font-size: 13px; }
+    .txt-dim { fill: #6e6e6e; font-size: 12px; }
+    .txt-sm { fill: #9ca3af; font-size: 11px; }
+    .chip-t { font-size: 11px; }
+    .hdr { fill: #6e6e6e; font-size: 11px; font-weight: 600; }
+    .mono { fill: #1f2328; font-size: 12px; font-family: Consolas, monospace; }
+    .rowsep { stroke: #e2e5ea; }
+</style></defs>
+<rect x="0" y="0" width="960" height="620" fill="#e9ebef"/>
+<rect x="200" y="40" width="560" height="260" class="panel" rx="10"/>
+<rect x="224" y="64" width="40" height="40" rx="10" fill="#fee2e2" stroke="#fca5a5" stroke-width="1"/>
+<text x="244" y="90" class="txt" text-anchor="middle" font-size="16" font-weight="700" fill="#dc2626">!</text>
+<text x="280" y="80" class="txt" font-size="15" font-weight="600">标记删除整个变量</text>
+<text x="280" y="98" class="txt-dim">提交修改后才会写入注册表</text>
+<text x="224" y="136" class="txt">即将标记删除 EPICS_CA_ADDR_LIST，包含 8 个分隔项。</text>
+<rect x="224" y="162" width="512" height="40" class="panel-alt" rx="4"/>
+<rect x="224" y="162" width="3" height="40" rx="1" fill="#58a6ff"/>
+<text x="236" y="178" class="mono">提交修改（Ctrl+S）后从注册表移除该变量</text>
+<line x1="224" y1="236" x2="736" y2="236" class="rowsep"/>
+<rect x="632" y="252" width="108" height="30" rx="6" fill="#dc2626" stroke="#b91c1c" stroke-width="1"/>
+<text x="686" y="272" class="txt" text-anchor="middle" fill="#ffffff" font-size="13px" font-weight="600">标记删除</text>
+<rect x="538" y="252" width="84" height="30" class="panel" rx="6"/>
+<text x="580" y="272" class="txt" text-anchor="middle">取消</text>
+<rect x="200" y="330" width="560" height="260" class="panel" rx="10"/>
+<rect x="224" y="354" width="40" height="40" rx="10" fill="#dbeafe" stroke="#93c5fd" stroke-width="1"/>
+<text x="244" y="380" class="txt" text-anchor="middle" font-size="16" font-weight="700" fill="#2563eb">i</text>
+<text x="280" y="370" class="txt" font-size="15" font-weight="600">确认保存</text>
+<text x="280" y="388" class="txt-dim">写入注册表前的最后一步</text>
+<text x="224" y="426" class="txt">保存 1 项修改：Path 的值将更新。</text>
+<rect x="224" y="452" width="512" height="40" class="panel-alt" rx="4"/>
+<rect x="224" y="452" width="3" height="40" rx="1" fill="#58a6ff"/>
+<text x="236" y="468" class="mono">~ Path = C:\Users\renfei\.cargo\bin;…</text>
+<line x1="224" y1="526" x2="736" y2="526" class="rowsep"/>
+<rect x="632" y="542" width="108" height="30" rx="6" fill="#58a6ff" stroke="#378add" stroke-width="1"/>
+<text x="686" y="562" class="txt" text-anchor="middle" fill="#ffffff" font-size="13px" font-weight="600">确认保存</text>
+<rect x="538" y="542" width="84" height="30" class="panel" rx="6"/>
+<text x="580" y="562" class="txt" text-anchor="middle">取消</text>
+</svg>

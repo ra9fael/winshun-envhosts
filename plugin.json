@@ -6,10 +6,10 @@
     "zh": "环境变量 / hosts 编辑",
     "en": "Env & hosts editor"
   },
-  "version": "0.4.0",
+  "version": "0.7.1",
   "description": {
-    "zh": "查看、过滤、改写用户环境变量和 hosts 条目；改写前自动备份，系统级目标未提权时明确降级",
-    "en": "Browse, filter and edit user env vars and hosts entries; auto-backup before writes; honest degradation for admin-only targets"
+    "zh": "可视化编辑用户环境变量与 hosts 条目：交互窗口支持多选批量、分隔项编辑与中英文界面；改写前自动备份，系统级目标未提权时明确降级",
+    "en": "Visual editor for user env vars and hosts: multi-select batch commands, split-item editing and a zh/en UI; auto-backup before writes; honest degradation for admin-only targets"
   },
   "author": "ra9fael",
   "license": "MIT",
@@ -104,6 +104,18 @@
       "type": "bool",
       "title": { "zh": "显示系统变量", "en": "Show system vars" },
       "default": true
+    },
+    {
+      "key": "uiLanguage",
+      "type": "choice",
+      "title": { "zh": "界面语言", "en": "UI language" },
+      "hint": { "zh": "跟随 Win顺 或固定中文 / 英文；已打开的编辑窗口会立即切换", "en": "Follow WinShun or pin Chinese / English; open editor windows switch at once" },
+      "options": [
+        { "value": "auto", "title": { "zh": "跟随 Win顺", "en": "Follow WinShun" } },
+        { "value": "zh-CN", "title": { "zh": "简体中文", "en": "Chinese (Simplified)" } },
+        { "value": "en-US", "title": { "zh": "English", "en": "English" } }
+      ],
+      "default": "auto"
     }
   ]
 }

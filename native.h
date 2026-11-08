@@ -440,26 +440,90 @@ public:
         return listDir(m_dir + "/backups/hosts", ".hosts");
     }
 
+    // ---- v0.6.0: read-only inspection and per-backup operations -------------
+    // Ids come from our own millisecond stamp(). Reject anything else so a
+    // crafted id can never escape the backup directory.
+    static bool validId(const std::string& id)
+    {
+        if (id.empty() || id.size() > 64 || id.find("..") != std::string::npos)
+            return false;
+        for (char c : id)
+            if (!((c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z')
+                  || (c >= '0' && c <= '9') || c == '.' || c == '-'))
+                return false;
+        return true;
+    }
+
+    std::string backupPath(const std::string& kind, const std::string& id) const
+    {
+        if (!validId(id))
+            return {};
+        if (kind == "env")
+            return m_dir + "/backups/env/" + id + ".json";
+        if (kind == "hosts")
+            return m_dir + "/backups/hosts/" + id + ".hosts";
+        return {};
+    }
+
+    EnvSnapshot readEnv(const std::string& id)
+    {
+        const std::string path = backupPath("env", id);
+        if (path.empty())
+            return {};
+        std::ifstream in(path, std::ios::binary);
+        if (!in)
+            return {};
+        return parseEnvBackup(std::string((std::istreambuf_iterator<char>(in)),
+                                          std::istreambuf_iterator<char>()));
+    }
+
+    std::string readHosts(const std::string& id)
+    {
+        const std::string path = backupPath("hosts", id);
+        if (path.empty())
+            return {};
+        std::ifstream in(path, std::ios::binary);
+        if (!in)
+            return {};
+        return std::string((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
+    }
+
+    // Delete exactly one backup file. Returns false for an unknown/invalid id.
+    bool remove(const std::string& kind, const std::string& id)
+    {
+        const std::string path = backupPath(kind, id);
+        if (path.empty())
+            return false;
+        std::error_code ec;
+        return std::filesystem::remove(std::filesystem::u8path(path), ec);
+    }
+
+    // Copy one backup into WS_DATA_DIR/exports so the user can open it outside
+    // the editor. Returns the written path, or "" on failure.
+    std::string exportTo(const std::string& kind, const std::string& id)
+    {
+        const std::string path = backupPath(kind, id);
+        if (path.empty())
+            return {};
+        std::ifstream in(path, std::ios::binary);
+        if (!in)
+            return {};
+        const std::string dir = m_dir + "/exports";
+        ensureDir(dir);
+        const std::string out = dir + "/" + id + (kind == "env" ? ".json" : ".hosts");
+        std::ofstream dst(std::filesystem::u8path(out), std::ios::binary);
+        if (!dst)
+            return {};
+        dst << in.rdbuf();
+        return out;
+    }
+
     // Restore user-scope vars to a backup (system scope needs elevated, skipped).
     bool restoreEnv(const std::string& id, EnvStore& env)
     {
-        const std::string path = m_dir + "/backups/env/" + id + ".json";
-        std::ifstream in(path, std::ios::binary);
-        if (!in)
+        const EnvSnapshot backup = readEnv(id);
+        if (backup.vars.empty() && backupPath("env", id).empty())
             return false;
-        std::string text((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
-        const auto parsed = winshun::Json::parse(text);
-        if (!parsed || !parsed->isObject())
-            return false;
-        EnvSnapshot backup;
-        for (const winshun::Json& v : (*parsed)["vars"].toArray()) {
-            EnvVar e;
-            e.scope = v["scope"].toString();
-            e.name = v["name"].toString();
-            e.type = v["type"].toString();
-            e.value = v["value"].toString();
-            backup.vars.push_back(std::move(e));
-        }
         EnvSnapshot current = env.read(false).snap;
         // Apply backup vars.
         for (const EnvVar& b : backup.vars) {
@@ -480,16 +544,30 @@ public:
 
     bool restoreHosts(const std::string& id, HostsStore& hosts)
     {
-        const std::string path = m_dir + "/backups/hosts/" + id + ".hosts";
-        std::ifstream in(path, std::ios::binary);
-        if (!in)
+        if (!validId(id))
             return false;
-        std::string content((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
+        const std::string content = readHosts(id);
         std::string err;
-        return hosts.write(content, err);
+        return !content.empty() && hosts.write(content, err);
     }
 
 private:
+    static EnvSnapshot parseEnvBackup(const std::string& text)
+    {
+        EnvSnapshot snap;
+        const auto parsed = winshun::Json::parse(text);
+        if (!parsed || !parsed->isObject())
+            return snap;
+        for (const winshun::Json& v : (*parsed)["vars"].toArray()) {
+            EnvVar e;
+            e.scope = v["scope"].toString();
+            e.name = v["name"].toString();
+            e.type = v["type"].toString();
+            e.value = v["value"].toString();
+            snap.vars.push_back(std::move(e));
+        }
+        return snap;
+    }
     static void ensureDir(const std::string& p)
     {
         std::error_code ec;

@@ -1,0 +1,107 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="960" height="620" viewBox="0 0 960 620" font-family="Segoe UI, Microsoft YaHei, sans-serif">
+<title>envhosts 备份页 v2</title>
+<defs><style>
+    .bg { fill: #ffffff; }
+    .panel { fill: #ffffff; stroke: #c8ced6; stroke-width: 1; }
+    .panel-alt { fill: #fbfbfc; stroke: #e2e5ea; stroke-width: 1; }
+    .head { fill: #f1efe8; stroke: #e2e5ea; }
+    .field { fill: #ffffff; stroke: #c8ced6; }
+    .tab { fill: #ffffff; stroke: #c8ced6; }
+    .tab-on { fill: #58a6ff; }
+    .txt { fill: #1f2328; font-size: 13px; }
+    .txt-dim { fill: #6e6e6e; font-size: 12px; }
+    .txt-sm { fill: #9ca3af; font-size: 11px; }
+    .chip-t { font-size: 11px; }
+    .hdr { fill: #6e6e6e; font-size: 11px; font-weight: 600; }
+    .mono { fill: #1f2328; font-size: 12px; font-family: Consolas, monospace; }
+    .rowsep { stroke: #e2e5ea; }
+</style></defs>
+<rect x="0" y="0" width="960" height="620" class="bg"/>
+<rect x="8" y="8" width="944" height="30" class="panel" rx="4"/>
+<text x="20" y="28" class="txt" font-weight="600">环境变量 — WinShun</text>
+<rect x="8" y="46" width="84" height="28" class="tab" rx="4"/>
+<text x="50" y="65" class="txt" text-anchor="middle" fill="#374151">用户 (18)</text>
+<rect x="96" y="46" width="84" height="28" class="tab" rx="4"/>
+<text x="138" y="65" class="txt" text-anchor="middle" fill="#374151">系统 (20)</text>
+<rect x="184" y="46" width="84" height="28" class="tab-on" rx="4"/>
+<text x="226" y="65" class="txt" text-anchor="middle" fill="#ffffff" font-weight="600">备份 (3)</text>
+<text x="280" y="65" class="txt-dim">过滤 Ctrl+F</text>
+<text x="640" y="65" class="txt-sm">备份范围</text>
+<rect x="700" y="48" width="52" height="24" class="tab-on" rx="12"/>
+<text x="726" y="64" class="chip-t" text-anchor="middle" fill="#ffffff" font-weight="600">全部</text>
+<rect x="754" y="48" width="52" height="24" class="tab" rx="12"/>
+<text x="780" y="64" class="chip-t" text-anchor="middle" fill="#374151">用户</text>
+<rect x="808" y="48" width="52" height="24" class="tab" rx="12"/>
+<text x="834" y="64" class="chip-t" text-anchor="middle" fill="#374151">系统</text>
+<rect x="8" y="84" width="272" height="430" class="panel-alt" rx="4"/>
+<text x="18" y="104" class="txt" font-weight="600">备份 (3)</text>
+<text x="196" y="104" class="txt-sm" fill="#9ca3af">自动保留最近 10 份</text>
+<rect x="10" y="114" width="268" height="44" class="panel" rx="3" fill="#d2e4fa"/>
+<rect x="10" y="114" width="3" height="44" fill="#378add"/>
+<text x="20" y="132" class="mono">20261107T205602.526Z</text>
+<text x="20" y="148" class="txt-sm">21:56:02 · 3 个变量</text>
+<rect x="196" y="120" width="36" height="17" rx="8.5" fill="#e6f1fb" stroke="#9ec5ff" stroke-width="1"/>
+<text x="214" y="132.5" class="chip-t" text-anchor="middle" fill="#185fa5">用户</text>
+<rect x="236" y="120" width="36" height="17" rx="8.5" fill="#f3e8ff" stroke="#c9a6f5" stroke-width="1"/>
+<text x="254" y="132.5" class="chip-t" text-anchor="middle" fill="#6b21a8">系统</text>
+<text x="20" y="184" class="mono">20261107T204118.913Z</text>
+<text x="20" y="200" class="txt-sm">20:41:18 · 1 个变量</text>
+<rect x="196" y="172" width="36" height="17" rx="8.5" fill="#e6f1fb" stroke="#9ec5ff" stroke-width="1"/>
+<text x="214" y="184.5" class="chip-t" text-anchor="middle" fill="#185fa5">用户</text>
+<text x="20" y="236" class="mono">20261107T195530.221Z</text>
+<text x="20" y="252" class="txt-sm">19:55:30 · 0 个变量</text>
+<rect x="196" y="224" width="36" height="17" rx="8.5" fill="#e6f1fb" stroke="#9ec5ff" stroke-width="1"/>
+<text x="214" y="236.5" class="chip-t" text-anchor="middle" fill="#185fa5">用户</text>
+<text x="18" y="500" class="txt-sm" fill="#9ca3af">点击左侧备份查看差异</text>
+<rect x="288" y="84" width="664" height="430" class="panel" rx="4"/>
+<text x="300" y="104" class="txt" font-weight="600">20261107T205602.526Z</text>
+<text x="300" y="122" class="txt-dim">21:56:02 · 用户 2 项 + 系统 1 项 · 共 3 个变量</text>
+<rect x="300" y="132" width="300" height="24" class="field" rx="4"/>
+<text x="310" y="148" class="txt-sm" fill="#9ca3af">搜索变量…</text>
+<rect x="292" y="164" width="656" height="20" class="head"/>
+<text x="300" y="178" class="hdr">变量</text>
+<text x="440" y="178" class="hdr">范围</text>
+<text x="510" y="178" class="hdr">备份中的值</text>
+<text x="932" y="178" class="hdr" text-anchor="end">差异</text>
+<text x="300" y="202" class="mono">EPICS_CA_ADDR_LIST</text>
+<rect x="440" y="186" width="36" height="17" rx="8.5" fill="#e6f1fb" stroke="#9ec5ff" stroke-width="1"/>
+<text x="458" y="198.5" class="chip-t" text-anchor="middle" fill="#185fa5">用户</text>
+<text x="510" y="202" class="mono">10.10.81.255 192.168.138.255</text>
+<text x="932" y="202" class="txt" text-anchor="end" fill="#a06414" font-size="12px">值不同</text>
+<line x1="292" y1="210" x2="948" y2="210" class="rowsep"/>
+<text x="300" y="226" class="mono">Path</text>
+<rect x="440" y="210" width="36" height="17" rx="8.5" fill="#e6f1fb" stroke="#9ec5ff" stroke-width="1"/>
+<text x="458" y="222.5" class="chip-t" text-anchor="middle" fill="#185fa5">用户</text>
+<text x="510" y="226" class="mono">C:\Users\renfei\.cargo\bin;…</text>
+<text x="932" y="226" class="txt" text-anchor="end" fill="#a06414" font-size="12px">值不同</text>
+<line x1="292" y1="234" x2="948" y2="234" class="rowsep"/>
+<text x="300" y="250" class="mono">TEMP</text>
+<rect x="440" y="234" width="36" height="17" rx="8.5" fill="#f3e8ff" stroke="#c9a6f5" stroke-width="1"/>
+<text x="458" y="246.5" class="chip-t" text-anchor="middle" fill="#6b21a8">系统</text>
+<text x="510" y="250" class="mono">%USERPROFILE%\AppData\Local\Temp</text>
+<text x="932" y="250" class="txt" text-anchor="end" fill="#a06414" font-size="12px">值不同</text>
+<line x1="292" y1="258" x2="948" y2="258" class="rowsep"/>
+<text x="300" y="274" class="mono">HF_TOKEN</text>
+<rect x="440" y="258" width="36" height="17" rx="8.5" fill="#e6f1fb" stroke="#9ec5ff" stroke-width="1"/>
+<text x="458" y="270.5" class="chip-t" text-anchor="middle" fill="#185fa5">用户</text>
+<text x="510" y="274" class="mono">hf_EjRWfJaUOlbdIoBV…</text>
+<text x="932" y="274" class="txt" text-anchor="end" fill="#1e7832" font-size="12px">相同</text>
+<line x1="292" y1="282" x2="948" y2="282" class="rowsep"/>
+<text x="300" y="298" class="mono">LM_LICENSE_FILE</text>
+<rect x="440" y="282" width="36" height="17" rx="8.5" fill="#e6f1fb" stroke="#9ec5ff" stroke-width="1"/>
+<text x="458" y="294.5" class="chip-t" text-anchor="middle" fill="#185fa5">用户</text>
+<text x="510" y="298" class="mono">C:\Microsemi\License\License.dat</text>
+<text x="932" y="298" class="txt" text-anchor="end" fill="#1e7832" font-size="12px">相同</text>
+<line x1="292" y1="306" x2="948" y2="306" class="rowsep"/>
+<text x="300" y="500" class="txt-sm">恢复前自动备份当前状态 · 恢复生成为未保存的改动，仍需按 Ctrl+S 写入</text>
+<rect x="8" y="524" width="944" height="42" class="panel" rx="4"/>
+<rect x="20" y="532" width="96" height="26" rx="4" fill="#ffffff" stroke="#c8ced6" stroke-width="1"/>
+<text x="68" y="549" class="txt" text-anchor="middle" fill="#1f2328">刷新</text>
+<rect x="124" y="532" width="96" height="26" rx="4" fill="#58a6ff" stroke="#378add" stroke-width="1"/>
+<text x="172" y="549" class="txt" text-anchor="middle" fill="#ffffff">恢复…</text>
+<rect x="228" y="532" width="96" height="26" rx="4" fill="#ffffff" stroke="#c8ced6" stroke-width="1"/>
+<text x="276" y="549" class="txt" text-anchor="middle" fill="#1f2328">删除</text>
+<rect x="332" y="532" width="110" height="26" rx="4" fill="#ffffff" stroke="#c8ced6" stroke-width="1"/>
+<text x="387" y="549" class="txt" text-anchor="middle" fill="#1f2328">导出 JSON</text>
+<text x="20" y="590" class="txt-dim">● 0 修改 · 选中 1 份备份 · 管理员</text>
+</svg>

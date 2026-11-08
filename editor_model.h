@@ -24,6 +24,20 @@
 namespace envh {
 namespace edit {
 
+// How a working row compares with the snapshot the window opened with. The
+// editor paints this per row so "unsaved change" is visible on the item that
+// actually changed, not just in a global status line.
+enum class RowState { Unchanged, Added, Modified, Deleted };
+
+// A value that Windows will let us write to the registry but that a new
+// process may not be able to read back in full. Soft warning, not a hard error.
+struct EnvWarning {
+    std::string name;
+    std::size_t used = 0;
+    std::size_t cap = 0;
+    std::size_t over = 0;
+};
+
 // ---------------------------------------------------------------------------
 // PATH helpers (env list-mode editing)
 // ---------------------------------------------------------------------------
@@ -32,6 +46,43 @@ inline std::vector<std::string> splitDelimited(const std::string& value, const s
 {
     if (delimiter.empty())
         return {value};
+    // " " stands for ANY whitespace run. joinDelimited() then emits one single
+    // space, so switching to this delimiter normalises the original spacing.
+    // The window warns before applying it (and refuses it for PATH by default).
+    if (delimiter == " ") {
+        std::vector<std::string> parts;
+        std::string current;
+        bool inQuote = false;
+        auto ws = [](char c) { return c == ' ' || c == '\t' || c == '\r' || c == '\n'; };
+        for (std::size_t i = 0; i < value.size();) {
+            const char c = value[i];
+            if (preserveQuoted && c == '"') {
+                inQuote = !inQuote;
+                current += c;
+                ++i;
+                continue;
+            }
+            if (!inQuote && ws(c)) {
+                parts.push_back(current);
+                current.clear();
+                while (i < value.size() && ws(value[i]))
+                    ++i;
+                continue;
+            }
+            current += c;
+            ++i;
+        }
+        parts.push_back(current);
+        // Leading / trailing whitespace in the raw value is a separator, not an
+        // empty item. Keep interior items intact (quoted text can be empty).
+        if (parts.size() > 1 && parts.front().empty())
+            parts.erase(parts.begin());
+        if (parts.size() > 1 && parts.back().empty())
+            parts.pop_back();
+        if (parts.empty())
+            parts.emplace_back();
+        return parts;
+    }
     std::vector<std::string> parts;
     std::string current;
     bool inQuote = false;
@@ -237,8 +288,42 @@ public:
         return out;
     }
 
-    // Validation: any invalid name/value blocks save. System rows only count
-    // when this window can write them (the plugin runs elevated).
+    // Per-row dirty state for the table paint. `base` is the snapshot taken
+    // when the window opened; `rows` is the live working copy.
+    RowState rowState(std::size_t idx) const
+    {
+        if (idx >= rows.size())
+            return RowState::Unchanged;
+        const EnvVarRow& r = rows[idx];
+        if (r.deleted)
+            return RowState::Deleted;
+        if (!r.inBase || r.isNew)
+            return RowState::Added;
+        for (const EnvVarRow& b : base)
+            if (b.scope == r.scope && toLower(b.name) == toLower(r.name))
+                return (b.name != r.name || b.type != r.type || b.value != r.value)
+                           ? RowState::Modified
+                           : RowState::Unchanged;
+        return RowState::Added;
+    }
+
+    std::vector<EnvWarning> warnings(bool systemWritable = false) const
+    {
+        std::vector<EnvWarning> out;
+        for (const EnvVarRow& r : rows) {
+            if (r.deleted || (r.scope == "system" && !systemWritable))
+                continue;
+            const std::size_t used = utf16Units(r.value);
+            if (used > kMaxEnvValue)
+                out.push_back({r.name, used, kMaxEnvValue, used - kMaxEnvValue});
+        }
+        return out;
+    }
+
+    // Validation: only HARD errors block a save. An over-long value is a soft
+    // warning since v0.6.0 (the user explicitly chose "save anyway"); the
+    // registry accepts it, and the editor shows four visible warning layers.
+    // System rows only count when this window can write them (elevated plugin).
     bool hasInvalid(bool systemWritable = false) const
     {
         for (const EnvVarRow& r : rows) {
@@ -246,7 +331,7 @@ public:
                 continue;
             if (r.name.empty() || !isValidEnvName(r.name))
                 return true;
-            if (!isValidEnvValue(r.value))
+            if (!envValueHardErrorOk(r.value))
                 return true;
         }
         return false;
@@ -335,6 +420,30 @@ public:
         // un-deleting a name that exists in base is just clearing the flag
         if (!rows[idx].deleted)
             rows[idx].isNew = false;
+    }
+
+    // One undo step for a whole selection. Base rows get the deletion flag;
+    // rows created in this window are erased instead (descending, so the
+    // remaining indices stay valid). Indices all refer to the pre-call rows.
+    void setDeletedMany(const std::vector<std::size_t>& idx, bool deleted)
+    {
+        if (idx.empty())
+            return;
+        pushUndo();
+        for (std::size_t i : idx)
+            if (i < rows.size() && rows[i].inBase) {
+                rows[i].deleted = deleted;
+                if (!deleted)
+                    rows[i].isNew = false;
+            }
+        std::vector<std::size_t> fresh;
+        for (std::size_t i : idx)
+            if (i < rows.size() && !rows[i].inBase)
+                fresh.push_back(i);
+        std::sort(fresh.begin(), fresh.end(), std::greater<std::size_t>());
+        for (std::size_t i : fresh)
+            if (i < rows.size() && !rows[i].inBase)
+                rows.erase(rows.begin() + static_cast<std::ptrdiff_t>(i));
     }
 
     std::size_t addNew(const std::string& scope = "user")
@@ -821,6 +930,37 @@ struct HostsModel {
         else
             rows.erase(rows.begin() + idx);
     }
+
+    // One undo step for a whole selection. Section headings are skipped here
+    // too. New rows are erased in descending order so the remaining indices
+    // still refer to the same rows.
+    void setDeletedMany(const std::vector<std::size_t>& idx, bool deleted)
+    {
+        if (idx.empty())
+            return;
+        pushUndo();
+        for (std::size_t i : idx)
+            if (i < rows.size() && !rows[i].isSection && rows[i].origin >= 0)
+                rows[i].deleted = deleted;
+        std::vector<std::size_t> fresh;
+        for (std::size_t i : idx)
+            if (i < rows.size() && !rows[i].isSection && rows[i].origin < 0)
+                fresh.push_back(i);
+        std::sort(fresh.begin(), fresh.end(), std::greater<std::size_t>());
+        for (std::size_t i : fresh)
+            if (i < rows.size() && !rows[i].isSection && rows[i].origin < 0)
+                rows.erase(rows.begin() + i);
+    }
+
+    void setEnabledMany(const std::vector<std::size_t>& idx, bool enabled)
+    {
+        if (idx.empty())
+            return;
+        pushUndo();
+        for (std::size_t i : idx)
+            if (i < rows.size() && !rows[i].isSection && !rows[i].isNew && !rows[i].deleted)
+                rows[i].commented = !enabled;
+    }
     void removeRow(std::size_t idx)
     {
         if (idx >= rows.size())
@@ -911,6 +1051,26 @@ struct HostsModel {
     }
 
     bool dominantCrlf() const { return m_dominantCrlf; }
+
+    RowState rowState(std::size_t idx) const
+    {
+        if (idx >= rows.size())
+            return RowState::Unchanged;
+        const HostsRow& r = rows[idx];
+        if (r.isSection)
+            return RowState::Unchanged; // display-only headings
+        if (r.deleted)
+            return RowState::Deleted;
+        if (r.isNew || r.origin < 0 || r.origin >= static_cast<int>(base.lines.size()))
+            return RowState::Added;
+        const HostsEntry e = parseHostLine(base.lines[r.origin].text, r.origin);
+        const std::vector<std::string> baseHosts =
+            e.hostnames.empty() ? std::vector<std::string> {e.hostname} : e.hostnames;
+        return (e.commented != r.commented || e.ip != r.ip || e.comment != r.comment
+                || baseHosts != r.hostnames)
+                   ? RowState::Modified
+                   : RowState::Unchanged;
+    }
 
 private:
     std::vector<Snapshot> m_undo;
@@ -1010,6 +1170,175 @@ private:
         return t;
     }
 };
+
+// ---------------------------------------------------------------------------
+// Three-snapshot diff for external changes (read-only, no OS dependency)
+// ---------------------------------------------------------------------------
+// base   = the snapshot the window opened with (EnvModel::base / HostsModel::disk)
+// mine   = the current working copy (unsaved edits)
+// theirs = what another process wrote while the window was open
+//
+// The panel only DISPLAYS these entries. It never merges anything: the user
+// picks one whole-view action (reload / force overwrite / defer).
+struct Diff3Entry {
+    std::string key; // "user/Path"
+    std::string verdict; // "mine" | "theirs" | "same" | "conflict"
+    std::string base, mine, theirs;
+    bool hasBase = false, hasMine = false, hasTheirs = false;
+};
+
+struct Diff3Result {
+    std::vector<Diff3Entry> entries;
+    int conflicts = 0;
+    int theirsOnly = 0;
+    int mineOnly = 0;
+};
+
+struct Diff3Val {
+    std::string value;
+    std::string type;
+    bool present = false;
+};
+
+inline std::map<std::string, Diff3Val> diff3Normalize(const EnvSnapshot& s)
+{
+    std::map<std::string, Diff3Val> out;
+    for (const EnvVar& v : s.vars) {
+        Diff3Val d;
+        d.value = v.value;
+        d.type = v.type;
+        d.present = true;
+        // All three snapshots come from the same registry, so the original
+        // spelling of a name is stable across them. Keep it for display.
+        out[v.scope + "/" + v.name] = std::move(d);
+    }
+    return out;
+}
+
+inline std::string diff3Brief(const Diff3Val& v)
+{
+    if (!v.present)
+        return "(absent)";
+    const std::string s = v.value.empty() ? std::string("(empty)") : v.value;
+    return s.size() > 52 ? s.substr(0, 52) + "…" : s;
+}
+
+// Converting rows to a snapshot lets this stay a pure function of three inputs.
+inline EnvSnapshot diff3RowsToSnapshot(const std::vector<EnvVarRow>& rows)
+{
+    EnvSnapshot s;
+    for (const EnvVarRow& r : rows) {
+        if (r.deleted || r.name.empty())
+            continue;
+        EnvVar v;
+        v.scope = r.scope;
+        v.name = r.name;
+        v.type = r.type;
+        v.value = r.value;
+        s.vars.push_back(std::move(v));
+    }
+    return s;
+}
+
+inline Diff3Result diff3Env(const EnvSnapshot& base, const EnvSnapshot& mine, const EnvSnapshot& theirs)
+{
+    const auto b = diff3Normalize(base);
+    const auto m = diff3Normalize(mine);
+    const auto t = diff3Normalize(theirs);
+    auto eq = [](const Diff3Val& a, const Diff3Val& c) {
+        return a.present == c.present && a.value == c.value && a.type == c.type;
+    };
+    std::vector<std::string> keys;
+    for (const auto& kv : b) keys.push_back(kv.first);
+    for (const auto& kv : m) keys.push_back(kv.first);
+    for (const auto& kv : t) keys.push_back(kv.first);
+    std::sort(keys.begin(), keys.end());
+    keys.erase(std::unique(keys.begin(), keys.end()), keys.end());
+
+    Diff3Result out;
+    for (const std::string& k : keys) {
+        auto at = [](const std::map<std::string, Diff3Val>& src, const std::string& key) {
+            const auto it = src.find(key);
+            return it == src.end() ? Diff3Val {} : it->second;
+        };
+        const Diff3Val bv = at(b, k), mv = at(m, k), tv = at(t, k);
+        if (eq(mv, bv) && eq(tv, bv))
+            continue; // nothing changed on either side
+        Diff3Entry e;
+        e.key = k;
+        e.hasBase = bv.present;
+        e.hasMine = mv.present;
+        e.hasTheirs = tv.present;
+        e.base = diff3Brief(bv);
+        e.mine = diff3Brief(mv);
+        e.theirs = diff3Brief(tv);
+        if (eq(mv, tv)) {
+            e.verdict = "same";
+        } else if (eq(mv, bv)) {
+            e.verdict = "theirs";
+            ++out.theirsOnly;
+        } else if (eq(tv, bv)) {
+            e.verdict = "mine";
+            ++out.mineOnly;
+        } else {
+            // Both sides moved away from base in different ways. A delete on
+            // one side plus an edit on the other lands here too.
+            e.verdict = "conflict";
+            ++out.conflicts;
+        }
+        out.entries.push_back(std::move(e));
+    }
+    return out;
+}
+
+// hosts diff is SUMMARY level on purpose: an inserted line shifts every
+// `origin` index, so a line-aligned unified diff would be unreliable.
+struct Diff3HostsResult {
+    int added = 0;
+    int removed = 0;
+    std::vector<std::string> samples;
+};
+
+inline Diff3HostsResult diff3Hosts(const std::string& base, const std::string& theirs)
+{
+    auto counts = [](const std::string& text) {
+        std::map<std::string, int> c;
+        std::string line;
+        for (std::size_t i = 0; i < text.size(); ++i) {
+            if (text[i] == '\n' || text[i] == '\r') {
+                if (!line.empty() && line.find_first_not_of(" \t") != std::string::npos)
+                    c[line] += 1;
+                line.clear();
+                continue;
+            }
+            line += text[i];
+        }
+        if (!line.empty() && line.find_first_not_of(" \t") != std::string::npos)
+            c[line] += 1;
+        return c;
+    };
+    const auto b = counts(base), t = counts(theirs);
+    Diff3HostsResult out;
+    std::vector<std::string> lines;
+    for (const auto& kv : b) lines.push_back(kv.first);
+    for (const auto& kv : t) lines.push_back(kv.first);
+    std::sort(lines.begin(), lines.end());
+    lines.erase(std::unique(lines.begin(), lines.end()), lines.end());
+    for (const std::string& l : lines) {
+        const int nb = b.count(l) ? b.at(l) : 0;
+        const int nt = t.count(l) ? t.at(l) : 0;
+        if (nt > nb) {
+            out.added += nt - nb;
+            if (out.samples.size() < 8)
+                out.samples.push_back("+ " + l);
+        } else if (nb > nt) {
+            out.removed += nb - nt;
+            if (out.samples.size() < 8)
+                out.samples.push_back("- " + l);
+        }
+    }
+    return out;
+}
 
 } // namespace edit
 } // namespace envh

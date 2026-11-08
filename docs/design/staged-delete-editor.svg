@@ -1,0 +1,116 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="960" height="620" viewBox="0 0 960 620" font-family="Segoe UI, Microsoft YaHei, sans-serif">
+<title>envhosts 编辑界面 · 暂存删除</title>
+<defs><style>
+    .bg { fill: #ffffff; }
+    .panel { fill: #ffffff; stroke: #c8ced6; stroke-width: 1; }
+    .panel-alt { fill: #fbfbfc; stroke: #e2e5ea; stroke-width: 1; }
+    .head { fill: #f1efe8; stroke: #e2e5ea; }
+    .field { fill: #ffffff; stroke: #c8ced6; }
+    .tab { fill: #ffffff; stroke: #c8ced6; }
+    .tab-on { fill: #58a6ff; }
+    .txt { fill: #1f2328; font-size: 13px; }
+    .txt-dim { fill: #6e6e6e; font-size: 12px; }
+    .txt-sm { fill: #9ca3af; font-size: 11px; }
+    .chip-t { font-size: 11px; }
+    .hdr { fill: #6e6e6e; font-size: 11px; font-weight: 600; }
+    .mono { fill: #1f2328; font-size: 12px; font-family: Consolas, monospace; }
+    .rowsep { stroke: #e2e5ea; }
+</style></defs>
+<rect x="0" y="0" width="960" height="620" class="bg"/>
+<rect x="8" y="8" width="944" height="30" class="panel" rx="4"/>
+<text x="20" y="28" class="txt" font-weight="600">环境变量 — WinShun</text>
+<rect x="8" y="46" width="84" height="28" class="tab-on" rx="4"/>
+<text x="50" y="65" class="txt" text-anchor="middle" fill="#ffffff" font-weight="600">用户 (18)</text>
+<rect x="96" y="46" width="84" height="28" class="tab" rx="4"/>
+<text x="138" y="65" class="txt" text-anchor="middle" fill="#374151">系统 (20)</text>
+<rect x="184" y="46" width="84" height="28" class="tab" rx="4"/>
+<text x="226" y="65" class="txt" text-anchor="middle" fill="#374151">备份 (3)</text>
+<text x="280" y="65" class="txt-dim">过滤 Ctrl+F</text>
+<rect x="600" y="46" width="352" height="24" class="field" rx="4"/>
+<text x="608" y="62" class="mono">EPICS_CA_ADDR</text>
+<rect x="8" y="84" width="944" height="236" class="panel" rx="4"/>
+<rect x="12" y="88" width="936" height="20" class="head"/>
+<text x="20" y="102" class="hdr">名称</text>
+<text x="280" y="102" class="hdr">类型</text>
+<text x="420" y="102" class="hdr">值</text>
+<text x="932" y="102" class="hdr" text-anchor="end">状态</text>
+<text x="20" y="126" class="mono">chocolateyinstall</text>
+<text x="280" y="126" class="mono">REG_SZ</text>
+<text x="420" y="126" class="mono">C:\Users\renfei\AppData\Local\UniGetUI\Chocolatey</text>
+<rect x="12" y="108" width="936" height="22" fill="#d2e4fa"/>
+<text x="20" y="124" class="mono">EPICS_CA_ADDR_LIST</text>
+<text x="280" y="124" class="mono">REG_SZ</text>
+<text x="420" y="124" class="mono">10.10.81.255 192.168.138.255 192.168.138.111:5064 192.168.138.111:5070</text>
+<circle cx="884" cy="119" r="4" fill="#b48228"/>
+<text x="932" y="123" class="txt" text-anchor="end" fill="#b48228" font-size="12px">● 已修改</text>
+<rect x="12" y="130" width="936" height="22" fill="#fff0f0"/>
+<text x="20" y="146" class="mono" fill="#aa3232" text-decoration="line-through">EPICS_CA_MAX_ARRAY_BYTES</text>
+<text x="280" y="146" class="mono" fill="#aa3232" text-decoration="line-through">REG_SZ</text>
+<text x="420" y="146" class="mono" fill="#aa3232" text-decoration="line-through">2000000</text>
+<text x="932" y="145" class="txt" text-anchor="end" fill="#aa3232" font-size="12px">− 待删除</text>
+<text x="20" y="168" class="mono">HF_TOKEN</text>
+<text x="280" y="168" class="mono">REG_SZ</text>
+<text x="420" y="168" class="mono">hf_EjRWfJaUOlbdIoBV…</text>
+<rect x="12" y="174" width="936" height="22" fill="#eef7ea"/>
+<text x="20" y="190" class="mono" fill="#1e7832">MY_NEW_VAR</text>
+<text x="280" y="190" class="mono" fill="#1e7832">REG_SZ</text>
+<text x="420" y="190" class="mono" fill="#1e7832">hello</text>
+<text x="932" y="189" class="txt" text-anchor="end" fill="#1e7832" font-size="12px">+ 待新增</text>
+<text x="20" y="212" class="mono">Path</text>
+<text x="280" y="212" class="mono">REG_EXPAND_SZ</text>
+<text x="420" y="212" class="mono">C:\Users\renfei\.cargo\bin;…</text>
+<text x="20" y="234" class="txt-sm">共 18 项 · 1 项已修改 · 1 项待删除 · 1 项待新增</text>
+<text x="760" y="234" class="txt-sm" fill="#9ca3af">删除仅标记，提交后才写入注册表</text>
+<rect x="8" y="330" width="944" height="200" class="panel" rx="4"/>
+<text x="20" y="352" class="txt-sm">名称</text>
+<rect x="20" y="358" width="330" height="24" class="field" rx="4"/>
+<text x="28" y="374" class="mono">EPICS_CA_ADDR_LIST</text>
+<text x="370" y="352" class="txt-sm">类型</text>
+<rect x="370" y="358" width="330" height="24" class="field" rx="4"/>
+<text x="378" y="374" class="mono">REG_SZ</text>
+<rect x="740" y="356" width="110" height="26" rx="4" fill="#169a3a" stroke="#15803d" stroke-width="1"/>
+<text x="795" y="373" class="txt" text-anchor="middle" fill="#ffffff">提交修改</text>
+<rect x="858" y="356" width="84" height="26" rx="4" fill="#ffffff" stroke="#c8ced6" stroke-width="1"/>
+<text x="900" y="373" class="txt" text-anchor="middle" fill="#1f2328">撤销全部</text>
+<rect x="20" y="398" width="80" height="24" class="tab-on" rx="4"/>
+<text x="60" y="414" class="txt" text-anchor="middle" fill="#ffffff" font-weight="600">原文</text>
+<rect x="104" y="398" width="80" height="24" class="tab" rx="4"/>
+<text x="144" y="414" class="txt" text-anchor="middle" fill="#374151">分隔项</text>
+<rect x="200" y="398" width="420" height="24" class="field" rx="4"/>
+<text x="210" y="414" class="txt-sm">分号 (;)</text>
+<rect x="628" y="398" width="80" height="24" rx="4" fill="#ffffff" stroke="#c8ced6" stroke-width="1"/>
+<text x="668" y="414" class="txt" text-anchor="middle" fill="#1f2328">+ 新增项</text>
+<text x="724" y="414" class="txt-sm">共 8 项 · 合计 74 / 32,767 字符</text>
+<rect x="20" y="430" width="920" height="20" class="head"/>
+<text x="28" y="444" class="hdr">#</text>
+<text x="80" y="444" class="hdr">分隔项</text>
+<text x="860" y="444" class="hdr" text-anchor="end">字符</text>
+<text x="932" y="444" class="hdr" text-anchor="end">操作</text>
+<text x="28" y="466" class="mono">01</text>
+<text x="80" y="466" class="mono">10.10.81.255</text>
+<text x="860" y="466" class="mono" text-anchor="end">12</text>
+<text x="932" y="466" class="txt-sm" text-anchor="end" fill="#9ca3af">×</text>
+<text x="28" y="488" class="mono">02</text>
+<text x="80" y="488" class="mono">192.168.138.255</text>
+<text x="860" y="488" class="mono" text-anchor="end">15</text>
+<text x="932" y="488" class="txt-sm" text-anchor="end" fill="#9ca3af">×</text>
+<rect x="20" y="494" width="920" height="22" fill="#fff0f0"/>
+<text x="28" y="510" class="mono" fill="#aa3232" text-decoration="line-through">03</text>
+<text x="80" y="510" class="mono" fill="#aa3232" text-decoration="line-through">192.168.138.111:5064</text>
+<text x="860" y="510" class="mono" text-anchor="end" fill="#aa3232" text-decoration="line-through">20</text>
+<text x="932" y="508" class="txt" text-anchor="end" fill="#aa3232" font-size="11px">− 待删除</text>
+<rect x="20" y="516" width="920" height="22" fill="#eef7ea"/>
+<text x="28" y="532" class="mono" fill="#1e7832">04</text>
+<text x="80" y="532" class="mono" fill="#1e7832">192.168.138.111:5070</text>
+<text x="860" y="532" class="mono" text-anchor="end" fill="#1e7832">20</text>
+<text x="932" y="530" class="txt" text-anchor="end" fill="#1e7832" font-size="11px">+ 待新增</text>
+<rect x="8" y="540" width="944" height="40" class="panel" rx="4"/>
+<text x="20" y="558" class="txt-dim">● 3 项待提交 · 1 项已修改 · 1 项待删除 · 1 项待新增</text>
+<text x="256" y="558" class="txt-sm">管理员：用户 / 系统均可写</text>
+<rect x="20" y="564" width="110" height="22" rx="4" fill="#169a3a" stroke="#15803d" stroke-width="1"/>
+<text x="75" y="579" class="txt" text-anchor="middle" fill="#ffffff">提交修改 Ctrl+S</text>
+<rect x="138" y="564" width="80" height="22" rx="4" fill="#ffffff" stroke="#c8ced6" stroke-width="1"/>
+<text x="178" y="579" class="txt" text-anchor="middle" fill="#1f2328">撤销</text>
+<rect x="226" y="564" width="70" height="22" rx="4" fill="#ffffff" stroke="#c8ced6" stroke-width="1"/>
+<text x="261" y="579" class="txt" text-anchor="middle" fill="#1f2328">重做</text>
+</svg>
