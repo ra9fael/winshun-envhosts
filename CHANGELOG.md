@@ -7,6 +7,18 @@ single source of truth; release tags are `<gdi|qml>/v<version>`.
 
 ## [Unreleased]
 
+## [0.8.2] - 2026-11-11
+
+### Fixed
+
+- QML windows failed to open under the host Qt contract: every QML file
+  imported `QtQuick.Controls`, but the shared Qt runtime only ships
+  `QtQuick.Controls.Basic` (no module-level qmldir/plugin). Switched all
+  `import QtQuick.Controls` to `import QtQuick.Controls.Basic`, matching the
+  contract and how WinShun's own QML imports the controls module. No source or
+  type behaviour change: `QQuickStyle::setStyle("Basic")` already pinned the
+  Basic style.
+
 ## [0.8.1] - 2026-11-11
 
 ### Changed

@@ -6,7 +6,7 @@
     "zh": "环境变量 / hosts 编辑（QML）",
     "en": "Env & hosts editor (QML)"
   },
-  "version": "0.8.1",
+  "version": "0.8.2",
   "description": {
     "zh": "可视化编辑用户环境变量与 hosts 条目：交互窗口支持多选批量、分隔项编辑与中英文界面；改写前自动备份，系统级目标未提权时明确降级",
     "en": "Visual editor for user env vars and hosts: multi-select batch commands, split-item editing and a zh/en UI; auto-backup before writes; honest degradation for admin-only targets"
