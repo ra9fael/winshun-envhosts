@@ -1,0 +1,20 @@
+PASS split-state editor opened
+PASS deletion keeps the staged row visible
+PASS undo before Commit restores all split items
+PASS undo restores the model value without reapplying stale controls
+PASS redo restores exactly one pending deletion
+PASS reopening the same row preserves its pending deletion
+PASS raw preview excludes the pending deletion without committing it
+PASS changing rows does not delete the new row's item
+PASS switching to raw preserves the other variable
+PASS delimiter change preserves pending deletions until explicitly committed
+PASS delimiter round trip preserves committed remaining items
+PASS Ctrl+N opens the new item's inline editor
+PASS new item can move before an existing item
+PASS deleting a moved new item removes it immediately
+PASS mixed deletion removes the new item and keeps the existing item staged
+PASS mixed batch's existing item can still be restored
+PASS filtering after deletion preserves the newly selected variable
+PASS filtered variable retains its value
+PASS split-state checks never write the registry before Save
+CHECKS failures=0 all passed

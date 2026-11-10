@@ -1,0 +1,12 @@
+{
+  "host": "WinShun/build/debug/WinShun.exe",
+  "host_pid": 54060,
+  "plugin_pid": 60808,
+  "editor_hwnd": 5899842,
+  "fixture_filter": "WS_ENVHOSTS_L3_NO_MATCH_20261108",
+  "query_then_enter_opened_editor": true,
+  "deployed_binary_matches_build": true,
+  "sha256": "1d301262a91081a7ed02fef81f44d0dc73cc939a7e1f8b3cdcb0310ad1bf2f5a",
+  "writes_performed": false,
+  "profile": "WinShun-preview-5e948a5c"
+}

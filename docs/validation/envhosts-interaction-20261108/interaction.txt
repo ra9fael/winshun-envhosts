@@ -1,0 +1,52 @@
+PASS interaction editor opened 
+PASS backup count loads before opening Backups 
+PASS User backup scope contains both user snapshots 
+PASS System backup scope contains only the system snapshot 
+PASS backup tab count is independent of scope 
+PASS backup total survives returning to User 
+PASS delete remains a visible candidate 
+PASS pending deletion does not modify the work model 
+PASS other variable stays unchanged 
+PASS returning to variable preserves pending deletion 
+PASS tab round trip preserves candidates without committing 
+PASS filter round trip preserves candidates without committing 
+PASS undo cancels pending deletion locally 
+PASS redo restores pending marker without committing 
+PASS Commit explicitly applies the candidate to the model 
+PASS one model undo reverses Commit 
+PASS native j moves down without type-to-select 
+PASS native k moves up 
+PASS Ctrl+J moves down 
+PASS Ctrl+K moves up 
+PASS G moves to last split item 
+PASS native gg moves to first split item 
+PASS single d does not delete 
+PASS native dd stages selected item 
+PASS Alt+J moves item down 
+PASS Alt+K moves item up 
+PASS visible Down button reorders item 
+PASS visible Up button reorders item 
+PASS new item and its edit remain candidates after navigation 
+PASS new item retains its identity after navigation 
+PASS draft keeps candidates for both variables 
+PASS draft persistence never commits candidates 
+PASS navigation never writes real fixture values 
+PASS zh 980: all footer labels fit without overlaps 
+PASS zh 980: Up/Down are above list controls 
+PASS zh 660: all footer labels fit without overlaps 
+PASS zh 660: Up/Down are above list controls 
+PASS en 980: all footer labels fit without overlaps 
+PASS en 980: Up/Down are above list controls 
+PASS en 660: all footer labels fit without overlaps 
+PASS en 660: Up/Down are above list controls 
+PASS closing pending candidates asks before leaving 
+PASS reopening offers the candidate draft 
+PASS editor reopened after draft restore 
+PASS restored draft preserves pending flags and uncommitted model 
+PASS restored candidates can be undone without changing the model 
+PASS restored candidate undo can be redone 
+PASS restored draft retains the other variable's candidate 
+PASS explicit Save asks for confirmation 
+PASS explicit Save applies both variable candidates 
+PASS backup count refreshes immediately after Save 
+CHECKS failures=0 all passed

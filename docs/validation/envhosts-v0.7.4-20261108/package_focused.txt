@@ -1,0 +1,95 @@
+PASS interaction editor opened
+PASS backup count loads before opening Backups
+PASS User backup scope contains both user snapshots
+PASS System backup scope contains only the system snapshot
+PASS backup tab count is independent of scope
+PASS backup total survives returning to User
+PASS delete remains a visible candidate
+PASS Path row displays Pending before Commit
+PASS pending deletion does not modify the work model
+PASS other variable stays unchanged
+PASS unchanged single-item variable has no status or move action
+PASS same variable name in System has independent status
+PASS returning to variable preserves pending deletion
+PASS returning to User restores its pending row indicator
+PASS tab round trip preserves candidates without committing
+PASS filter round trip preserves candidates without committing
+PASS undo cancels pending deletion locally
+PASS undo back to source clears the pending row indicator
+PASS redo restores pending marker without committing
+PASS Commit explicitly applies the candidate to the model
+PASS Commit changes row indicator to Unsaved
+PASS new candidate on a modified row displays Pending and Unsaved together
+PASS candidate undo retains the existing Unsaved state
+PASS one model undo reverses Commit
+PASS model undo clears the final row indicator
+PASS first item disables Up and enables Down
+PASS disabled Up is a no-op
+PASS native j moves down without type-to-select
+PASS native k moves up
+PASS Ctrl+J moves down
+PASS Ctrl+K moves up
+PASS G moves to last split item
+PASS last item enables Up and disables Down
+PASS native gg moves to first split item
+PASS single d does not delete
+PASS native dd stages selected item
+PASS Alt+J moves item down
+PASS Alt+K moves item up
+PASS visible Down button reorders item
+PASS reorder alone sets the pending row indicator
+PASS footer move returns keyboard focus to the item list
+PASS visible Up button reorders item
+PASS moving back to original order clears pending status
+PASS new item and its edit remain candidates after navigation
+PASS added item shows a pending indicator on its variable
+PASS new item retains its identity after navigation
+PASS removing an uncommitted new item clears pending status
+PASS editing alone shows Pending on the variable row
+PASS draft keeps candidates for both variables
+PASS draft persistence never commits candidates
+PASS navigation never writes real fixture values
+PASS zh 980: all footer labels fit without overlaps
+PASS zh 980: Up/Down share the footer below the list
+PASS zh 980: Items group stays together
+PASS zh 980: Pending row label fits its status column
+PASS zh 980: item list reclaims the old movement toolbar row
+PASS zh 660: all footer labels fit without overlaps
+PASS zh 660: Up/Down share the footer below the list
+PASS zh 660: Items group stays together
+PASS zh 660: Pending row label fits its status column
+PASS zh 660: item list reclaims the old movement toolbar row
+PASS en 980: all footer labels fit without overlaps
+PASS en 980: Up/Down share the footer below the list
+PASS en 980: Items group stays together
+PASS en 980: Pending row label fits its status column
+PASS en 980: item list reclaims the old movement toolbar row
+PASS en 660: all footer labels fit without overlaps
+PASS en 660: Up/Down share the footer below the list
+PASS en 660: Items group stays together
+PASS en 660: Pending row label fits its status column
+PASS en 660: item list reclaims the old movement toolbar row
+PASS raw mode hides the item footer group
+PASS raw mode retains the variable pending indicator
+PASS closing pending candidates asks before leaving
+PASS reopening offers the candidate draft
+PASS editor reopened after draft restore
+PASS restored draft preserves pending flags and uncommitted model
+PASS draft recovery restores the variable pending indicator
+PASS restored candidates can be undone without changing the model
+PASS restored candidate undo can be redone
+PASS restored draft retains the other variable's candidate
+PASS explicit Save asks for confirmation
+PASS explicit Save applies both variable candidates
+PASS backup count refreshes immediately after Save
+PASS Save clears the current variable status
+PASS Save clears the other variable status
+PASS whole-variable deletion still asks for confirmation
+PASS deleted variable shows Unsaved deletion and disables item movement
+PASS undoing whole-variable deletion clears its status
+PASS new variable displays New and Unsaved
+PASS new variable can also display Pending without committing its item
+PASS zh: combined Pending/New/Unsaved label fits
+PASS en: combined Pending/New/Unsaved label fits
+PASS empty filtered list disables both item movement actions
+CHECKS failures=0 all passed

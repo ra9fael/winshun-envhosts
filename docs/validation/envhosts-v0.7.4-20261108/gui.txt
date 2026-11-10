@@ -1,0 +1,146 @@
+PASS both editor windows opened
+PASS hosts enabled field is visible
+PASS hosts enabled field stays inside detail panel
+PASS hosts IP field is visible
+PASS hosts IP field stays inside detail panel
+PASS hosts hostnames field is visible
+PASS hosts hostnames field stays inside detail panel
+PASS hosts comment field is visible
+PASS hosts comment field stays inside detail panel
+PASS hosts fields are ordered without overlap
+PASS hosts enabled checkbox toggles and restores
+PASS hosts raw tab shows the whole file
+PASS raw tab hides the window's own scrollbar (only the text box scrolls)
+PASS raw box reaches the status bar
+PASS raw box is editable when hosts is writable
+PASS raw box hides on the entries tab
+PASS entries tab brings the window scrollbar back
+PASS hosts window is minimised for the re-open test
+PASS re-opening restores a minimised editor
+PASS raw edit shows up as the entry on that line
+PASS hosts save asks for confirmation
+PASS save writes the raw edit to the hosts file with CRLF kept
+PASS custom delimiter box stays hidden until 自定义… is chosen
+PASS page-down scrolls the table
+PASS Ins adds one row
+PASS Del removes it again
+PASS item list shows in list mode
+PASS raw value box hides in list mode
+PASS every segment becomes an item
+PASS item list now spans nearly the full window width
+PASS the separate item edit box stays hidden until in-place editing
+PASS click selects the item under the pointer
+PASS selection keeps its scroll position
+PASS double-click opens the floating in-place item editor
+PASS in-place edit updates that list row
+PASS in-place edit keeps the scroll position
+PASS in-place edit keeps the selection
+PASS Enter closes the in-place editor
+PASS space delimiter on Path asks for confirmation first
+PASS declining the space prompt keeps the semicolon split
+PASS 自定义… shows the delimiter box in the button slot
+PASS Enter applies and hides the custom box
+PASS custom delimiter re-splits the whole value
+PASS delimiter switch keeps the value intact
+PASS delimiter switch back restores the items
+PASS item text survives the delimiter round trip
+PASS raw value box visible again
+PASS raw box shows the rejoined value after item edits
+PASS dragging the splitter grows the value field
+PASS save confirmation dialog answered
+PASS save wrote the edited Path to the registry
+PASS system rows survive a save
+PASS 2s watcher notices an external registry write while dirty
+PASS save confirmation is still answered
+PASS save opens the read-only diff panel instead of Abort/Retry
+PASS the diff panel footer hint has a real band, not a clipped sliver
+PASS the diff panel footer sits below the actions and inside the panel
+PASS Defer closes the diff panel
+PASS Defer leaves the external write intact
+PASS F5 with unsaved edits asks before discarding
+PASS reload reads the external value back
+PASS value without a preset delimiter starts whole
+PASS space delimiter still confirms the whitespace normalisation
+PASS space delimiter splits the two addresses
+PASS space split yields both addresses
+PASS backup tab hides the detail editing controls
+PASS table scrolled back to the top for selection tests
+PASS Ctrl+Click and Shift+Click select a contiguous range
+PASS Ctrl+C copies exactly the selected rows
+PASS Esc clears the multi-selection first
+PASS Ctrl+A selects every visible row
+PASS two rows selected for the batch delete
+PASS deleting whole env variables asks for confirmation by name
+PASS cancelling the delete leaves the rows and selection intact
+PASS Del marks both selected rows deleted in one batch
+PASS save lists the two variables that will be removed
+PASS one Ctrl+Z restores the whole batch (single undo transaction)
+PASS two hosts rows selected for the batch toggle
+PASS Space disables both selected hosts rows in one batch
+PASS toggling again re-enables both rows
+PASS plain click parks the caret on the clicked row
+PASS j moves the table caret down
+PASS k moves the table caret up
+PASS a bare count digit does not move the caret
+PASS 3j moves three rows down
+PASS 3k moves three rows back up
+PASS G jumps to the last row like End
+PASS gg jumps to the first row like Home
+PASS 5G jumps to row five
+PASS l toggles the row like Enter
+PASS l toggles the row back off
+PASS x marks the hosts row deleted like Del
+PASS x again restores the deleted hosts row
+PASS dd marks the hosts row deleted like x
+PASS dd again restores the deleted hosts row
+PASS editor is in raw mode for the long value
+PASS test value really exceeds the 32767-unit cap
+PASS overlong value shows a visible error banner instead of failing silently
+PASS the over-length warning is a registered notice band
+PASS notice band text clears WCAG AA contrast on its own background
+PASS the item counter strip is wide enough for the whole counter text
+PASS the item counter strip never runs into the commit button
+PASS overlong save is allowed but the confirmation names the risk
+PASS over-length warning band stays visible
+PASS editor switches to split-item mode
+PASS overlong value still splits into every item without truncation
+PASS deleting one split item only stages it (still in the list)
+PASS 提交修改 applies the staged item deletion
+PASS editor returns to raw mode after item deletion
+PASS the removed item is gone from the rejoined value, not just hidden
+PASS editor is in split-item mode for multiselect
+PASS three items before the multiselect check
+PASS Ctrl+Click + Del stages BOTH rows (list unchanged)
+PASS the status row reports both staged rows
+PASS commit applies BOTH staged deletions
+PASS undo restores the three items
+PASS Ctrl+N adds one item
+PASS Ctrl+N puts the caret on the new item (after the old)
+PASS Ctrl+J moves the caret down
+PASS Alt+K moves the item up (swap with the previous slot)
+PASS the caret follows the moved item
+PASS Alt+J moves the item back down
+PASS Backspace stages the caret item like Del
+PASS Backspace again restores the staged item
+PASS Ctrl+K walks the caret back to the added empty item
+PASS Backspace on an added item erases it immediately
+PASS bare j moves the item caret down
+PASS bare j does not reorder the items
+PASS bare k moves the item caret back up
+PASS error banner clears once the value is valid
+PASS editor is in split-item mode for the row-delete check
+PASS short valid Path splits into three items
+PASS a row marked for deletion shows no stale split items
+PASS undo restores the row and its split items
+PASS editor is in raw mode before the final save
+PASS short Path saves after confirmation
+PASS Path still exists after removing a split item from an overlong value
+PASS window starts in Chinese (host locale=zh)
+PASS appearance locale=en switches an already open window to English
+PASS native child control text switches with the language
+PASS uiLanguage=zh-CN overrides an English host
+PASS a pinned language survives later host appearance changes
+PASS auto returns to following the (English) host
+PASS auto follows the host back to Chinese
+PASS child control text follows back to Chinese
+CHECKS failures=0 all passed

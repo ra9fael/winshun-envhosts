@@ -1,0 +1,21 @@
+{
+  "version": "0.7.3",
+  "commit": "6ed276dc48bc45bc3ee1a0d4f74b9a61f4284463",
+  "archiveBytes": 5940418,
+  "archiveFiles": 80,
+  "commitFilesVerified": 79,
+  "sha256": "a8f8c4b27b32ddd59aa9227472c64d21424e9922a7a01962c9236128b6aec20e",
+  "executableSha256": "1d301262a91081a7ed02fef81f44d0dc73cc939a7e1f8b3cdcb0310ad1bf2f5a",
+  "sameExecutableAsPriorHostAndGuiVerification": true,
+  "registryErrors": [],
+  "registryWarnings": [
+    "D:\\dev\\github\\winshun-dev\\ra9fael.envhosts\\dist\\release-v0.7.3\\ra9fael.envhosts-0.7.3.wsplugin：未审核的原生插件：文件检查与哈希不代表代码审核或构建来源证明"
+  ],
+  "tag": "v0.7.3",
+  "annotatedTag": true,
+  "ctestPassed": 3,
+  "unpackedProtocolPassed": 37,
+  "packageVerificationFailures": 0,
+  "localOnly": true,
+  "temporaryExtractionCleaned": true
+}

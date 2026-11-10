@@ -1,0 +1,19 @@
+   sha256 1758446c0f417f741f09f63bd9e9cab0393ab8b2d04cf936e3448a65f21887af  (6021770 bytes)
+  PASS  archive within the 64 MiB limit
+  PASS  archive entry names are all safe
+  PASS  plugin.json is at the archive root
+  PASS  unpacked size within the 256 MiB limit
+  PASS  manifest id
+  PASS  three-part version
+  PASS  runtime.program is an exe present in the package
+  PASS  minWinShun is the unreviewed-native floor
+  PASS  installed executable exists
+  PASS  installed manifest exists
+  PASS  installed manifest matches the package
+     PASS  appearance locale=zh switches the running plugin without a restart
+     PASS  uiLanguage=en-US overrides the host's zh locale
+     PASS  the pinned language survives a later host appearance change
+     PASS  uiLanguage=zh-CN pins Chinese even when the host is English
+   == RESULT: 37 passed, 0 failed ==
+  PASS  protocol integration passed against the installed exe
+== RESULT: 0 failure(s), screenshots in build\interaction-20261108\package-check\output ==

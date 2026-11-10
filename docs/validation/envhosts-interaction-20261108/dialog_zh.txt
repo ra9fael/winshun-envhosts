@@ -1,0 +1,9 @@
+PASS restore-draft dialog opened 
+PASS restore dialog control 65535 fits the client area 
+PASS restore dialog control 7 fits the client area 
+PASS restore dialog control 6 fits the client area 
+PASS restore body leaves space for the complete button row 
+PASS discard closes the restore dialog 
+PASS editor is enabled after dialog closes 
+PASS discard never applies the draft to registry 
+CHECKS failures=0 all passed

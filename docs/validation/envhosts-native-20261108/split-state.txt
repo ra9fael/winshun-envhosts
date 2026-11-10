@@ -1,0 +1,40 @@
+PASS split-state editor opened 
+PASS deletion keeps the staged row visible 
+FAIL undo before Commit restores all split items ['C:\\sample\\gamma']
+FAIL undo restores the model value without reapplying stale controls 
+PASS redo deletes exactly one item 
+FAIL reopening the same row applies the pending delete only once ['C:\\sample\\alpha']
+FAIL reopened row list and raw value agree 
+FAIL changing rows does not delete the new row's item ['']
+FAIL switching to raw preserves the other variable 
+FAIL delimiter change never applies an old deletion to the new split ['']
+FAIL delimiter round trip preserves remaining items ['']
+FAIL Ctrl+N opens the new item's inline editor 
+FAIL new item can move before an existing item ['C:\\sample\\alpha', '', 'C:\\sample\\beta', 'C:\\sample\\gamma']
+FAIL deleting a moved new item removes it immediately ['C:\\sample\\alpha', '', 'C:\\sample\\beta', 'C:\\sample\\gamma']
+FAIL mixed deletion removes the new item and keeps the existing item staged ['C:\\sample\\alpha', 'C:\\sample\\beta', 'C:\\sample\\gamma']
+PASS mixed batch's existing item can still be restored 
+FAIL filtering after deletion preserves the newly selected variable ['']
+FAIL filtered variable retains its value 
+PASS split-state checks never write the registry before Save 
+CHECKS failures=14 undo before Commit restores all split items,undo restores the model value without reapplying stale controls,reopening the same row applies the pending delete only once,reopened row list and raw value agree,changing rows does not delete the new row's item,switching to raw preserves the other variable,delimiter change never applies an old deletion to the new split,delimiter round trip preserves remaining items,Ctrl+N opens the new item's inline editor,new item can move before an existing item,deleting a moved new item removes it immediately,mixed deletion removes the new item and keeps the existing item staged,filtering after deletion preserves the newly selected variable,filtered variable retains its value
+PASS split-state editor opened 
+PASS deletion keeps the staged row visible 
+PASS undo before Commit restores all split items 
+PASS undo restores the model value without reapplying stale controls 
+PASS redo deletes exactly one item 
+PASS reopening the same row applies the pending delete only once 
+PASS reopened row list and raw value agree 
+PASS changing rows does not delete the new row's item 
+PASS switching to raw preserves the other variable 
+PASS delimiter change never applies an old deletion to the new split 
+PASS delimiter round trip preserves remaining items 
+PASS Ctrl+N opens the new item's inline editor 
+PASS new item can move before an existing item 
+PASS deleting a moved new item removes it immediately 
+PASS mixed deletion removes the new item and keeps the existing item staged 
+PASS mixed batch's existing item can still be restored 
+PASS filtering after deletion preserves the newly selected variable 
+PASS filtered variable retains its value 
+PASS split-state checks never write the registry before Save 
+CHECKS failures=0 all passed

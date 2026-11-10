@@ -1,0 +1,27 @@
+== ARCHIVE  D:\dev\github\winshun-dev\ra9fael.envhosts\dist\release-v0.7.3\ra9fael.envhosts-0.7.3.wsplugin
+   sha256 a8f8c4b27b32ddd59aa9227472c64d21424e9922a7a01962c9236128b6aec20e  (5940418 bytes)
+  PASS  archive within the 64 MiB limit
+  PASS  archive entry names are all safe
+  PASS  plugin.json is at the archive root
+  PASS  unpacked size within the 256 MiB limit
+  PASS  manifest id
+  PASS  three-part version
+  PASS  runtime.program is an exe present in the package
+  PASS  minWinShun is the unreviewed-native floor
+   80 files, 5929636 bytes unpacked, version 0.7.3
+== INSTALL  D:\dev\github\winshun-dev\ra9fael.envhosts\build\release-v0.7.3\package-check-va5y10x2\installed
+   unpacked 80 files
+== INSTALLED  D:\dev\github\winshun-dev\ra9fael.envhosts\build\release-v0.7.3\package-check-va5y10x2\installed\envhosts.exe
+  PASS  installed executable exists
+  PASS  installed manifest exists
+  PASS  installed manifest matches the package
+== RUN  protocol integration
+     PASS  appearance locale=zh switches the running plugin without a restart
+     PASS  uiLanguage=en-US overrides the host's zh locale
+     PASS  the pinned language survives a later host appearance change
+     PASS  uiLanguage=zh-CN pins Chinese even when the host is English
+   
+   == RESULT: 37 passed, 0 failed ==
+  PASS  protocol integration passed against the installed exe
+
+== RESULT: 0 failure(s), screenshots in D:\dev\github\winshun-dev\ra9fael.envhosts\build\release-v0.7.3\package-check-va5y10x2\screenshots ==

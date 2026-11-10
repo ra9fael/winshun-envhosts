@@ -62,7 +62,7 @@ no new public release requested in this turn.
 
 No new permissions or dependencies. Preserve running user applications and
 real environment/hosts data. Update bilingual usage/changelog and validation
-evidence under `WinShun/docs/validation/`. Physical multi-monitor DPI switching
+evidence under `docs/validation/`. Physical multi-monitor DPI switching
 and real elevated writes remain untested unless explicitly exercised.
 
 不新增权限或依赖；保持真实用户数据和运行中的程序。更新双语说明及验证记录。
@@ -87,7 +87,7 @@ dialog locales 8/8 passed. The final draft changes were covered by the focused
 and dialog suites. A real isolated WinShun host opened the matching native exe
 with the expected filter, then exited with code 0.
 
-验证记录 / Evidence: `WinShun/docs/validation/envhosts-interaction-20261108/`。
+验证记录 / Evidence: `docs/validation/envhosts-interaction-20261108/`。
 提供独立测试包，仍沿用 0.7.3 清单；不是新的发行版或新标签。
 The separate test archive retains manifest 0.7.3; it is not a new release/tag.
 
@@ -129,6 +129,6 @@ The separate test archive retains manifest 0.7.3; it is not a new release/tag.
 通过；合成截图确认待提交/未保存组合状态与中英 660/980 px 底部分组完整显示。
 按用户授权提交，使用 0.7.4 / v0.7.4 生成独立测试包；不公开发布或更新线上索引。
 最终干净源码构建、包内程序与宿主验收结果见
-`WinShun/docs/validation/envhosts-v0.7.4-20261108/`。
+`docs/validation/envhosts-v0.7.4-20261108/`。
 
 [English](NATIVE_INTERACTION_FIXES.en.md)

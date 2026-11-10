@@ -1,0 +1,66 @@
+{
+  "date": "2026-11-08",
+  "manifest_version": "0.7.3",
+  "release": false,
+  "base_commit": "6ed276dc48bc45bc3ee1a0d4f74b9a61f4284463",
+  "exe_sha256": "6ad5e99392454c68c0156bf5f049b4c9273cf9ce29048fb933f6d2a4d0541f72",
+  "package_sha256": "1758446c0f417f741f09f63bd9e9cab0393ab8b2d04cf936e3448a65f21887af",
+  "package_bytes": 6021770,
+  "package_executable_matches_build": true,
+  "ctest": {
+    "passed": 3,
+    "failed": 0
+  },
+  "protocol": {
+    "passed": 37,
+    "failed": 0
+  },
+  "package_protocol": {
+    "passed": 37,
+    "failed": 0
+  },
+  "package_checks_failed": 0,
+  "tests": {
+    "interaction": {
+      "passed": 51,
+      "failed": 0
+    },
+    "split_state": {
+      "passed": 19,
+      "failed": 0
+    },
+    "gui_regression": {
+      "passed": 145,
+      "failed": 0,
+      "timing": "Before final candidate-draft recovery and maximum footer-label measurement; final changes covered by interaction and dialog suites."
+    },
+    "dialog_zh": {
+      "passed": 8,
+      "failed": 0
+    },
+    "dialog_en_dark": {
+      "passed": 8,
+      "failed": 0
+    }
+  },
+  "physical_dpi": 96,
+  "source_files": {
+    "editor_win.h": "06c46d03584b91b843648677c776eaeb8247773d6abe940458e54f57555af150",
+    "tests/gui_preview.py": "568b5a06d525f31aa16e7f49a084566a07344f9380dec352eb49606c7dffe119",
+    "tests/split_state_checks.py": "e7428bd5728a18dcdecf6bbcf92b3d78b1cee1d6e312b3536d178d17f3a954d3",
+    "tests/interaction_checks.py": "8425cc44d6ff5e37f12424f07117885bdba8b2f614fb9092ea2121de6b015fbb",
+    "NATIVE_INTERACTION_FIXES.md": "5110a45e35cf3cfc8c7c8c670be108d69e68393a5cf4981137c2fd7281036d2f",
+    "NATIVE_INTERACTION_FIXES.en.md": "a2315312d9efd6de557aac0fe3b053f6b0ec7a01b2af1abff562eabd37d3c70b"
+  },
+  "cleanup": {
+    "gui_fixture_keys_and_data": "removed by harness",
+    "host_exit": 0,
+    "host_profiles": [
+      "WinShun-preview-c58a5629",
+      "WinShun-preview-0dbfaecd",
+      "WinShun-preview-ab25c52c"
+    ],
+    "host_profiles_removal": "automatic approval rejected: blocked by policy; retained, no retry",
+    "user_installation": "not replaced"
+  }
+}

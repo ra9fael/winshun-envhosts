@@ -1,0 +1,30 @@
+PASS restore-draft dialog opened 
+PASS restore dialog control 65535 fits the client area 
+FAIL restore dialog control 7 fits the client area control=(394, 188, 478, 218) client=(620, 196)
+FAIL restore dialog control 6 fits the client area control=(488, 188, 596, 218) client=(620, 196)
+PASS restore body leaves space for the complete button row 
+CAPTURE draft_dialog (620, 196) D:\dev\github\winshun-dev\ra9fael.envhosts\build\continuation-20261108\dialog-before\editor_draft_dialog.png
+PASS discard closes the restore dialog 
+PASS editor is enabled after dialog closes 
+PASS discard never applies the draft to registry 
+CHECKS failures=2 restore dialog control 7 fits the client area,restore dialog control 6 fits the client area
+PASS restore-draft dialog opened 
+PASS restore dialog control 65535 fits the client area 
+PASS restore dialog control 7 fits the client area 
+PASS restore dialog control 6 fits the client area 
+PASS restore body leaves space for the complete button row 
+CAPTURE draft_dialog (620, 236) D:\dev\github\winshun-dev\ra9fael.envhosts\build\continuation-20261108\dialog-after\editor_draft_dialog.png
+PASS discard closes the restore dialog 
+PASS editor is enabled after dialog closes 
+PASS discard never applies the draft to registry 
+CHECKS failures=0 all passed
+PASS restore-draft dialog opened 
+PASS restore dialog control 65535 fits the client area 
+PASS restore dialog control 7 fits the client area 
+PASS restore dialog control 6 fits the client area 
+PASS restore body leaves space for the complete button row 
+CAPTURE draft_dialog (620, 236) D:\dev\github\winshun-dev\ra9fael.envhosts\build\continuation-20261108\dialog-en-dark\editor_draft_dialog.png
+PASS discard closes the restore dialog 
+PASS editor is enabled after dialog closes 
+PASS discard never applies the draft to registry 
+CHECKS failures=0 all passed

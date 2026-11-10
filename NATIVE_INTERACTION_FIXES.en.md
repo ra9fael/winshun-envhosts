@@ -68,7 +68,7 @@ preceded the final candidate-draft fix; focused and dialog suites cover those
 final changes. A real isolated WinShun host opened the matching executable with
 the expected query filter, verified by readback and SHA256, and exited with 0.
 
-Evidence: `WinShun/docs/validation/envhosts-interaction-20261108/`.
+Evidence: `docs/validation/envhosts-interaction-20261108/`.
 The separate test archive retains manifest 0.7.3; it is not a new release/tag.
 
 ## Approved follow-up: row status and footer actions (implemented)
@@ -106,6 +106,6 @@ combined Pending/Unsaved status and footer groups in Chinese/English at 660/980 
 Use the existing authorization to commit and create 0.7.4 / v0.7.4 and its local
 test archive, without public publishing or online index updates. Final clean
 source build, archive and host checks are recorded in
-`WinShun/docs/validation/envhosts-v0.7.4-20261108/`.
+`docs/validation/envhosts-v0.7.4-20261108/`.
 
 [简体中文](NATIVE_INTERACTION_FIXES.md)

@@ -1,0 +1,45 @@
+{
+  "date": "2026-11-08",
+  "baseCommit": "eb35144",
+  "ctest": {
+    "passed": 3,
+    "failed": 0
+  },
+  "dialogLayout": {
+    "failed": 0,
+    "fontDpi": [
+      96,
+      144,
+      192
+    ],
+    "passed": 168
+  },
+  "integration": {
+    "passed": 37,
+    "failed": 0
+  },
+  "gui": {
+    "passed": 145,
+    "failed": 0
+  },
+  "splitState": {
+    "passed": 19,
+    "failed": 0
+  },
+  "dialog": {
+    "failed": 0,
+    "chineseLightPassed": 8,
+    "englishDarkPassed": 8
+  },
+  "package": {
+    "sha256": "80df71ba4824842280b166b9375e7fd3be31a63d5e3111f0bfa8b7d805c4d92e",
+    "developmentBuild": true,
+    "manifestVersion": "0.7.2",
+    "installVerificationFailures": 0,
+    "bytes": 5939777
+  },
+  "hostSmoke": {
+    "exitCode": 0,
+    "queryAndOpen": true
+  }
+}
