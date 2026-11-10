@@ -85,6 +85,11 @@ def verify_package(folder):
         if actual['runtime'].get('qt') == 'host':
             required += {'ra9fael.qr': ['QrApp.dll'], 'ra9fael.bosskey': ['BossKeyApp.dll'],
                          'ra9fael.binarylab': ['BinaryLabApp.dll']}.get(actual['id'], [])
+            forbidden = [n for n in archive.namelist()
+                         if n.startswith(('Qt6', 'platforms/', 'qml/', 'licenses/qt/', 'styles/'))
+                         or n in ('qt.conf', 'opengl32sw.dll')]
+            if forbidden:
+                raise ValueError(f'Host-Qt package must not bundle Qt runtime files: {forbidden}')
         if actual.get('icon'):
             required.append(actual['icon'])
         for name in required:

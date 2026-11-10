@@ -14,10 +14,12 @@
   "author": "ra9fael",
   "license": "MIT",
   "homepage": "https://github.com/ra9fael/winshun-envhosts",
-  "minWinShun": "0.22.0",
+  "minWinShun": "0.23.0",
   "runtime": {
     "mode": "resident",
     "program": "envhosts.exe",
+    "qt": "host",
+    "qtVersion": "6.12.0",
     "sandbox": "normal",
     "start": "lazy",
     "timeoutMs": 1500,

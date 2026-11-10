@@ -56,17 +56,12 @@ jobs:
           New-Item -ItemType Directory -Path build-qml/evidence -Force | Out-Null
           ctest --test-dir build --output-on-failure
           if ($LASTEXITCODE) { throw 'Tests failed' }
-      - name: Deploy Qt runtime
-        if: steps.edition.outputs.backend == 'qml'
-        run: |
-          $qtRoot = Split-Path -Parent (Split-Path -Parent (Get-Command windeployqt.exe).Source)
-          ./tools/deploy_qml.ps1 -Exe build/bin/envhosts.exe -Out build/deploy -QtDir $qtRoot
       - name: Package
         env:
           RELEASE_TAG: ${{ inputs.tag }}
         run: |
           $arguments = @('tools/package.py', '--out', 'dist/ci')
-          if ('${{ steps.edition.outputs.backend }}' -eq 'qml') { $arguments += @('--runtime-dir','build/deploy') }
+          if ('${{ steps.edition.outputs.backend }}' -eq 'qml') { $arguments += @('--exe','build/bin/envhosts.exe') }
           if ($env:RELEASE_TAG) { $arguments += @('--tag',$env:RELEASE_TAG) }
           python @arguments
           if ($LASTEXITCODE) { throw 'Packaging failed' }

@@ -45,8 +45,9 @@ downgrade confirmation. Settings/backups remain; drafts are separate per backend
 The current plugin library has one backend URL per ID. Accepting its GDI update
 may switch QML back to GDI; use QML releases to stay on QML. Listing this newly
 created repository in the library requires a separate submission; a GitHub
-release alone does not add it. WinShun 0.22.0+ is required, with host confirmation
-for native-plugin installs and updates.
+release alone does not add it. WinShun 0.23.0+ is required (QML reuses the
+host Qt runtime; the shared-Qt contract must also support `elevated`), with
+host confirmation for native-plugin installs and updates.
 
 See [edition switching, migration and acceptance](docs/DUAL_EDITIONS.md).
 
@@ -54,7 +55,7 @@ See [edition switching, migration and acceptance](docs/DUAL_EDITIONS.md).
 
 Windows 10/11 x64, CMake 3.21+, MSVC 2022+ and Python 3.10+.
 Check out `gdi` or `qml`; `edition.json` selects the backend automatically.
-QML also needs Qt 6.8.3 on `CMAKE_PREFIX_PATH`.
+QML also needs Qt 6.12.0 (matching the host shared-Qt contract) on `CMAKE_PREFIX_PATH`.
 
 ```powershell
 cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
@@ -62,7 +63,8 @@ cmake --build build
 ctest --test-dir build --output-on-failure
 ```
 
-GDI uses `python tools/package.py`. Deploy Qt before packaging QML.
+GDI uses `python tools/package.py`. QML uses `python tools/package.py --exe build/bin/envhosts.exe` —
+the host Qt runtime is reused, no Qt DLLs are bundled.
 See [edition instructions](docs/DUAL_EDITIONS.md) and [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## Keywords and examples
@@ -87,7 +89,7 @@ open hosts file in the default editor).
 
 - Windows 10/11, x64 (a 32-bit build is rejected at compile time: the Wow64
   file-system redirector would otherwise edit `SysWOW64\drivers\etc\hosts`).
-- GDI is statically linked; QML bundles Qt 6.8.3 and the VC runtime.
+- GDI is statically linked; QML reuses the host's shared Qt 6.12.0 runtime — no Qt DLLs in the package.
 - Resident plugin (`mode: resident`), lazy start, `idleExitSec: 0` — it stays
   resident until WinShun exits so an open editor window is never killed by idle.
 
@@ -104,7 +106,7 @@ open hosts file in the default editor).
   done directly via `RegSetValueExW` (never `setx`, which silently truncates at
   1024 characters). This is declared honestly here rather than hidden.
 - No `processes` permission. The `elevated` permission **is** requested (this
-  package requires Win顺 ≥ 0.22.0): when Win顺 itself runs as administrator and you have clicked
+  package requires Win顺 ≥ 0.23.0): when Win顺 itself runs as administrator and you have clicked
   "Confirm" once on the envhosts card in Settings → Plugins, the plugin starts
   elevated and both system variables and hosts become writable. WinShun never
   shows UAC for a plugin; the confirmation must be repeated after the plugin

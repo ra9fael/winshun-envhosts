@@ -12,7 +12,7 @@ Do not rename the ID or install a second copy under another ID.
 | Edition | Branch | Tag | Asset | Dependencies |
 |---|---|---|---|---|
 | GDI | `gdi` | `gdi/v0.7.5` | `ra9fael.envhosts-0.7.5.wsplugin` | Windows only |
-| QML | `qml` | `qml/v0.8.0` | `ra9fael.envhosts-qml-0.8.0.wsplugin` | Bundled Qt/VC runtime |
+| QML | `qml` | `qml/v0.8.0` | `ra9fael.envhosts-qml-0.8.0.wsplugin` | Host Qt 6.12 (WinShun ≥ 0.23.0) |
 
 `plugin.json` is the sole version source. `edition.json` selects the backend;
 the build and package tools reject mismatches. `--build-info` checks a binary's
@@ -63,14 +63,13 @@ QML 用户请从 QML 发布页更新。当前宿主不识别后端；手动接�
 ## Build and release
 
 Use the matching branch. `cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release`
-selects its edition automatically. QML additionally needs Qt 6.8.3 on
-`CMAKE_PREFIX_PATH`. Then build and run `ctest --test-dir build --output-on-failure`.
+selects its edition automatically. QML additionally needs Qt 6.12.0 on
+`CMAKE_PREFIX_PATH` (matching the host's shared Qt). Then build and run
+`ctest --test-dir build --output-on-failure`.
 
 GDI: `python tools/package.py --tag gdi/v0.7.5`.
 
-QML: deploy with `tools/deploy_qml.ps1 -Exe build/bin/envhosts.exe -Out build/deploy
--QtDir <QtRoot> -VcRedistDir <x64-CRT>`, then
-`python tools/package.py --runtime-dir build/deploy --tag qml/v0.8.0`.
+QML (host Qt, no bundled runtime): `python tools/package.py --exe build/bin/envhosts.exe --tag qml/v0.8.1`.
 
 Push a new edition version tag to build, test and publish automatically. Updated
 or deleted tags do not build. For verification, dispatch `release.yml` with a

@@ -41,7 +41,7 @@
 **更新：** 从所选版本的发布页安装对应更新。当前插件库只有一个后端的下载地址，
 若接受其中的 GDI 更新可能切回 GDI；QML 用户请使用 QML 发布页。
 本仓库新建后的插件库收录需单独提交，不能以 Release 发布代表已经收录。
-要求 WinShun ≥ 0.22.0。原生插件安装及更新需要宿主确认。
+要求 WinShun ≥ 0.23.0（QML 版复用宿主 Qt 运行时，需要共享 Qt 契约支持 `elevated`）。原生插件安装及更新需要宿主确认。
 
 详见[双版本、数据迁移和验收说明](docs/DUAL_EDITIONS.md)。
 
@@ -49,7 +49,7 @@
 
 Windows 10/11 x64，CMake 3.21+、MSVC 2022+ 和 Python 3.10+。
 检出 `gdi` 或 `qml` 分支，`edition.json` 自动选择对应后端。
-QML 另需 Qt 6.8.3，配置时设置 `CMAKE_PREFIX_PATH`。
+QML 另需 Qt 6.12.0（与宿主共享 Qt 契约一致），配置时设置 `CMAKE_PREFIX_PATH`。
 
 ```powershell
 cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
@@ -57,7 +57,7 @@ cmake --build build
 ctest --test-dir build --output-on-failure
 ```
 
-GDI 使用 `python tools/package.py`。QML 先部署 Qt 运行库，再打包；
+GDI 使用 `python tools/package.py`。QML 使用 `python tools/package.py --exe build/bin/envhosts.exe`，复用宿主 Qt，不再打包 Qt 运行库；
 完整步骤见 [双版本说明](docs/DUAL_EDITIONS.md) 和 [贡献指南](CONTRIBUTING.md)。
 
 ## 关键词与示例
@@ -81,7 +81,7 @@ GDI 使用 `python tools/package.py`。QML 先部署 Qt 运行库，再打包；
 
 - Windows 10/11、x64（编译期拒绝 32 位：否则 Wow64 文件系统重定向会让它改到
   `SysWOW64\drivers\etc\hosts`）。
-- GDI 静态链接，无需额外运行库；QML 包自带 Qt 6.8.3 和 VC 运行库。
+- GDI 静态链接，无需额外运行库；QML 复用宿主 Qt 6.12.0 运行时，包内不带 Qt DLL。
 - 常驻插件（`mode: resident`）、懒启动、`idleExitSec: 0` —— 一直驻留到 Win顺 退出，
   保证打开的编辑窗口不会被空闲回收杀掉。
 
@@ -96,7 +96,7 @@ GDI 使用 `python tools/package.py`。QML 先部署 Qt 运行库，再打包；
 - **注册表访问在 Win顺 权限系统里没有对应名称。** 用户环境变量位于
   `HKCU\Environment`；读写直接调用 `RegSetValueExW`（绝不用 `setx`，它会在
   1024 字符处静默截断）。这里如实声明，而不是藏起来。
-- 不申请 `processes`。申请 `elevated`（本包要求 Win顺 ≥ 0.22.0）：当 Win顺 自身以管理员
+- 不申请 `processes`。申请 `elevated`（本包要求 Win顺 ≥ 0.23.0）：当 Win顺 自身以管理员
   运行、且你在设置 → 插件的 envhosts 卡片上点过一次「确认」后，插件会以管理员权限
   启动，此时系统环境变量与 hosts 均可写。Win顺 从不为插件弹 UAC；插件文件被改动后
   需要重新确认；提权后的插件不响应 AI / 命令行调用。编辑窗口状态栏右端的 ⓘ 随时

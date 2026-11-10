@@ -2,7 +2,8 @@
 """Build a checked GDI/QML wsplugin without changing its installation identity.
 
 GDI: python tools/package.py --tag gdi/v0.7.5
-QML: python tools/package.py --runtime-dir build-qml/deploy --tag qml/v0.8.0
+QML (host Qt): python tools/package.py --exe build/bin/envhosts.exe --tag qml/v0.8.1
+QML (bundled Qt): python tools/package.py --runtime-dir build-qml/deploy --tag qml/v0.8.0
 Versions come only from plugin.json; edition.json chooses the backend.
 """
 from __future__ import annotations
@@ -51,22 +52,28 @@ def main() -> int:
     paths["DUAL_EDITIONS.md"] = ROOT / "docs/DUAL_EDITIONS.md"
     paths["app.ico"] = ROOT / "app.ico"
     if backend == "qml":
-        if not args.runtime_dir or args.exe:
-            raise ValueError("QML requires --runtime-dir containing the matching exe and Qt DLLs")
-        runtime = args.runtime_dir.resolve(strict=True)
-        required = (program, "Qt6Core.dll", "Qt6Qml.dll", "Qt6Quick.dll", "platforms/qwindows.dll",
-                    "qml/QtQuick/Controls/Basic/qmldir", "licenses/qt/LICENSE")
-        for name in required:
-            if not (runtime / name).is_file():
-                raise ValueError(f"Missing QML runtime file: {name}")
-        for path in runtime.rglob("*"):
-            if path.is_symlink():
-                raise ValueError("Runtime must contain real files, not symbolic links")
-            if path.is_file():
-                name = path.relative_to(runtime).as_posix()
-                if name not in paths:
-                    paths[name] = path
-        exe = runtime / program
+        if manifest["runtime"].get("qt") == "host":
+            if args.runtime_dir:
+                raise ValueError("Host-Qt QML packages must not bundle Qt runtime files")
+            exe = (args.exe or ROOT / "build" / "bin" / program).resolve(strict=True)
+            paths[program] = exe
+        else:
+            if not args.runtime_dir or args.exe:
+                raise ValueError("QML requires --runtime-dir containing the matching exe and Qt DLLs")
+            runtime = args.runtime_dir.resolve(strict=True)
+            required = (program, "envhosts.exe", "Qt6Qml.dll", "Qt6Quick.dll", "platforms/qwindows.dll",
+                        "qml/QtQuick/Controls/Basic/qmldir", "licenses/qt/LICENSE")
+            for name in required:
+                if not (runtime / name).is_file():
+                    raise ValueError(f"Missing QML runtime file: {name}")
+            for path in runtime.rglob("*"):
+                if path.is_symlink():
+                    raise ValueError("Runtime must contain real files, not symbolic links")
+                if path.is_file():
+                    name = path.relative_to(runtime).as_posix()
+                    if name not in paths:
+                        paths[name] = path
+            exe = runtime / program
     else:
         if args.runtime_dir:
             raise ValueError("GDI packages must not bundle Qt runtime files")

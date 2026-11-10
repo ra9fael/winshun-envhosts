@@ -7,16 +7,18 @@ single source of truth; release tags are `<gdi|qml>/v<version>`.
 
 ## [Unreleased]
 
-## [0.8.1] - 2026-11-09
+## [0.8.1] - 2026-11-11
 
-Local package for manual acceptance; not publicly released.
+### Changed
+
+- Switch QML from bundled Qt to the host's shared Qt runtime (`runtime.qt: "host"`, Qt 6.12.0). The package no longer includes Qt DLLs, platform plugins, QML modules, or Qt license files; size drops from ~45 MB to <2 MB.
+- Bump `minWinShun` from 0.22.0 to 0.23.0: the shared-Qt contract only allows `elevated` from 0.23.0 (GitHub #255).
 
 ### Fixed
 
 - Port the executable and window icon fix from local main commit `ace9b0c`.
 - QML windows use an application icon assembled from eight embedded PNG sizes.
 - Bundle `app.ico` and derive Windows file/product versions from `plugin.json`.
-- Built and packaged for user testing; no automated tests or GUI acceptance run for this version.
 
 ## [0.8.0] - 2026-11-09
 
