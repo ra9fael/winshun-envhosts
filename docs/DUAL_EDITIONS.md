@@ -12,7 +12,7 @@ Do not rename the ID or install a second copy under another ID.
 | Edition | Branch | Tag | Asset | Dependencies |
 |---|---|---|---|---|
 | GDI | `gdi` | `gdi/v0.7.5` | `ra9fael.envhosts-0.7.5.wsplugin` | Windows only |
-| QML | `qml` | `qml/v0.8.0` | `ra9fael.envhosts-qml-0.8.0.wsplugin` | Host Qt 6.12 (WinShun ≥ 0.23.0) |
+| QML | `qml` | `qml/v0.8.3` | `ra9fael.envhosts-qml-0.8.3.wsplugin` | Host Qt 6.12 (WinShun ≥ 0.23.0) |
 
 `plugin.json` is the sole version source. `edition.json` selects the backend;
 the build and package tools reject mismatches. `--build-info` checks a binary's
@@ -69,7 +69,7 @@ selects its edition automatically. QML additionally needs Qt 6.12.0 on
 
 GDI: `python tools/package.py --tag gdi/v0.7.5`.
 
-QML (host Qt, no bundled runtime): `python tools/package.py --exe build/bin/envhosts.exe --tag qml/v0.8.1`.
+QML (host Qt, no bundled runtime): `python tools/package.py --exe build/bin/envhosts.exe --tag qml/v0.8.3`.
 
 Push a new edition version tag to build, test and publish automatically. Updated
 or deleted tags do not build. For verification, dispatch `release.yml` with a

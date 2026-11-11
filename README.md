@@ -28,7 +28,7 @@
 | 版本 | 下载 | 分支 |
 |---|---|---|
 | GDI 原生界面 | [GDI 0.7.5](https://github.com/ra9fael/winshun-envhosts/releases/tag/gdi%2Fv0.7.5) | `gdi` |
-| QML 界面 | [QML 0.8.0](https://github.com/ra9fael/winshun-envhosts/releases/tag/qml%2Fv0.8.0) | `qml` |
+| QML 界面 | [QML 0.8.3](https://github.com/ra9fael/winshun-envhosts/releases/tag/qml%2Fv0.8.3) | `qml` |
 
 1. 下载对应 `.wsplugin`，可用同页 `.sha256` 核对文件。
 2. 打开 **设置 → 插件 → 已安装 → 添加插件 → 压缩包（.zip / .wsplugin）**。

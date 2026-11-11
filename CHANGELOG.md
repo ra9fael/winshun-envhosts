@@ -7,6 +7,23 @@ single source of truth; release tags are `<gdi|qml>/v<version>`.
 
 ## [Unreleased]
 
+## [0.8.3] - 2026-11-11
+
+### Fixed
+
+- QML editor windows failed to open under the host Qt contract. Every QML file
+  imported `QtQuick.Controls`, while the shared Qt runtime only provides
+  `QtQuick.Controls.Basic` (there is no module-level qmldir or plugin). All QML
+  imports now use `QtQuick.Controls.Basic`; `QQuickStyle::setStyle("Basic")`
+  already pinned the style, so behaviour is unchanged. This is the fix first
+  prepared as 0.8.2, which was never published.
+
+### Changed
+
+- `README.md` and `README.en.md` link to the current QML release instead of 0.8.0.
+- `CONTRIBUTING.md` and `DUAL_EDITIONS.md` now state that the QML edition
+  reuses WinShun's shared Qt runtime and bundles no Qt DLLs or QML modules.
+
 ## [0.8.2] - 2026-11-11
 
 ### Fixed
@@ -415,7 +432,7 @@ First public release.
 - A backup before every write, with a configurable `backupCount`.
 - Byte-exact hosts round trip (UTF-8 BOM, CRLF, section comments preserved).
 
-[Unreleased]: https://github.com/ra9fael/winshun-envhosts/compare/qml/v0.8.0...qml
+[Unreleased]: https://github.com/ra9fael/winshun-envhosts/compare/qml/v0.8.3...qml
 [0.7.2]: https://github.com/ra9fael/winshun-envhosts/releases/tag/v0.7.2
 [0.7.1]: https://github.com/ra9fael/winshun-envhosts/releases/tag/v0.7.1
 [0.7.0]: https://github.com/ra9fael/winshun-envhosts/releases/tag/v0.7.0
@@ -423,3 +440,4 @@ First public release.
 [0.1.0]: https://github.com/ra9fael/winshun-envhosts/releases/tag/v0.1.0
 
 [0.8.0]: https://github.com/ra9fael/winshun-envhosts/releases/tag/qml%2Fv0.8.0
+[0.8.3]: https://github.com/ra9fael/winshun-envhosts/releases/tag/qml%2Fv0.8.3

@@ -30,7 +30,7 @@ Both editions are maintained and published. Choose the interface you prefer:
 | Edition | Download | Branch |
 |---|---|---|
 | Native GDI interface | [GDI 0.7.5](https://github.com/ra9fael/winshun-envhosts/releases/tag/gdi%2Fv0.7.5) | `gdi` |
-| QML interface | [QML 0.8.0](https://github.com/ra9fael/winshun-envhosts/releases/tag/qml%2Fv0.8.0) | `qml` |
+| QML interface | [QML 0.8.3](https://github.com/ra9fael/winshun-envhosts/releases/tag/qml%2Fv0.8.3) | `qml` |
 
 1. Download its `.wsplugin`; optionally verify the accompanying `.sha256`.
 2. Open **Settings → Plugins → Installed → Add plugin → Archive (.zip / .wsplugin)**.

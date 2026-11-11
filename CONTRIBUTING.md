@@ -163,8 +163,9 @@ for build, package, migration and release acceptance requirements.
 
 `plugin.json` is the only version source. Tags are `gdi/vX.Y.Z` or `qml/vX.Y.Z`.
 The package tool checks the manifest, edition and executable before writing an
-immutable package and SHA-256. QML bundles its dynamic Qt/VC dependencies;
-GDI remains a standalone executable. Never replace published release assets.
+immutable package and SHA-256. QML reuses WinShun's shared Qt 6.12.0 runtime
+and bundles no Qt DLLs or QML modules (requires WinShun >= 0.23.0); GDI
+remains a standalone executable. Never replace published release assets.
 
 Dispatch `release.yml` with `ref` and `publish=false` for verification. A new
 `gdi/vX.Y.Z` or `qml/vX.Y.Z` tag runs the complete build and publishes it. To
