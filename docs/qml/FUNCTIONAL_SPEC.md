@@ -200,7 +200,7 @@ Writing 时禁用编辑和重复保存；关闭请求延迟到本次结果确定
 ### F18 — 主题、语言和设置（P08，T45–T46）
 
 - 沿用 `uiLanguage=auto/zh-CN/en-US`，固定设置优先，auto 跟宿主；已经打开窗口即时刷新文案，保留输入、选择、撤销和草稿。
-- 宿主 appearance 更新明暗主题；不重建 session。P08 给出暗色 tokens，所有页和模态框共用。
+- 宿主 appearance 更新明暗主题、界面风格、强调色、圆角和界面大小；不重建 session。颜色和圆角取 `nativeLook`，字体大小取 `uiSize`，界面字体取 `resolvedUiFont`；旧宿主无 `nativeLook` 时回退 P08 tokens。所有页和模态框共用同一 `AppTheme`。
 - 保留 hostsPath、backupCount、maxResults、showSystemVars；非法设置按既有默认处理。hostsPath 变化时旧目标的未保存编辑必须先决策，旧草稿不可套到新目标。
 - 设置和语言切换不获得额外系统写权限，不触发隐式保存。
 

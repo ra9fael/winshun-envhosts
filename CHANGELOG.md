@@ -7,6 +7,22 @@ single source of truth; release tags are `<gdi|qml>/v<version>`.
 
 ## [Unreleased]
 
+## [0.8.4] - 2026-11-15
+
+### Changed
+
+- The QML editor follows WinShun's interface look instead of keeping a palette
+  of its own. `appearance.nativeLook` supplies the style's colours and radii
+  (fluent / brand / tactile / liquid, the user's accent colour, dark mode and
+  rounded or square corners), `uiSize` the type scale and row heights, and
+  `resolvedUiFont` the interface font. The native title bar and Basic controls
+  follow the same colour scheme. An older host without `nativeLook` keeps the
+  generated design tokens, so tests and the design contract are unchanged.
+- The editor now renders like WinShun's own windows (D3D11 + FreeType with
+  vertical hinting) instead of software + GDI. The GDI engine smeared the
+  unhinted Alibaba PuHuiTi face across two pixel rows; memory stays within the
+  manifest's 512 MB (130.45 MiB working with both windows open).
+
 ## [0.8.3] - 2026-11-11
 
 ### Fixed
@@ -432,7 +448,7 @@ First public release.
 - A backup before every write, with a configurable `backupCount`.
 - Byte-exact hosts round trip (UTF-8 BOM, CRLF, section comments preserved).
 
-[Unreleased]: https://github.com/ra9fael/winshun-envhosts/compare/qml/v0.8.3...qml
+[Unreleased]: https://github.com/ra9fael/winshun-envhosts/compare/qml/v0.8.4...qml
 [0.7.2]: https://github.com/ra9fael/winshun-envhosts/releases/tag/v0.7.2
 [0.7.1]: https://github.com/ra9fael/winshun-envhosts/releases/tag/v0.7.1
 [0.7.0]: https://github.com/ra9fael/winshun-envhosts/releases/tag/v0.7.0
@@ -441,3 +457,4 @@ First public release.
 
 [0.8.0]: https://github.com/ra9fael/winshun-envhosts/releases/tag/qml%2Fv0.8.0
 [0.8.3]: https://github.com/ra9fael/winshun-envhosts/releases/tag/qml%2Fv0.8.3
+[0.8.4]: https://github.com/ra9fael/winshun-envhosts/releases/tag/qml%2Fv0.8.4

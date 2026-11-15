@@ -38,7 +38,7 @@
 | P05：`renderBackup` | BACKUPS：`pages/BackupsPage.qml` | BackupModel / 预览计划；C10、C13 | T35–T38 |
 | P06：`requestSave`、`showConflict` | REVIEW：`dialogs/SaveReview.qml`、`ConflictReview.qml` | WriteService / ReviewPlan；C06、C07、C08 | T26–T32 |
 | P07：banner、失败 / 草稿情境 | FEEDBACK：`controls/StatusBanner.qml`、`dialogs/DraftRecovery.qml` | 结构化错误 / 草稿 / 关闭决定；C09、C11 | T33–T34、T41–T42 |
-| P08：theme | TOKENS：`DesignTokens.qml`；CONTROLS：`controls/CommandButton.qml`、`EditField.qml` | Theme / Locale；C12；不新建 session | T43–T46 |
+| P08：theme | TOKENS：`AppTheme.qml`（宿主 `appearance.nativeLook`，`DesignTokens.qml` 为回退）；CONTROLS：`controls/CommandButton.qml`、`EditField.qml` | Theme / Locale；C12；不新建 session | T43–T46 |
 | P09：状态转换解释图 | SESSION、WRITE：C++ 服务；上述 QML 状态投影 | C01–C12；无需单独制作“状态图页面” | T09–T13、T26–T34、T39 |
 
 原型的评审标题、任务侧栏、模拟外变 / 失败 / 只读开关和假标题栏不进入产品。
@@ -191,8 +191,9 @@ QAbstractItemModel 及其通知在所属 GUI 线程运行；后台服务只接�
 
 ### K08 — 视觉、组件与可访问性
 
-[design-tokens.json](design-tokens.json) 是颜色和尺寸的唯一来源。SVG 生成器与 HTML 的 `tokens.css` 已消费颜色；未来 `DesignTokens.qml` 由同一源生成，作为只读语义属性，不复制散落的十六进制值。
-生成器已经纳入 `DesignTokens.qml` 的 `--check`，同源生成共 13 个资产。
+产品的颜色和圆角来自宿主 `appearance.nativeLook`（`AppTheme.qml` 映射为语义属性），与 WinShun 的界面风格、强调色、明暗和圆角设置一致；`design-tokens.json` 是设计稿和回退用的基准，`DesignTokens.qml` 由它生成，只在宿主没有 `nativeLook`（旧宿主、测试）时使用。
+SVG 生成器与 HTML 的 `tokens.css` 消费同一套设计基准，不复制散落的十六进制值；生成器已纳入 `DesignTokens.qml` 的 `--check`，同源生成共 13 个资产。
+`nativeLook` 不提供 success / caution，状态色继续取 `DesignTokens.qml` 的 green / amber，红色取宿主的 danger。
 
 窗口默认 1120×760 DIP、最小 900×640；内容边距 12、基础间距 6、行高 28、按钮最低 26、输入及下拉框最低 28、焦点线宽 2。
 复选标记 14 DIP，整个 32×28 选择单元格可点击。Compact 控件覆盖 Basic 默认背景、padding 和 indicator 隐式尺寸。
@@ -203,7 +204,7 @@ QAbstractItemModel 及其通知在所属 GUI 线程运行；后台服务只接�
 长值不得裁切底层数据；32,768 / 100,000 UTF-16 单元输入必须验证控件最大长度配置。
 
 共享控件同时覆盖 normal / hover / pressed / focused / disabled / invalid / readOnly；状态标记同时有符号和文字。
-主动作使用 accent / onAccent，分段选择和开关的选中态使用 soft / accent；不能把所有选中控件都画成主提交按钮。
+主动作使用 accentFill / onAccent（文字、线和焦点环用 accent），分段选择和开关的选中态使用 soft / accent；不能把所有选中控件都画成主提交按钮。
 对比度目标：普通文字 4.5:1、交互边界和焦点 3:1；颜色数值检查只是必要条件，截图仍需检查叠加、透明度和背景。
 Accessible 名称、作用、选中状态、错误 / 禁用原因与可见文案一致；屏幕阅读器验证单列人工证据。
 中文 / 英文通过同一翻译层；语言 / 主题更新只发属性变化，不能重建正在输入的页面或 session。

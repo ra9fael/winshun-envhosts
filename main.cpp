@@ -548,6 +548,7 @@ struct EnvHosts : winshun::Plugin {
             oa.select = data["select"].toString();
             oa.setLang(uiLang());
             oa.dark = (theme() == "dark");
+            oa.appearanceJson = appearance().dump();
             oa.elevated = envh::native::processElevated();
             if (target == "hosts") {
                 envh::native::HostsStore hs(winshun::wide(testHostsPath(st)));
@@ -657,7 +658,7 @@ struct EnvHosts : winshun::Plugin {
         }
         if((kind=="envRestore"||kind=="hostsRestore")&&a.action=="restore"){
             editorwin::OpenArgs args;args.kind=kind=="envRestore"?"env":"hosts";args.userSubkey=testUserSubkey();args.sysSubkey=testSystemSubkey();
-            args.hostsPath=winshun::wide(testHostsPath(st));args.dataDir=dataDir();args.backupCount=st.backupCount;args.showSystem=st.showSystem;args.setLang(uiLang());args.dark=theme()=="dark";
+            args.hostsPath=winshun::wide(testHostsPath(st));args.dataDir=dataDir();args.backupCount=st.backupCount;args.showSystem=st.showSystem;args.setLang(uiLang());args.dark=theme()=="dark";args.appearanceJson=appearance().dump();
             if(!editorwin::openEditorDeferred(args))return {notify("E_QML_INIT"),winshun::effect::keep()};
             return {notify(tr(zh,"请在“备份”页预览并恢复；保存后才写入目标。","Preview and restore in Backups, then Save to write the target.")),winshun::effect::hide()};
         }
@@ -885,7 +886,7 @@ struct EnvHosts : winshun::Plugin {
     {
         winshun::debug("ra9fael.envhosts: settingsChanged");
         const auto lang = envh::i18n::resolve(locale(), readSettings(s).uiLanguage);
-        editorwin::onAppearanceChanged(lang, theme() == "dark");
+        editorwin::onAppearanceChanged(lang, theme() == "dark", appearance().dump());
     }
 
     // WinShun sends `appearance` (with locale inside the look object) when its
@@ -893,7 +894,7 @@ struct EnvHosts : winshun::Plugin {
     // GUI threads; a new window picks up the same values from uiLang().
     void appearanceChanged() override
     {
-        editorwin::onAppearanceChanged(uiLang(), theme() == "dark");
+        editorwin::onAppearanceChanged(uiLang(), theme() == "dark", appearance().dump());
     }
 
 #ifdef ENVHOSTS_QML_EDITOR
@@ -932,12 +933,13 @@ int main(int argc, char** argv)
     // Qt Quick requires the GUI thread, so the Qt loop owns the main thread and
     // the JSON-RPC loop moves to a worker. stdio stays owned by the protocol
     // thread; the GUI thread never writes to it.
-    // Use the Windows GDI font database with this software-rendered editor.
-    // DirectWrite's process-wide font data survived engine destruction and
-    // accounted for most of the measured post-close footprint on this machine.
-    // An explicit platform selection remains available for diagnostics.
+    // The font engine WinShun itself uses with its hardware renderer: the UI
+    // font (Alibaba PuHuiTi) has no hinting, and FreeType's vertical hinting
+    // snaps its horizontal strokes to the grid where GDI smears them across two
+    // pixel rows (docs/qml/MEMORY_FIX.md). An explicit platform selection
+    // remains available for diagnostics.
     if(qEnvironmentVariableIsEmpty("QT_QPA_PLATFORM"))
-        qputenv("QT_QPA_PLATFORM", "windows:fontengine=gdi");
+        qputenv("QT_QPA_PLATFORM", "windows:fontengine=freetype");
     QGuiApplication app(argc, argv);
     setPluginWindowIcon();
     app.setQuitOnLastWindowClosed(false);

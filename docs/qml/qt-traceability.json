@@ -108,6 +108,7 @@
     "TOKENS": {
       "state": "IMPLEMENTED",
       "paths": [
+        "qt/qml/AppTheme.qml",
         "qt/qml/DesignTokens.qml"
       ]
     },

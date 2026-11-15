@@ -15,7 +15,7 @@
 - C++ 写入服务串行校验指纹 / 权限、验证备份、写入、读回、广播；区分部分失败、读回失败、已保存但广播失败。
 - QML 构建的启动器写动作走相同服务；备份恢复转到窗口预览。完整确认前只改工作副本。
 - v2 草稿保留未结束输入和分隔项元数据；旧草稿导入标记“原基线未知”。备份恢复前另存恢复草稿，避免自动保存覆盖恢复点。
-- 中英文和深浅主题即时更新，同源 tokens；可独立部署 Qt 运行时的预览包。
+- 中英文和深浅主题即时更新；颜色、圆角、字体和界面大小跟宿主 `appearance`（`nativeLook` / `uiSize` / `resolvedUiFont`），旧宿主回退同源 tokens。
 
 ## 实际验证与边界
 
@@ -157,3 +157,17 @@ HTML 离线检查 **16 组 / 89 断言 PASS**，设计契约与生成资产检�
 
 新增项修复交付：[0.8.0-qml.3 安装包](../../dist/qml-preview-06/ra9fael.envhosts-qml.wsplugin)。SHA-256 与压缩包内 exe 已核对；在仅含 Windows 系统目录的 PATH 下通过 **6/6** 组独立协议检查。
 [完整验证记录](../../build-qml/evidence/insertion-validation.json) · [协议结果](../../build-qml/evidence/insertion-package-protocol.json)。现有 WinShun 中的新包加载仍为 NOT_RUN。
+
+## host-look · 跟随宿主界面风格
+
+按 binarylab QML 版的做法接入宿主外观，但不只抄它的配色：宿主 `appearance.nativeLook` 给出当前界面风格（fluent / brand / tactile / liquid）算好的颜色和半径，`AppTheme.qml` 把它们映射成页面原有的语义属性；`uiSize` 决定正文、次要文字、标题和行高（紧凑 12 / 标准 13 / 宽敞 15），`resolvedUiFont` 决定界面字体；`theme` 同时设置 `QStyleHints::colorScheme`，让原生标题栏、Basic 控件和窗口底色一起切换。`nativeLook` 没有 success / caution，绿色和琥珀色仍取 `DesignTokens.qml`，红色取宿主的 `danger`。旧宿主或测试没有 `nativeLook` 时，`AppTheme` 回退 `DesignTokens.qml`，设计与契约检查不变。
+
+- `editor_common.h` / `main.cpp`：`appearance()` 原样带进 `OpenArgs.appearanceJson`，`appearanceChanged` 把新 look 推给已开窗口。
+- `qt/qt_editor.cpp`：解析为 `EditorBridge.appearance`；窗口创建和外观变化都先应用 `colorScheme`；从 `WS_APP_DIR/fonts` 加载 WinShun 的界面字体。
+- `qt/qml/AppTheme.qml`：唯一颜色 / 圆角 / 字号入口；`Main.qml` 和各控件只读它。
+- 状态色：`RowSurface` / `PartsEditor` / `StatusBanner` 只用 `theme.green/amber/red` 与对应底色；输入选择色改用 `theme.selection`，选中文字用 `theme.ink`。
+
+字体跟 WinShun 一致：先前的软件渲染 + GDI 字体引擎会把没有 hinting 的 Alibaba PuHuiTi 横向笔画糊成两行（WinShun `main.cpp` 里同样的结论），这也是实机看到的“字体很糊”。现在改用 WinShun 自己 D3D11 时用的组合：**D3D11 场景图 + FreeType 字体引擎 + PreferVerticalHinting**，并在 `WS_APP_DIR/fonts` 加载同一个 Alibaba PuHuiTi 文件；QML 再按 `resolvedUiFont` 指定同一个 family。D3D11 下两窗实测 working 130.45 MiB、关闭后 82.28 MiB、峰值 private 148.91 MiB，manifest 上限 512 MB，内存代价可接受；证据 [lifecycle-host-look.json](../../build-qml/evidence/lifecycle-host-look.json)。
+
+真实 Qt 测试新增 `hostAppearanceColorsAndType`：暗色 brand、紧密界面下窗口底色为 `#1d1d20`、正文 12 px；再推送浅色标准 look，同一窗口即时变为 `#f9f9f9`、正文 13 px，不重建 session。CTest **4/4 PASS**，qml_editor **34 项全过**（含本项）。真实窗口（D3D11 + FreeType + Alibaba PuHuiTi）截图：[probe-env.png](../../build-qml/evidence/probe-env.png)。
+现有 WinShun 中加载新包后的宿主实测为 **NOT_RUN**：没有替换运行中的插件副本，也没有另起 WinShun。

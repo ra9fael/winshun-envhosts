@@ -93,6 +93,7 @@ if(ENVHOSTS_QML_EDITOR)
         QML_FILES
             qt/qml/Main.qml
             qt/qml/RowDelegate.qml
+            qt/qml/AppTheme.qml
             qt/qml/DesignTokens.qml
             qt/qml/controls/CommandButton.qml
             qt/qml/controls/CompactCheckBox.qml

@@ -65,5 +65,5 @@ Row {
     }
     function fontForColumn(key) { return key === "value" || key === "ip" || key === "names" ? mono.font : ui.font }
     Text { id: mono; visible: false; font.family: "Consolas"; font.pixelSize: header.theme.bodyFontSize }
-    Text { id: ui; visible: false; font.family: bridge.state.zh ? "Microsoft YaHei UI" : "Segoe UI"; font.pixelSize: header.theme.bodyFontSize }
+    Text { id: ui; visible: false; font.family: header.theme.uiFontFamily.length > 0 ? header.theme.uiFontFamily : Qt.application.font.family; font.pixelSize: header.theme.bodyFontSize }
 }

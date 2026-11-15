@@ -67,9 +67,11 @@ ColumnLayout {
                 objectName: field.fieldName + "Field"
                 property bool editingText: true
                 color: field.readOnly ? theme.muted : field.textColor
-                selectionColor: theme.accent
-                selectedTextColor: theme.onAccent
-                font.family: field.fieldName === "name" ? "Segoe UI" : "Consolas"
+                selectionColor: theme.selection
+                selectedTextColor: theme.ink
+                font.family: field.fieldName === "name"
+                    ? (theme.uiFontFamily.length > 0 ? theme.uiFontFamily : Qt.application.font.family)
+                    : "Consolas"
                 font.pixelSize: theme.bodyFontSize
                 wrapMode: field.multiline ? TextEdit.Wrap : TextEdit.NoWrap
                 selectByMouse: true

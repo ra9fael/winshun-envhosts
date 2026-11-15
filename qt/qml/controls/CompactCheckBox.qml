@@ -12,7 +12,7 @@ CheckBox {
         width: control.theme.checkSize; height: width
         x: (control.width - width) / 2; y: (control.height - height) / 2
         radius: 2
-        color: control.checked ? control.theme.accent : control.theme.panel
+        color: control.checked ? control.theme.accentFill : control.theme.panel
         border.color: control.activeFocus ? control.theme.accent : control.theme.control
         border.width: control.activeFocus ? 2 : 1
         Text {

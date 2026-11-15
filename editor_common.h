@@ -39,6 +39,10 @@ struct OpenArgs {
         zh = envh::i18n::chinese(l);
     }
     bool dark = false;
+    // The host's `appearance` object as JSON (WS appearance contract, "ui"
+    // permission). The Qt front-end turns it into the look its theme follows;
+    // the GDI front-end keeps using `dark` and editor_theme.h.
+    std::string appearanceJson;
     bool writable = true; // hosts writability probe at open time
     bool systemWritable = false; // env: HKLM writable (elevated plugin)
     bool elevated = false; // the plugin process runs with an elevated token

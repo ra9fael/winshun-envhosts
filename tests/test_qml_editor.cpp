@@ -188,6 +188,38 @@ private slots:
         EditorSession session("hosts");session.load(h.read());session.editField({},"raw","127.0.0.1 isolated.test\n");QCOMPARE(WriteService::execute(h,plan(session)).state,QString("Succeeded"));QCOMPARE(h.read().hosts,QByteArray("127.0.0.1 isolated.test\r\n").prepend("\xef\xbb\xbf"));
         a.dataDir=(dir.path()+"/blocked").toStdString();QFile block(QString::fromStdString(a.dataDir));QVERIFY(block.open(QIODevice::WriteOnly));block.write("file");block.close();NativeBackend blocked(a);QVERIFY(!blocked.backup(read,{"hosts"},backup,error));
     }
+    void hostAppearanceColorsAndType() {
+        QTemporaryDir dir;auto store=std::make_shared<FakeStore>();OpenArgs a;a.kind="env";a.dataDir=dir.path().toStdString();
+        a.appearanceJson=
+            "{\"theme\":\"dark\",\"uiStyle\":\"brand\",\"uiSize\":\"compact\",\"resolvedUiFont\":\"Segoe UI\","
+            "\"nativeLook\":{\"dark\":true,\"background\":\"#ff1d1d20\",\"layer\":\"#ff26262b\","
+            "\"control\":\"#ff303038\",\"text\":\"#fff2f2f5\",\"subtext\":\"#ffb8b8b8\","
+            "\"divider\":\"#ff3a3a40\",\"controlBorder\":\"#ff505058\",\"accentLine\":\"#ff7ecbff\","
+            "\"accentFill\":\"#ff2d6ca8\",\"accentText\":\"#ffffffff\",\"danger\":\"#ffff99a4\","
+            "\"textSelection\":\"#557ecbff\",\"controlRadius\":6,\"cardRadius\":8}}";
+        EditorBridge bridge(a,nullptr,store);
+        QQmlEngine engine;QQmlComponent component(&engine,QUrl::fromLocalFile(QStringLiteral(ENVHOSTS_SOURCE_DIR "/qt/qml/Main.qml")));
+        QVERIFY2(component.isReady(),qPrintable(component.errorString()));
+        std::unique_ptr<QObject> object(component.createWithInitialProperties({{"bridge",QVariant::fromValue(&bridge)}}));
+        QVERIFY2(object,qPrintable(component.errorString()));auto* window=qobject_cast<QQuickWindow*>(object.get());window->show();bridge.load();
+        QTRY_VERIFY(bridge.state()["ready"].toBool());QVERIFY(QTest::qWaitForWindowExposed(window));QTest::qWait(80);
+        // nativeLook colours the open window and its compact uiSize sets 12 px.
+        QCOMPARE(window->color(),QColor("#1d1d20"));
+        QCOMPARE(window->property("font").value<QFont>().pixelSize(),12);
+        QDir().mkpath(QStringLiteral(ENVHOSTS_SOURCE_DIR "/build-qml/evidence"));
+        QVERIFY(window->grabWindow().save(QStringLiteral(ENVHOSTS_SOURCE_DIR "/build-qml/evidence/host-look-dark-compact.png")));
+        // The next host look recolours that same window, no session rebuild.
+        bridge.appearance(envh::i18n::Lang::EnUS,false,
+            "{\"theme\":\"light\",\"uiStyle\":\"brand\",\"uiSize\":\"standard\","
+            "\"nativeLook\":{\"dark\":false,\"background\":\"#fff9f9f9\",\"layer\":\"#ffffffff\","
+            "\"control\":\"#ffffffff\",\"text\":\"#ff1b1b20\",\"subtext\":\"#ff666666\","
+            "\"divider\":\"#ffdedede\",\"controlBorder\":\"#ffc8c8c8\",\"accentLine\":\"#ffb5452c\","
+            "\"accentFill\":\"#ffa8402c\",\"accentText\":\"#ffffffff\",\"danger\":\"#ffc42b1c\","
+            "\"textSelection\":\"#55a8402c\",\"controlRadius\":4,\"cardRadius\":6}}");
+        QTRY_COMPARE(window->color(),QColor("#f9f9f9"));
+        QCOMPARE(window->property("font").value<QFont>().pixelSize(),13);
+        QVERIFY(window->grabWindow().save(QStringLiteral(ENVHOSTS_SOURCE_DIR "/build-qml/evidence/host-look-light-standard.png")));
+    }
     void realQmlMultiSelectionAndScreenshots() {
         QTemporaryDir dir;auto store=std::make_shared<FakeStore>();OpenArgs a;a.kind="env";a.dataDir=dir.path().toStdString();EditorBridge bridge(a,nullptr,store);
         QQmlEngine engine;QStringList warnings;connect(&engine,&QQmlEngine::warnings,this,[&](const QList<QQmlError>& list){for(const auto& w:list)warnings<<w.toString();});

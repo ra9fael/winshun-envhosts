@@ -1,5 +1,13 @@
 # QML memory and launcher handoff repair
 
+> **Later note (host-look):** the GDI/software choice below was made to keep the
+> closed footprint low. It also made the unhinted Alibaba PuHuiTi UI font look
+> blurrier than WinShun's own text. The host-look build now uses WinShun's
+> renderer (D3D11 + FreeType, see `main.cpp` / `initialize()`). Measured with
+> `tools/check_qml_lifecycle.py`: 110.03 MiB working after env opened, 130.45
+> with env + hosts, 82.28 after both closed, 148.91 peak private; the manifest
+> allows 512 MB. Evidence: `build-qml/evidence/lifecycle-host-look.json`.
+
 Package: `0.8.0-qml.7`, `dist/qml-preview-10/ra9fael.envhosts-qml.wsplugin`.
 
 ## Findings

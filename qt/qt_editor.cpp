@@ -11,8 +11,13 @@
 #include <QThread>
 #include <QDebug>
 #include <QFontMetricsF>
+#include <QFontDatabase>
 #include <QSettings>
 #include <QDir>
+#include <QFile>
+#include <QJsonDocument>
+#include <QJsonObject>
+#include <QStyleHints>
 #include <QElapsedTimer>
 #include <psapi.h>
 #include <map>
@@ -36,6 +41,7 @@ void logMemory(const char* phase){
 
 EditorBridge::EditorBridge(OpenArgs a,QObject* parent,std::shared_ptr<StoreBackend> backend)
     :QObject(parent),args(std::move(a)),edit(qs(args.kind)),native(std::make_shared<NativeBackend>(args)) {
+    parseAppearance(args.appearanceJson);
     store=backend?std::move(backend):native;filter=qs(args.filter);page=args.kind=="env"?"env":"hosts";
     if(!args.dataDir.empty()){
         QSettings settings(qs(args.dataDir)+"/qml-view.ini",QSettings::IniFormat);
@@ -379,9 +385,21 @@ bool EditorBridge::requestClose(bool shutdown){
     showDialog("close",trText("有未保存的修改","Unsaved changes"),trText("保存到系统、保留草稿或继续编辑。","Save to the target, keep a draft, or continue editing."));return false;
 }
 void EditorBridge::setActive(bool active){watcher.setInterval(active?2000:10000);}
-void EditorBridge::appearance(envh::i18n::Lang lang,bool dark){args.setLang(lang);args.dark=dark;notice.clear();emit columnsChanged();rebuild();}
+void EditorBridge::parseAppearance(const std::string& appearanceJson){
+    m_appearance.clear();
+    if(!appearanceJson.empty()){
+        const QJsonDocument doc=QJsonDocument::fromJson(QByteArray::fromStdString(appearanceJson));
+        if(doc.isObject())m_appearance=doc.object().toVariantMap();
+    }
+    // A host that sent no theme still gets the window's opening theme, so the
+    // QML fallback tokens switch exactly as they did before nativeLook.
+    if(!m_appearance.contains("theme"))m_appearance.insert("theme",args.dark?"dark":"light");
+}
+void EditorBridge::appearance(envh::i18n::Lang lang,bool dark,const std::string& appearanceJson){
+    args.setLang(lang);args.dark=dark;parseAppearance(appearanceJson);
+    notice.clear();emit appearanceChanged();emit columnsChanged();rebuild();}
 void EditorBridge::applyFocus(const OpenArgs& a){
-    appearance(a.lang,a.dark);
+    appearance(a.lang,a.dark,a.appearanceJson);
     if(native->identity()!=NativeBackend(a).identity()){fail(trText("目标路径已变；请先保存或关闭当前编辑窗口，再打开新目标。","Target changed. Save or close this window before opening the new target."));return;}
     if(!finish())return;
     if(edit.kind=="env"&&!a.select.empty())for(const auto& v:edit.work.env)if(v.key()==qs(a.select).toCaseFolded()&&(v.scope!="system"||args.showSystem)){setScope(v.scope);filter.clear();break;}
@@ -393,6 +411,31 @@ void EditorBridge::applyFocus(const OpenArgs& a){
 }
 
 namespace {
+// WinShun's own title bars, Basic controls and the host look all follow the
+// color scheme: set it before a window is made so the native frame and the
+// QML fallback palette start in the theme the host is in.
+void applyColorScheme(bool dark){
+#if QT_VERSION >= QT_VERSION_CHECK(6, 8, 0)
+    if(auto* hints=QGuiApplication::styleHints())hints->setColorScheme(dark?Qt::ColorScheme::Dark:Qt::ColorScheme::Light);
+#else
+    // Before 6.8 the color scheme is read-only; the QML fallback tokens still
+    // follow `theme`, the native title bar follows Windows.
+    Q_UNUSED(dark)
+#endif
+}
+// WinShun's UI font (the same file its own windows load). A plugin runs in its
+// own process, so its application font starts as the system default.
+void applyUiFont(){
+    const QString appDir=qEnvironmentVariable("WS_APP_DIR");
+    if(appDir.isEmpty())return;
+    const QString file=appDir+"/fonts/AlibabaPuHuiTi-3-55-Regular.ttf";
+    if(!QFile::exists(file))return;
+    const int id=QFontDatabase::addApplicationFont(file);
+    const QStringList families=QFontDatabase::applicationFontFamilies(id);
+    if(families.isEmpty())return;
+    QFont font(families.first());font.setHintingPreference(QFont::PreferVerticalHinting);
+    QGuiApplication::setFont(font);
+}
 struct WindowState {QPointer<QQuickWindow> window;QPointer<EditorBridge> bridge;};
 class EditorController : public QObject {
 public:
@@ -419,6 +462,7 @@ public:
         if(shuttingDown){error="E_SHUTDOWN";return false;}
         if(auto it=windows.find(args.kind);it!=windows.end()&&it->second.window){auto* win=it->second.window.data();it->second.bridge->applyFocus(args);win->showNormal();win->raise();win->requestActivate();return true;}
         if(!engine)engine=std::make_unique<QQmlEngine>();
+        applyColorScheme(args.dark);
         auto* bridge=new EditorBridge(args);
         QQmlComponent component(engine.get(),QUrl("qrc:/qt/qml/EnvHosts/Editor/qt/qml/Main.qml"));
         if(component.isError()){error=component.errorString().toStdString();delete bridge;releaseWhenUnused();return false;}
@@ -442,11 +486,14 @@ EditorController* controller=nullptr;
 }
 void initialize(){
     if(controller)return;
-    // This editor only uses 2D controls. Avoid creating a hardware graphics
-    // device and driver caches for a short-lived editing window.
-    QQuickWindow::setGraphicsApi(QSGRendererInterface::Software);
+    // The same renderer WinShun's own windows use: FreeType text in a hardware
+    // scene graph. The software renderer would need the GDI font engine, whose
+    // unhinted text is what made this editor look blurrier than the host.
+    QQuickWindow::setGraphicsApi(QSGRendererInterface::Direct3D11);
     QQuickWindow::setTextRenderType(QQuickWindow::NativeTextRendering);
     QQuickStyle::setStyle("Basic");
+    applyUiFont();
+    if(const QString theme=qEnvironmentVariable("WS_THEME");!theme.isEmpty())applyColorScheme(theme=="dark");
     controller=new EditorController;
     controller->setParent(qApp);
 }
@@ -469,7 +516,7 @@ bool openEditorDeferred(const OpenArgs& a){
 }
 bool isEditorOpen(const std::string& kind){if(!controller)return false;std::lock_guard<std::mutex> lock(controller->mutex);return controller->opened[kind];}
 void onExternalChange(const std::string& kind){if(controller)QMetaObject::invokeMethod(controller,[kind]{auto it=controller->windows.find(kind);if(it!=controller->windows.end()&&it->second.bridge)it->second.bridge->poll();},Qt::QueuedConnection);}
-void onAppearanceChanged(envh::i18n::Lang lang,bool dark){if(controller)QMetaObject::invokeMethod(controller,[lang,dark]{for(auto& item:controller->windows)if(item.second.bridge)item.second.bridge->appearance(lang,dark);},Qt::QueuedConnection);}
+void onAppearanceChanged(envh::i18n::Lang lang,bool dark,const std::string& appearanceJson){if(controller)QMetaObject::invokeMethod(controller,[lang,dark,appearanceJson]{applyColorScheme(dark);for(auto& item:controller->windows)if(item.second.bridge)item.second.bridge->appearance(lang,dark,appearanceJson);},Qt::QueuedConnection);}
 void closeAllEditors(unsigned timeoutMs){
     if(!controller)return;QMetaObject::invokeMethod(controller,[]{controller->shutdown();},Qt::QueuedConnection);
     if(timeoutMs&&QThread::currentThread()!=qApp->thread()){

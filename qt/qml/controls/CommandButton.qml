@@ -26,7 +26,7 @@ Button {
     }
     background: Rectangle {
         radius: theme.controlRadius
-        color: !control.enabled ? theme.field : control.primary ? (control.hovered ? theme.accentHover : theme.accent) : control.down || control.hovered ? theme.soft : theme.panel
+        color: !control.enabled ? theme.field : control.primary ? (control.hovered ? theme.accentHover : theme.accentFill) : control.down || control.hovered ? theme.soft : theme.panel
         border.color: control.activeFocus ? theme.accent : control.danger ? theme.red : theme.control
         border.width: control.activeFocus ? theme.focusWidth : control.primary ? 0 : 1
     }

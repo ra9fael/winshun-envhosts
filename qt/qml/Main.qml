@@ -10,7 +10,7 @@ ApplicationWindow {
     objectName: "editorWindow"
     required property var bridge
     readonly property var s: bridge.state
-    DesignTokens { id: tokens; dark: s.dark }
+    AppTheme { id: tokens; appearance: root.bridge.appearance; fallbackDark: s.dark }
     width: tokens.windowWidth
     height: tokens.windowHeight
     minimumWidth: tokens.minimumWidth
@@ -18,7 +18,7 @@ ApplicationWindow {
     title: (s.dirty ? "● " : "") + s.title + " · EnvHosts"
     visible: false
     color: tokens.bg
-    font.family: s.zh ? "Microsoft YaHei UI" : "Segoe UI"
+    font.family: tokens.uiFontFamily.length > 0 ? tokens.uiFontFamily : Qt.application.font.family
     font.pixelSize: tokens.bodyFontSize
     palette.window: tokens.bg
     palette.windowText: tokens.ink
@@ -26,7 +26,7 @@ ApplicationWindow {
     palette.text: tokens.ink
     palette.button: tokens.panel
     palette.buttonText: tokens.ink
-    palette.highlight: tokens.accent
+    palette.highlight: tokens.accentFill
     palette.highlightedText: tokens.onAccent
     palette.placeholderText: tokens.muted
     palette.mid: tokens.control

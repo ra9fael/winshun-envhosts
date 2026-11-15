@@ -11,6 +11,10 @@ namespace editorwin {
 class EditorBridge : public QObject {
     Q_OBJECT
     Q_PROPERTY(QVariantMap state READ state NOTIFY changed)
+    // The host's appearance object (see winshun.h): theme, uiStyle, uiSize,
+    // nativeLook. Empty on an older host or a test harness, and the theme
+    // then falls back to the design tokens.
+    Q_PROPERTY(QVariantMap appearance READ appearance NOTIFY appearanceChanged)
     Q_PROPERTY(EditorRows* rows READ rows CONSTANT)
     Q_PROPERTY(EditorRows* parts READ parts CONSTANT)
     Q_PROPERTY(EditorRows* backups READ backups CONSTANT)
@@ -18,6 +22,7 @@ class EditorBridge : public QObject {
 public:
     explicit EditorBridge(OpenArgs args,QObject* parent=nullptr,std::shared_ptr<StoreBackend> backend={});
     QVariantMap state() const;
+    QVariantMap appearance() const{return m_appearance;}
     EditorRows* rows(){return &rowModel;}
     EditorRows* parts(){return &partModel;}
     EditorRows* backups(){return &backupModel;}
@@ -71,16 +76,19 @@ public:
     Q_INVOKABLE bool requestClose(bool shutdown=false);
     Q_INVOKABLE void setActive(bool active);
     void applyFocus(const OpenArgs& a);
-    void appearance(envh::i18n::Lang lang,bool dark);
+    void appearance(envh::i18n::Lang lang,bool dark,const std::string& appearanceJson={});
 signals:
     void changed();
+    void appearanceChanged();
     void columnsChanged();
     void scopeChanging();
     void focusField(const QString& row,const QString& field,const QString& part);
     void closeReady();
     void closeAccepted();
 private:
+    void parseAppearance(const std::string& appearanceJson);
     OpenArgs args;
+    QVariantMap m_appearance;
     EditorSession edit;
     std::shared_ptr<StoreBackend> store;
     std::shared_ptr<NativeBackend> native;
@@ -125,7 +133,7 @@ bool openEditor(const OpenArgs& a,std::string& error);
 bool openEditorDeferred(const OpenArgs& a);
 bool isEditorOpen(const std::string& kind);
 void onExternalChange(const std::string& kind);
-void onAppearanceChanged(envh::i18n::Lang lang,bool dark);
+void onAppearanceChanged(envh::i18n::Lang lang,bool dark,const std::string& appearanceJson);
 void closeAllEditors(unsigned timeoutMs);
 void shutdownWhenReady();
 }

@@ -56,7 +56,8 @@ RowSurface {
                     text: cell.stateCell ? (record.deleted ? bridge.trText(bridge.state.zh,"− 待删除","− Deleted") : record.state === "added" ? bridge.trText(bridge.state.zh,"+ 新增","+ Added") : record.state === "modified" ? bridge.trText(bridge.state.zh,"● 已修改","● Modified") : record.duplicate ? bridge.trText(bridge.state.zh,"! 重复","! Duplicate") : !record.writable ? bridge.trText(bridge.state.zh,"只读","Read-only") : "—") : cell.enabledCell ? (record.deleted ? "—" : record.enabled ? bridge.trText(bridge.state.zh,"● 启用","● Enabled") : bridge.trText(bridge.state.zh,"Ⅱ 停用","Ⅱ Disabled")) : record[cell.field]
                     color: cell.badge ? cell.tone : record.deleted ? delegate.theme.red : delegate.added ? delegate.theme.green : delegate.theme.ink
                     font.strikeout: record.deleted && !cell.stateCell && !cell.enabledCell
-                    font.family: ["value","ip","names"].indexOf(cell.field) >= 0 ? "Consolas" : (bridge.state.zh ? "Microsoft YaHei UI" : "Segoe UI")
+                    font.family: ["value","ip","names"].indexOf(cell.field) >= 0 ? "Consolas"
+                        : (delegate.theme.uiFontFamily.length > 0 ? delegate.theme.uiFontFamily : Qt.application.font.family)
                 }
                 MouseArea {
                     anchors.fill: parent; hoverEnabled: true
