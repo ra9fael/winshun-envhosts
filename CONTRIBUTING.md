@@ -157,26 +157,30 @@ English.
 
 ## Releasing (maintainers)
 
-Maintain `gdi` and `qml` independently. Port common storage/protocol fixes to
-both; keep interface changes on their own branch. Read [DUAL_EDITIONS.md](docs/DUAL_EDITIONS.md)
-for build, package, migration and release acceptance requirements.
+Maintain the `qml` branch. The native GDI line ended at 0.7.5 and the `gdi`
+branch is archived: do not add features or releases there. Read
+[DUAL_EDITIONS.md](docs/DUAL_EDITIONS.md) for the lifecycle, build, package,
+migration and release acceptance requirements.
 
-`plugin.json` is the only version source. Tags are `gdi/vX.Y.Z` or `qml/vX.Y.Z`.
-The package tool checks the manifest, edition and executable before writing an
-immutable package and SHA-256. QML reuses WinShun's shared Qt 6.12.0 runtime
-and bundles no Qt DLLs or QML modules (requires WinShun >= 0.23.0); GDI
-remains a standalone executable. Never replace published release assets.
+`plugin.json` is the only version source. Tags are `qml/vX.Y.Z`. The package
+tool checks the manifest, edition and executable before writing an immutable
+package and SHA-256. QML reuses WinShun's shared Qt 6.12.0 runtime and bundles
+no Qt DLLs or QML modules (requires WinShun >= 0.23.0). The package is
+`ra9fael.envhosts-<version>.wsplugin`; the `-qml-` part is gone because the
+registry index accepts only `<id>-<version>.wsplugin`. Never replace published
+release assets.
 
 Dispatch `release.yml` with `ref` and `publish=false` for verification. A new
-`gdi/vX.Y.Z` or `qml/vX.Y.Z` tag runs the complete build and publishes it. To
-publish an existing tag manually, set `ref` to that tag and `publish=true`.
-Branch pushes and pull requests do not trigger Actions. GDI is Latest; QML is not.
+`qml/vX.Y.Z` tag runs the complete build and publishes it. To publish an
+existing tag manually, set `ref` to that tag and `publish=true`. Branch pushes
+and pull requests do not trigger Actions. QML releases are Latest.
 Use English Angular commit subjects and bodies. See [WORKFLOWS.md](WORKFLOWS.md).
 Operate GitHub sequentially and avoid repeated requests.
 
-The registry currently accepts only a single package URL for an ID. Keep its
-entry on GDI; adding backend-aware installation/updates needs host and index
-changes. Library submission is separate from publishing GitHub Releases.
+The plugin-library entry (`plugins/ra9fael.envhosts.json` in
+`LingCore/WinShun-plugins`) tracks the QML package. Update it in a separate
+pull request after the release exists; a GitHub release alone does not update
+the library.
 
 ## License
 

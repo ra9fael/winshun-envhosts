@@ -9,7 +9,7 @@
 每次写入前都会先备份；只有管理员才能改的目标会如实报错，而不是假装成功。
 
 
-本分支维护 **QML 版**。两种界面均可选装，功能与快捷键以各自版本说明为准。
+本分支维护 **QML 版**，它从 0.9.0 起是唯一维护和发布的版本；旧 GDI 版停在 0.7.5。
 
 ## 设计目的
 
@@ -23,27 +23,17 @@
 
 ## 安装
 
-两版均维护和发布，请按界面偏好选择：
+QML 版从 0.9.0 起是唯一维护和发布的版本；GDI 版停在 0.7.5，不再更新。
 
-| 版本 | 下载 | 分支 |
-|---|---|---|
-| GDI 原生界面 | [GDI 0.7.5](https://github.com/ra9fael/winshun-envhosts/releases/tag/gdi%2Fv0.7.5) | `gdi` |
-| QML 界面 | [QML 0.8.4](https://github.com/ra9fael/winshun-envhosts/releases/tag/qml%2Fv0.8.4) | `qml` |
-
-1. 下载对应 `.wsplugin`，可用同页 `.sha256` 核对文件。
+1. 下载 [QML 0.9.0](https://github.com/ra9fael/winshun-envhosts/releases/tag/qml%2Fv0.9.0) 的 `.wsplugin`，可用同页 `.sha256` 核对文件。
 2. 打开 **设置 → 插件 → 已安装 → 添加插件 → 压缩包（.zip / .wsplugin）**。
 3. 确认安装和权限，并按需启用。
 
-**安装互斥：** 两版的 ID 都是 `ra9fael.envhosts`。安装另一版会提示替换，
-不是额外安装第二个插件；无需先卸载。切换前请保存或关闭编辑窗口。
-较低版本可能显示降级确认，插件设置与备份保留，草稿按后端隔离。
+**从 GDI 升级：** 两版 ID 都是 `ra9fael.envhosts`，安装 0.9.0 会提示替换而不是再装一个，无需先卸载。切换前请保存或关闭编辑窗口；插件设置与备份保留，草稿按后端隔离。降回 `gdi/v0.7.5` 会显示降级确认。
 
-**更新：** 从所选版本的发布页安装对应更新。当前插件库只有一个后端的下载地址，
-若接受其中的 GDI 更新可能切回 GDI；QML 用户请使用 QML 发布页。
-本仓库新建后的插件库收录需单独提交，不能以 Release 发布代表已经收录。
-要求 WinShun ≥ 0.23.0（QML 版复用宿主 Qt 运行时，需要共享 Qt 契约支持 `elevated`）。原生插件安装及更新需要宿主确认。
+**更新：** 插件库条目已指向 QML 版，可在 **设置 → 插件** 里更新，也可从[发布页](https://github.com/ra9fael/winshun-envhosts/releases)手动安装。要求 WinShun ≥ 0.23.0（QML 版复用宿主 Qt 运行时，需要共享 Qt 契约支持 `elevated`）；更早的宿主会留在 GDI 0.7.5，不会被推给不支持的包。原生插件安装及更新需要宿主确认。
 
-详见[双版本、数据迁移和验收说明](docs/DUAL_EDITIONS.md)。
+详见[版本生命周期、数据迁移和验收说明](docs/DUAL_EDITIONS.md)。
 
 ## 从源码构建
 

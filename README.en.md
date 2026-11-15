@@ -10,7 +10,8 @@ Browse, filter and edit **user environment variables** and **hosts file entries*
 directly from the WinShun launcher. Every write is backed up first; admin-only
 targets degrade honestly instead of pretending to succeed.
 
-This branch maintains the **QML edition**. Features and shortcuts follow each edition’s documentation.
+This branch maintains the **QML edition**, which has been the only maintained
+and published edition since 0.9.0; the old GDI line ends at 0.7.5.
 
 ## Purpose
 
@@ -25,31 +26,27 @@ This branch maintains the **QML edition**. Features and shortcuts follow each ed
 
 ## Install
 
-Both editions are maintained and published. Choose the interface you prefer:
+The QML edition has been the only maintained and published edition since 0.9.0;
+the GDI line ends at 0.7.5 and receives no further updates.
 
-| Edition | Download | Branch |
-|---|---|---|
-| Native GDI interface | [GDI 0.7.5](https://github.com/ra9fael/winshun-envhosts/releases/tag/gdi%2Fv0.7.5) | `gdi` |
-| QML interface | [QML 0.8.4](https://github.com/ra9fael/winshun-envhosts/releases/tag/qml%2Fv0.8.4) | `qml` |
-
-1. Download its `.wsplugin`; optionally verify the accompanying `.sha256`.
+1. Download [QML 0.9.0](https://github.com/ra9fael/winshun-envhosts/releases/tag/qml%2Fv0.9.0)
+   (`.wsplugin`); optionally verify the accompanying `.sha256`.
 2. Open **Settings → Plugins → Installed → Add plugin → Archive (.zip / .wsplugin)**.
 3. Confirm installation and permissions, then enable it as needed.
 
-**Mutually exclusive installation:** both packages use `ra9fael.envhosts`.
-Installing the other edition replaces the current one. No uninstall is needed.
-Save or close editor windows first. Switching to a lower version may show a
-downgrade confirmation. Settings/backups remain; drafts are separate per backend.
+**Upgrading from GDI:** both packages use `ra9fael.envhosts`. Installing 0.9.0
+replaces the GDI copy instead of adding a second plugin, so no uninstall is
+needed. Save or close editor windows first. Settings and backups remain; drafts
+stay separate per backend. Reinstalling `gdi/v0.7.5` shows a downgrade confirmation.
 
-**Updates:** install updates from the release page for your chosen edition.
-The current plugin library has one backend URL per ID. Accepting its GDI update
-may switch QML back to GDI; use QML releases to stay on QML. Listing this newly
-created repository in the library requires a separate submission; a GitHub
-release alone does not add it. WinShun 0.23.0+ is required (QML reuses the
-host Qt runtime; the shared-Qt contract must also support `elevated`), with
-host confirmation for native-plugin installs and updates.
+**Updates:** the plugin-library entry now points at this QML package, so updates
+from **Settings → Plugins** stay on QML; the [release page](https://github.com/ra9fael/winshun-envhosts/releases)
+also works. WinShun 0.23.0+ is required (QML reuses the host Qt runtime and the
+shared-Qt contract must support `elevated`); older hosts stay on GDI 0.7.5
+because the manifest's `minWinShun` blocks a package they cannot run. Native
+plugin installs and updates need host confirmation.
 
-See [edition switching, migration and acceptance](docs/DUAL_EDITIONS.md).
+See [edition lifecycle, migration and acceptance](docs/DUAL_EDITIONS.md).
 
 ## Build from source
 

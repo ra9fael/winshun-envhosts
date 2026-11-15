@@ -81,7 +81,6 @@ jobs:
             exit 1
           fi
           flags=(--latest=true)
-          if [ "$PRERELEASE" = true ]; then flags=(--prerelease --latest=false);
-          elif [ "$VARIANT" = qml ]; then flags=(--latest=false); fi
+          if [ "$PRERELEASE" = true ]; then flags=(--prerelease --latest=false); fi
           gh release create "$RELEASE_TAG" --verify-tag --title "$RELEASE_TAG" "${flags[@]}" \
             --notes-file dist/ci/release-notes.md dist/ci/*.wsplugin dist/ci/*.sha256

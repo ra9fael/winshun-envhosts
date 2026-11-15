@@ -85,7 +85,7 @@ def main() -> int:
     identity = json.loads(result.stdout)
     if identity != {"id": pid, "version": version, "backend": backend}:
         raise ValueError(f"Executable does not match manifest/edition: {identity}")
-    name = f"{pid}{'-qml' if backend == 'qml' else ''}-{version}.wsplugin"
+    name = f"{pid}-{version}.wsplugin"
     target = args.out / name
     if target.exists() or target.with_suffix(target.suffix + ".sha256").exists():
         raise ValueError("Published packages are immutable; use a new output directory or version")
@@ -105,14 +105,12 @@ def main() -> int:
         raise ValueError("Package exceeds 64 MiB")
     checksum = hashlib.sha256(target.read_bytes()).hexdigest()
     target.with_suffix(target.suffix + ".sha256").write_text(f"{checksum}  {target.name}\n", encoding="ascii")
-    notice = (f"# {backend.upper()} {version}\n\n"
-              "同一个插件 ID；安装另一版会替换当前版，设置和备份保留，草稿按版本类型隔离。\n"
-              "Both editions share one plugin ID. Installing the other replaces this edition. "
-              "Settings/backups are retained; drafts are stored separately per backend.\n\n"
-              "下载 / Downloads: [GDI](https://github.com/ra9fael/winshun-envhosts/releases/latest) · "
-              "[QML](https://github.com/ra9fael/winshun-envhosts/tree/qml#安装)\n\n"
-              "插件库目前不区分后端；QML 请从 QML 发布页更新。\n"
-              "The plugin library does not track backends; update QML from its release page.\n\n")
+    notice = (f"# WinShun {version}\n\n"
+              "QML 版是唯一维护的版本；安装会替换旧版（含 GDI 0.7.5），设置和备份保留，草稿按版本类型隔离。\n"
+              "QML is the only maintained edition. Installing this replaces the previous copy "
+              "(including GDI 0.7.5); settings/backups are kept and drafts stay per backend.\n\n"
+              "项目主页 / Home: https://github.com/ra9fael/winshun-envhosts/tree/qml\n"
+              "Requires WinShun 0.23.0 or newer (shared host Qt 6.12).\n\n")
     (args.out / "release-notes.md").write_text(notice + notes + f"\n\nSHA-256 `{checksum}`\n", encoding="utf-8")
     print(f"{target}\nbackend={backend} version={version} size={target.stat().st_size} sha256={checksum}")
     return 0

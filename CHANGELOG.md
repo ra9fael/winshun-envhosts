@@ -7,6 +7,29 @@ single source of truth; release tags are `<gdi|qml>/v<version>`.
 
 ## [Unreleased]
 
+## [0.9.0] - 2026-11-15
+
+### Changed
+
+- QML is now the only maintained edition. The GDI line ends at 0.7.5 and its
+  branch is archived; `qml` is the mainline for fixes, features and releases.
+- The package is named `ra9fael.envhosts-<version>.wsplugin` (the `-qml-` part
+  is gone) so the plugin-library index accepts it: an entry's asset must be
+  `<id>-<version>.wsplugin`. The library entry now points at this package, so
+  library updates keep the QML backend instead of switching back to GDI.
+- QML releases are published as the repository's Latest release. The final GDI
+  release (`gdi/v0.7.5`) stays downloadable but is no longer Latest.
+- `README.md`, `README.en.md`, `CONTRIBUTING.md` and `DUAL_EDITIONS.md` describe
+  the single maintained line, the upgrade from GDI and the downgrade path.
+
+### Notes
+
+- The plugin ID, settings, backups and the installed command set do not change.
+  Installing 0.9.0 over GDI replaces it in place; drafts stay separated per
+  backend. WinShun older than 0.23.0 keeps running GDI 0.7.5 because the
+  manifest's `minWinShun` blocks the update instead of installing a package it
+  cannot run.
+
 ## [0.8.4] - 2026-11-15
 
 ### Changed
@@ -448,7 +471,7 @@ First public release.
 - A backup before every write, with a configurable `backupCount`.
 - Byte-exact hosts round trip (UTF-8 BOM, CRLF, section comments preserved).
 
-[Unreleased]: https://github.com/ra9fael/winshun-envhosts/compare/qml/v0.8.4...qml
+[Unreleased]: https://github.com/ra9fael/winshun-envhosts/compare/qml/v0.9.0...qml
 [0.7.2]: https://github.com/ra9fael/winshun-envhosts/releases/tag/v0.7.2
 [0.7.1]: https://github.com/ra9fael/winshun-envhosts/releases/tag/v0.7.1
 [0.7.0]: https://github.com/ra9fael/winshun-envhosts/releases/tag/v0.7.0
@@ -458,3 +481,4 @@ First public release.
 [0.8.0]: https://github.com/ra9fael/winshun-envhosts/releases/tag/qml%2Fv0.8.0
 [0.8.3]: https://github.com/ra9fael/winshun-envhosts/releases/tag/qml%2Fv0.8.3
 [0.8.4]: https://github.com/ra9fael/winshun-envhosts/releases/tag/qml%2Fv0.8.4
+[0.9.0]: https://github.com/ra9fael/winshun-envhosts/releases/tag/qml%2Fv0.9.0
