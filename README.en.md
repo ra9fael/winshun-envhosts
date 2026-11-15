@@ -24,6 +24,12 @@ and published edition since 0.9.0; the old GDI line ends at 0.7.5.
   "进入交互式编辑界面" (Enter opens the installed edition’s editor): full keyboard control,
   undo/redo, conflict detection, and auto-saved drafts under `WS_DATA_DIR/drafts/`.
 
+## Demonstration
+
+![Environment variables and hosts editor](https://github.com/user-attachments/assets/9e7abf03-6e1a-4565-9149-4fee0ef6add6)
+
+![Environment variables and hosts editor](https://github.com/user-attachments/assets/5db87586-3b1a-45a3-8a5c-77fc3950ece2)
+
 ## Install
 
 The QML edition has been the only maintained and published edition since 0.9.0;

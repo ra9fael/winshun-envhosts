@@ -21,6 +21,12 @@
   "进入交互式编辑界面"（Enter 打开所安装版本的编辑窗口）：全键盘操作、撤销 / 重做、
   冲突检测、草稿自动保存到 `WS_DATA_DIR/drafts/`。
 
+## 演示
+
+![环境变量与 hosts 编辑窗口](https://github.com/user-attachments/assets/9e7abf03-6e1a-4565-9149-4fee0ef6add6)
+
+![环境变量与 hosts 编辑窗口](https://github.com/user-attachments/assets/5db87586-3b1a-45a3-8a5c-77fc3950ece2)
+
 ## 安装
 
 QML 版从 0.9.0 起是唯一维护和发布的版本；GDI 版停在 0.7.5，不再更新。
