@@ -400,6 +400,77 @@ def main():
     else:
         check(True, "no system var row to test (acceptable)")
 
+    print("== T2.10 duplicate hosts rows keep independent identities ==")
+    dq = parse(d.query("hosts", "docker", "hosts docker"))
+    drows = [it for it in dq["result"]["items"] if it.get("data", {}).get("kind") == "hosts"]
+    kube = [it for it in drows if "kubernetes" in it.get("data", {}).get("hostname", "")]
+    ids = [it["id"] for it in kube]
+    check(len(kube) == 2, "duplicate kubernetes entries both listed", str(ids))
+    check(any(i.endswith("-2") for i in ids) and any(not i.endswith("-2") for i in ids),
+          "duplicates get distinct ids (second occurrence carries -2)", str(ids))
+    first, second = (kube[0], kube[1]) if kube and ids[0].endswith("-2") is False else (kube[1], kube[0])
+    # Toggle only the second occurrence: exactly one of the two lines flips.
+    t = parse(d.action("hosts", "disable" if not second["data"]["commented"] else "enable", second))
+    tnote = next((e for e in t["result"]["effects"] if e.get("type") == "notify"), {})
+    time.sleep(0.3)
+    cur = [it for it in parse(d.query("hosts", "docker", "hosts docker"))["result"]["items"]
+           if it.get("data", {}).get("kind") == "hosts" and "kubernetes" in it["data"]["hostname"]]
+    check(len(cur) == 2 and sum(1 for it in cur if it["data"]["commented"]) == 1,
+          "toggling one duplicate leaves the other live",
+          str([(it["id"], it["data"]["commented"]) for it in cur]))
+    # Flip it back so later sections see the original file.
+    it2 = next(it for it in cur if it["data"]["commented"])
+    d.action("hosts", "enable", it2)
+    time.sleep(0.3)
+    back = [it for it in parse(d.query("hosts", "docker", "hosts docker"))["result"]["items"]
+            if it.get("data", {}).get("kind") == "hosts" and "kubernetes" in it["data"]["hostname"]]
+    check(all(not it["data"]["commented"] for it in back), "toggle back restores both live")
+    # Delete flows through a confirm row that re-checks the raw line.
+    delc = parse(d.action("hosts", "delete", second))
+    conf = d.find_item(delc["result"]["effects"][0]["items"] if any(
+        e.get("type") == "replace" for e in delc["result"]["effects"]) else [],
+        kind="hostsDeleteConfirm")
+    check(conf is not None, "hosts delete returns a confirm row",
+          json.dumps(delc["result"]["effects"])[:150])
+    if conf is not None:
+        d.action("hosts", "confirm", conf)
+        time.sleep(0.3)
+        after_del = parse(d.query("hosts", "docker", "hosts docker"))
+        dtexts = [it.get("title", "") for it in after_del["result"]["items"]
+                  if it.get("data", {}).get("kind") == "hosts" and "kubernetes" in it.get("data", {}).get("hostname", "")]
+        check(len(dtexts) == 1, "confirmed delete removes exactly the selected occurrence", str(dtexts))
+
+    print("== T2.11 read-only hosts allows copies, edit re-locates after loss ==")
+    d3 = Driver(data_dir, hosts_path, hosts_override=False)
+    d3.initialize(data_dir, settings)
+    rq = parse(d3.query("hosts", "host.docker", "hosts host.docker"))
+    rrow = next((it for it in rq["result"]["items"] if it.get("data", {}).get("kind") == "hosts"), None)
+    if rrow:
+        for act, rid in (("copyIp", "ip"), ("copyHostname", "hostname"), ("copyLine", "primary")):
+            cp = parse(d3.action("hosts", act, rrow))
+            has_copy = any(e.get("type") == "copy" for e in cp["result"]["effects"])
+            check(has_copy, f"read-only hosts: {act} still copies", json.dumps(cp["result"]["effects"])[:120])
+        of = parse(d3.action("hosts", "openFile", rrow))
+        check(any(e.get("type") == "openPath" for e in of["result"]["effects"]) or of["result"]["effects"],
+              "read-only hosts: openFile is offered", json.dumps(of["result"]["effects"])[:120])
+    d3.shutdown()
+
+    print("== T2.12 inline env edit keeps the row's scope ==")
+    seeded = next((it for it in parse(d.query("env", "WS_DUP", "env WS_DUP"))["result"]["items"]
+                   if it.get("data", {}).get("kind") == "env" and it["data"].get("scope") == "system"), None)
+    if seeded:
+        ie = parse(d.action("env", "inlineEdit", seeded))
+        qtext = next((e.get("text", "") for e in ie["result"]["effects"] if e.get("type") == "setQuery"), "")
+        check("env:set" in qtext, "inlineEdit issues an env:set query", qtext)
+        e_row = next((it for it in parse(d.query("env", qtext.replace("env:set ", "").split("=")[0],
+                                                 qtext))["result"]["items"]
+                      if it.get("data", {}).get("kind") == "envEdit"), None)
+        check(e_row is not None and e_row["data"].get("scope") == seeded["data"]["scope"],
+              "edit row keeps the seeded scope",
+              str(e_row["data"].get("scope") if e_row else None))
+    else:
+        check(True, "no system var named *WS_DUP* to test (acceptable)")
+
     print("== T2.9 locale: host language, plugin override, live appearance ==")
 
     def pinned_title(dv):

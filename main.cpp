@@ -62,10 +62,8 @@ Settings readSettings(const winshun::Json& s)
     };
     st.hostsPath = text("hostsPath", st.hostsPath);
     st.uiLanguage = text("uiLanguage", st.uiLanguage);
-    const std::string bc = text("backupCount", "10");
-    st.backupCount = std::stoi(bc);
-    const std::string mr = text("maxResults", "50");
-    st.maxResults = std::stoi(mr);
+    st.backupCount = envh::parseIntOr(text("backupCount", "10"), st.backupCount);
+    st.maxResults = envh::parseIntOr(text("maxResults", "50"), st.maxResults);
     if (st.maxResults <= 0 || st.maxResults > 200)
         st.maxResults = 50;
     // Booleans arrive as JSON bools from the host; the string form is kept for
@@ -140,11 +138,30 @@ winshun::Item envVarRow(const envh::EnvVar& v, const std::string& expanded, bool
         subtitle = tr(zh, "用户 · ", "user · ") + v.type;
     else
         subtitle = tr(zh, "系统 · ", "system · ") + v.type + (writableScope ? "" : tr(zh, " · 🔒 改写需管理员", " · 🔒 needs admin"));
-    if (v.type == "REG_EXPAND_SZ" && expanded != v.value)
+    const bool expandable = v.type == "REG_EXPAND_SZ" && expanded != v.value;
+    if (expandable)
         subtitle += tr(zh, " · 展开 ", " · expanded ") + std::to_string(expanded.size()) + tr(zh, " 字符", " chars");
 
-    const std::string preview = v.value + (expanded != v.value ? "\n\n" + expanded : "");
+    const std::string preview = v.value + (expandable ? "\n\n" + expanded : "");
     const std::string icon = isUser ? "color:#185FA5" : "color:#8A8A8A";
+
+    // Inline edit covers the single-line grammar only: PATH-style separator
+    // items, multi-string and any value the launcher grammar cannot round-trip
+    // go through the editor, which keeps element boundaries and types.
+    const bool inlineEditable = (v.type == "REG_SZ" || v.type == "REG_EXPAND_SZ")
+                                && v.value.find('\n') == std::string::npos
+                                && v.value.find(';') == std::string::npos;
+
+    std::vector<winshun::Action> actions {
+        {"open", tr(zh, "打开编辑器", "Open editor"), "Enter"},
+        {"copyValue", tr(zh, "复制原始值", "Copy value"), "Ctrl+Enter"}};
+    if (expandable)
+        actions.push_back({"copyExpanded", tr(zh, "复制展开值", "Copy expanded"), "Shift+Enter"});
+    actions.push_back({"copyName", tr(zh, "复制变量名", "Copy name"), ""});
+    actions.push_back({"copyAssign", tr(zh, "复制 NAME=value", "Copy NAME=value"), ""});
+    if (inlineEditable)
+        actions.push_back({"inlineEdit", tr(zh, "行内编辑", "Quick edit"), ""});
+    actions.push_back({"delete", tr(zh, "删除", "Delete"), ""});
 
     winshun::Item item(envh::envId(v), title, subtitle);
     item.withIcon(icon)
@@ -156,15 +173,12 @@ winshun::Item envVarRow(const envh::EnvVar& v, const std::string& expanded, bool
                           {"name", v.name},
                           {"value", v.value},
                           {"type", v.type},
+                          {"select", v.scope + "/" + v.name},
                           {"primary", v.value},
                           {"detail", expanded},
                           {"chain", "env " + v.name},
-                          {"expand", (v.type == "REG_EXPAND_SZ" && expanded != v.value)}}))
-        .withActions(std::vector<winshun::Action> {
-            {"edit", tr(zh, "编辑", "Edit"), "Enter"},
-            {"copyValue", tr(zh, "复制值", "Copy value"), "Ctrl+Enter"},
-            {"copyExpanded", tr(zh, "复制展开值", "Copy expanded"), "Shift+Enter"},
-            {"delete", tr(zh, "删除", "Delete"), ""}});
+                          {"expand", expandable}}))
+        .withActions(std::move(actions));
     return item;
 }
 
@@ -174,10 +188,13 @@ winshun::Item hostsEntryRow(const envh::HostsEntry& e, const std::string& id, bo
 {
     const std::string raw = e.raw;
     if (e.section) {
-        winshun::Item item(id, (e.commented ? "" : "") + e.comment, tr(zh, "分组注释", "section comment"));
+        // A divider is not a record: nothing to enable, toggle or delete, just
+        // the text itself.
+        winshun::Item item(id, e.comment, tr(zh, "分组注释", "section comment"));
         item.invalid()
             .withIcon("color:#8A8A8A")
             .withScore(10)
+            .withCopy(raw)
             .withPreview(raw)
             .withData(rowData({{"kind", "hostsSection"}, {"primary", raw}, {"detail", raw}, {"chain", ""}, {"expand", false}}));
         return item;
@@ -188,6 +205,8 @@ winshun::Item hostsEntryRow(const envh::HostsEntry& e, const std::string& id, bo
     if (!writable)
         subtitle += tr(zh, " · 🔒 需管理员", " · 🔒 needs admin");
     const std::string icon = e.commented ? "color:#8A8A8A" : "color:#107C10";
+    // The default action is named after its outcome: enable a commented line,
+    // disable a live one.
     winshun::Item item(id, title, subtitle);
     item.withIcon(icon)
         .withScore(e.commented ? 60 : 90)
@@ -199,12 +218,16 @@ winshun::Item hostsEntryRow(const envh::HostsEntry& e, const std::string& id, bo
                           {"ip", e.ip},
                           {"hostname", e.hostname},
                           {"commented", e.commented},
+                          {"select", std::to_string(e.lineIndex + 1)},
                           {"primary", raw},
                           {"detail", raw},
                           {"chain", "hosts " + e.hostname},
                           {"expand", false}}))
         .withActions(std::vector<winshun::Action> {
-            {"toggle", tr(zh, "注释 / 启用", "Toggle"), "Enter"},
+            {e.commented ? "enable" : "disable", e.commented ? tr(zh, "启用", "Enable") : tr(zh, "禁用", "Disable"), "Enter"},
+            {"edit", tr(zh, "编辑并定位", "Edit and locate"), ""},
+            {"copyIp", tr(zh, "复制 IP", "Copy IP"), ""},
+            {"copyHostname", tr(zh, "复制主机名", "Copy hostname"), ""},
             {"copyLine", tr(zh, "复制整行", "Copy line"), "Ctrl+Enter"},
             {"openFile", tr(zh, "打开 hosts 文件", "Open hosts file"), "Shift+Enter"},
             {"delete", tr(zh, "删除该行", "Delete line"), ""}});
@@ -213,7 +236,8 @@ winshun::Item hostsEntryRow(const envh::HostsEntry& e, const std::string& id, bo
 
 // ---- edit / confirm rows -------------------------------------------------------
 
-winshun::Item envEditRow(const std::string& name, const std::string& value, bool valid, const std::string& errMsg, bool zh)
+winshun::Item envEditRow(const std::string& name, const std::string& value, const std::string& scope,
+                         bool valid, const std::string& errMsg, bool zh)
 {
     const std::string title = (name.empty() ? tr(zh, "新建变量", "new variable") : tr(zh, "保存 ", "save ") + name)
                              + " = " + (value.size() > 80 ? value.substr(0, 80) + "…" : value);
@@ -226,7 +250,7 @@ winshun::Item envEditRow(const std::string& name, const std::string& value, bool
         .withCopy(value)
         .withPreview(name + " = " + value)
         .withData(rowData({{"kind", "envEdit"},
-                          {"scope", "user"},
+                          {"scope", scope},
                           {"name", name},
                           {"value", value},
                           {"primary", value},
@@ -243,14 +267,18 @@ winshun::Item envEditRow(const std::string& name, const std::string& value, bool
 }
 
 winshun::Item confirmRow(const std::string& id, const std::string& kind, const std::string& target,
-                         const std::string& title, const std::string& subtitle, bool zh)
+                         const std::string& title, const std::string& subtitle, bool zh,
+                         winshun::Json extra = winshun::Json(winshun::Json::Object {}))
 {
+    winshun::Json::Object data {{"kind", kind}, {"target", target}, {"primary", target}, {"detail", subtitle}, {"chain", ""}, {"expand", false}};
+    for (const auto& [key, value] : extra.toObject())
+        data[key] = value;
     winshun::Item item(id, title, subtitle);
     item.invalid()
         .withIcon("color:#C0392B")
         .withScore(100)
         .withCopy(target)
-        .withData(rowData({{"kind", kind}, {"target", target}, {"primary", target}, {"detail", subtitle}, {"chain", ""}, {"expand", false}}))
+        .withData(winshun::Json(std::move(data)))
         .withActions(std::vector<winshun::Action> {
             {"confirm", tr(zh, "确认", "Confirm"), "Enter"},
             {"cancel", tr(zh, "取消", "Cancel"), "Ctrl+Enter"}});
@@ -328,6 +356,60 @@ struct EnvHosts : winshun::Plugin {
     }
     bool uiChinese() const { return envh::i18n::chinese(uiLang()); }
 
+    // Shared OpenArgs construction for the pinned editor row and the per-item
+    // "open and locate" actions, so both open the same window the same way.
+    // `select` carries the target: "user/NAME" / "system/NAME" for env, the
+    // 1-based hosts line number for hosts.
+    editorwin::OpenArgs buildEditorArgs(const std::string& kind, const std::string& filter,
+                                        const std::string& select, const Settings& st)
+    {
+        editorwin::OpenArgs oa;
+        oa.kind = kind;
+        oa.userSubkey = testUserSubkey();
+        oa.sysSubkey = testSystemSubkey();
+        oa.hostsPath = winshun::wide(testHostsPath(st));
+        oa.dataDir = dataDir();
+        oa.backupCount = st.backupCount;
+        oa.showSystem = st.showSystem;
+        oa.filter = filter;
+        oa.select = select;
+        oa.setLang(uiLang());
+        oa.dark = (theme() == "dark");
+        oa.appearanceJson = appearance().dump();
+        oa.elevated = envh::native::processElevated();
+        if (kind == "hosts") {
+            envh::native::HostsStore hs(winshun::wide(testHostsPath(st)));
+            std::string werr;
+            oa.writable = hs.isWritable(werr);
+        } else {
+            oa.writable = true;
+            // System scope is writable only with an elevated token (the
+            // plugin declares `elevated` and Win顺 runs as administrator).
+            envh::native::EnvStore es(oa.userSubkey, oa.sysSubkey);
+            std::string werr;
+            oa.systemWritable = st.showSystem && es.canWriteSystem(werr);
+        }
+        return oa;
+    }
+
+    winshun::Effects openEditorTarget(const std::string& kind, const std::string& filter,
+                                      const std::string& select, const Settings& st, bool zh)
+    {
+        const editorwin::OpenArgs oa = buildEditorArgs(kind, filter, select, st);
+        std::string err;
+#ifdef ENVHOSTS_QML_EDITOR
+        // Do not block the action reply on QML component creation. The
+        // protocol thread answers while the GUI thread creates the window.
+        if (editorwin::openEditorDeferred(oa))
+            return {winshun::effect::notify(tr(zh, "正在打开编辑窗口", "Opening editor window")), winshun::effect::hide()};
+        err = "E_QML_INIT";
+#else
+        if (editorwin::openEditor(oa, err))
+            return {winshun::effect::notify(tr(zh, "已打开编辑窗口", "Editor window opened")), winshun::effect::hide()};
+#endif
+        return {winshun::effect::notify(tr(zh, "无法打开编辑窗口：", "Cannot open editor: ") + err), winshun::effect::keep()};
+    }
+
     winshun::Items query(const winshun::Query& q) override
     {
         const bool zh = uiChinese();
@@ -393,7 +475,19 @@ struct EnvHosts : winshun::Plugin {
                 err = tr(zh, "变量名需 1-255 字符且不含 '=' 或控制字符", "name needs 1-255 chars, no '=' or control chars");
             else if (!envh::isValidEnvValue(value))
                 err = tr(zh, "值过长或含有控制字符", "value too long or has control chars");
-            return {envEditRow(name, value, valid, err, zh)};
+            // Editing an existing variable keeps its scope (and, through the
+            // matched `before`, its registry type); a new variable keeps the
+            // command's default scope. The save path picks the write target
+            // from this scope, so a system variable can never land in user.
+            std::string scope = "user";
+            if (!name.empty() && envh::isValidEnvName(name)) {
+                const envh::EnvVar* existing = envh::findEnvVar(r.snap, name, "user");
+                if (existing == nullptr && st.showSystem)
+                    existing = envh::findEnvVar(r.snap, name, "system");
+                if (existing != nullptr)
+                    scope = existing->scope;
+            }
+            return {envEditRow(name, value, scope, valid, err, zh)};
         }
 
         if (pq.kind == envh::CmdKind::EnvRestore) {
@@ -536,63 +630,35 @@ struct EnvHosts : winshun::Plugin {
         // ---- open the interactive editor window ----
         if (kind == "openEditor") {
             const std::string target = data["target"].toString(); // "env" | "hosts"
-            editorwin::OpenArgs oa;
-            oa.kind = target;
-            oa.userSubkey = testUserSubkey();
-            oa.sysSubkey = testSystemSubkey();
-            oa.hostsPath = winshun::wide(testHostsPath(st));
-            oa.dataDir = dataDir();
-            oa.backupCount = st.backupCount;
-            oa.showSystem = st.showSystem;
-            oa.filter = data["filter"].toString();
-            oa.select = data["select"].toString();
-            oa.setLang(uiLang());
-            oa.dark = (theme() == "dark");
-            oa.appearanceJson = appearance().dump();
-            oa.elevated = envh::native::processElevated();
-            if (target == "hosts") {
-                envh::native::HostsStore hs(winshun::wide(testHostsPath(st)));
-                std::string werr;
-                oa.writable = hs.isWritable(werr);
-            } else {
-                oa.writable = true;
-                // System scope is writable only with an elevated token (the
-                // plugin declares `elevated` and Win顺 runs as administrator).
-                envh::native::EnvStore es(oa.userSubkey, oa.sysSubkey);
-                std::string werr;
-                oa.systemWritable = st.showSystem && es.canWriteSystem(werr);
-            }
-            std::string err;
-#ifdef ENVHOSTS_QML_EDITOR
-            // Do not block the action reply on QML component creation. The
-            // protocol thread answers while the GUI thread creates the window.
-            const bool ok = editorwin::openEditorDeferred(oa);
-            if (ok)
-                return {winshun::effect::notify(tr(zh, "正在打开编辑窗口", "Opening editor window")), winshun::effect::hide()};
-            err = "E_QML_INIT";
-#else
-            const bool ok = editorwin::openEditor(oa, err);
-            if (ok)
-                return {winshun::effect::notify(tr(zh, "已打开编辑窗口", "Editor window opened")), winshun::effect::hide()};
-#endif
-            return {winshun::effect::notify(tr(zh, "无法打开编辑窗口：", "Cannot open editor: ") + err), winshun::effect::keep()};
+            return openEditorTarget(target, data["filter"].toString(), data["select"].toString(), st, zh);
         }
 
-        // ---- env read-only actions ----
+        // ---- env actions ----
         if (kind == "env") {
             const std::string scope = data["scope"].toString();
             const std::string name = data["name"].toString();
             const std::string value = data["value"].toString();
-            if (a.action == "edit")
-                return {winshun::effect::setQuery("env:set " + name + "=" + value), winshun::effect::keep()};
+            if (a.action == "open")
+                return openEditorTarget("env", name, scope + "/" + name, st, zh);
+            if (a.action == "inlineEdit") {
+                // Replace the list with the edit row directly: routing through
+                // env:set would re-resolve the scope and could pick the user
+                // variable when both scopes carry the same name.
+                return {winshun::effect::replace(winshun::Items {envEditRow(name, value, scope, /*valid=*/true, "", zh)}),
+                        winshun::effect::keep()};
+            }
             if (a.action == "copyValue")
                 return {winshun::effect::copy(value), notify(tr(zh, "已复制值", "Copied value")), winshun::effect::hide()};
             if (a.action == "copyExpanded")
                 return {winshun::effect::copy(data["detail"].toString()),
                         notify(tr(zh, "已复制展开值", "Copied expanded")), winshun::effect::hide()};
+            if (a.action == "copyName")
+                return {winshun::effect::copy(name), notify(tr(zh, "已复制变量名", "Copied name")), winshun::effect::hide()};
+            if (a.action == "copyAssign")
+                return {winshun::effect::copy(name + "=" + value), notify(tr(zh, "已复制 NAME=value", "Copied NAME=value")), winshun::effect::hide()};
             if (a.action == "delete") {
                 // System scope is allowed through to the confirm row; the
-                // envDeleteConfirm handler below re-probes and refuses only
+                // shared write transaction below re-probes and refuses only
                 // when the write would actually fail.
                 const std::string target = scope + "/" + name;
                 const bool well = envh::isWellKnownName(name);
@@ -622,7 +688,12 @@ struct EnvHosts : winshun::Plugin {
             if(!snapshot.error.isEmpty())return {notify(snapshot.error.toStdString()),winshun::effect::keep()};
             editorwin::WriteRequest request;request.kind=QString::fromStdString(args.kind);request.token=editorwin::freshId();request.revision="launcher-action";
             if(environment){
-                const auto target=data["target"].toString();const QString scope=kind=="envEdit"||target.compare(0,7,"system/")!=0?"user":"system";
+                // The edit row carries the scope it was opened with (the scope
+                // of the existing variable, or the new-variable default); the
+                // delete confirm carries it as the "scope/NAME" target.
+                const auto target=data["target"].toString();
+                const QString scope=QString::fromStdString(kind=="envEdit"?data["scope"].toString():(target.compare(0,7,"system/")==0?"system":"user"));
+                if(scope!="user"&&scope!="system")return {notify("E_SCOPE"),winshun::effect::keep()};
                 const QString name=QString::fromStdString(kind=="envEdit"?data["name"].toString():target.substr(target.find('/')+1));
                 if(!envh::isValidEnvName(name.toStdString()))return {notify("E_ENV_NAME"),winshun::effect::keep()};
                 editorwin::Change change;change.scope=scope;change.name=name;
@@ -643,9 +714,15 @@ struct EnvHosts : winshun::Plugin {
                     if(row.section||row.hostnames.empty())return {notify("E_HOSTS_HOST"),winshun::effect::keep()};
                     auto added=envh::hostsAdd(parsed,row.ip,row.hostnames.front(),row.comment);if(!added.success)return {notify(added.failure.message),winshun::effect::keep()};parsed=added.value;
                 }else{
-                    int line=-1;if(kind=="hosts")envh::findHostsEntryById(parsed,data["id"].toString(),line);
-                    else for(size_t i=0;i<parsed.lines.size();++i)if(parsed.lines[i].text==data["target"].toString()){line=int(i);break;}
-                    if(line<0)return {notify("E_STALE_HOSTS_ROW"),winshun::effect::keep()};
+                    // Resolve by the identity carried from the queried row
+                    // (stable id with its occurrence), then compare the raw
+                    // line: a record that changed after the query refreshes
+                    // instead of writing to whichever line matches now.
+                    int line=-1;
+                    if(!envh::findHostsEntryById(parsed,data["id"].toString(),line)
+                       || parsed.lines[size_t(line)].text!=data["primary"].toString())
+                        return {notify(tr(zh,"该行已被外部修改，列表已刷新","The line changed externally; the list was refreshed")),
+                                winshun::effect::setQuery("hosts "+data["hostname"].toString()),winshun::effect::keep()};
                     auto changed=kind=="hosts"?envh::hostsToggle(parsed,line):envh::hostsDelete(parsed,line);
                     if(!changed.success)return {notify(changed.failure.message),winshun::effect::keep()};parsed=changed.value;
                 }
@@ -657,8 +734,7 @@ struct EnvHosts : winshun::Plugin {
             return {notify(result.state=="Succeeded"?tr(zh,"已保存并核对","Saved and verified"):tr(zh,"已保存，广播失败","Saved; broadcast failed")),winshun::effect::hide()};
         }
         if((kind=="envRestore"||kind=="hostsRestore")&&a.action=="restore"){
-            editorwin::OpenArgs args;args.kind=kind=="envRestore"?"env":"hosts";args.userSubkey=testUserSubkey();args.sysSubkey=testSystemSubkey();
-            args.hostsPath=winshun::wide(testHostsPath(st));args.dataDir=dataDir();args.backupCount=st.backupCount;args.showSystem=st.showSystem;args.setLang(uiLang());args.dark=theme()=="dark";args.appearanceJson=appearance().dump();
+            const auto args=buildEditorArgs(kind=="envRestore"?"env":"hosts","","",st);
             if(!editorwin::openEditorDeferred(args))return {notify("E_QML_INIT"),winshun::effect::keep()};
             return {notify(tr(zh,"请在“备份”页预览并恢复；保存后才写入目标。","Preview and restore in Backups, then Save to write the target.")),winshun::effect::hide()};
         }
@@ -727,28 +803,50 @@ struct EnvHosts : winshun::Plugin {
         if (kind == "hosts") {
             const std::string id = data["id"].toString();
             const std::string hostname = data["hostname"].toString();
+            // Copy and open act on the queried row's text: no write access and
+            // no re-read needed, so they work on a read-only hosts too.
+            if (a.action == "copyIp")
+                return {winshun::effect::copy(data["ip"].toString()), notify(tr(zh, "已复制 IP", "Copied IP")), winshun::effect::hide()};
+            if (a.action == "copyHostname")
+                return {winshun::effect::copy(hostname), notify(tr(zh, "已复制主机名", "Copied hostname")), winshun::effect::hide()};
+            if (a.action == "copyLine")
+                return {winshun::effect::copy(data["primary"].toString()), notify(tr(zh, "已复制整行", "Copied line")), winshun::effect::hide()};
+            if (a.action == "openFile")
+                return {winshun::effect::openPath(testHostsPath(st)), notify(tr(zh, "已打开 hosts 文件", "Opened hosts file")), winshun::effect::hide()};
+
             envh::native::HostsStore store(winshun::wide(testHostsPath(st)));
-            std::string writableErr;
-            if (!store.isWritable(writableErr))
-                return {winshun::effect::replace(winshun::Items {errorRow("hosts:denied", "E_DENIED",
-                                                                         tr(zh, "hosts 只读", "hosts is read-only"),
-                                                                         tr(zh, "普通权限无法写入；可 Shift+Enter 用管理员编辑器打开后手动修改，或让 Win顺 以管理员运行并确认 elevated",
-                                                                             "normal user cannot write; Shift+Enter opens it in an admin editor, or run Win顺 as admin with elevated"),
-                                                                         writableErr, zh)}),
-                        winshun::effect::keep()};
             const envh::native::HostsReadResult r = store.read();
             if (!r.ok)
                 return {notify(r.errMsg), winshun::effect::keep()};
             envh::HostsParsed parsed = envh::parseHosts(r.content);
             int lineIndex = -1;
-            if (!envh::findHostsEntryById(parsed, id, lineIndex))
-                return {notify(tr(zh, "找不到该行（可能已被外部修改）", "Line not found (external edit?)")), winshun::effect::keep()};
 
-            if (a.action == "copyLine")
-                return {winshun::effect::copy(data["primary"].toString()), notify(tr(zh, "已复制整行", "Copied line")), winshun::effect::hide()};
-            if (a.action == "openFile")
-                return {winshun::effect::openPath(testHostsPath(st)), notify(tr(zh, "已打开 hosts 文件", "Opened hosts file")), winshun::effect::hide()};
-            if (a.action == "toggle") {
+            if (a.action == "edit") {
+                // Locate the record's current line; a record that moved is
+                // still opened, just without a stale line number.
+                if (envh::findHostsEntryById(parsed, id, lineIndex))
+                    return openEditorTarget("hosts", hostname, std::to_string(lineIndex + 1), st, zh);
+                const auto opened = openEditorTarget("hosts", hostname, "", st, zh);
+                return {notify(tr(zh, "记录已变化，未定位；编辑器已打开", "Record changed; opened the editor without locating")),
+                        opened};
+            }
+
+            // Write actions probe access only now, after copy/open/edit.
+            std::string writableErr;
+            if (!store.isWritable(writableErr))
+                return {winshun::effect::replace(winshun::Items {errorRow("hosts:denied", "E_DENIED",
+                                                                         tr(zh, "hosts 只读", "hosts is read-only"),
+                                                                         tr(zh, "普通权限无法写入；可用“打开 hosts 文件”在外部编辑器中修改，或让 Win顺 以管理员运行并确认 elevated",
+                                                                             "normal user cannot write; use \u201cOpen hosts file\u201d to edit it externally, or run Win顺 as admin with elevated"),
+                                                                         writableErr, zh)}),
+                        winshun::effect::keep()};
+
+            if (!envh::findHostsEntryById(parsed, id, lineIndex)
+                || parsed.lines[std::size_t(lineIndex)].text != data["primary"].toString())
+                return {notify(tr(zh, "该行已被外部修改，列表已刷新", "The line changed externally; the list was refreshed")),
+                        winshun::effect::setQuery("hosts " + hostname), winshun::effect::keep()};
+
+            if (a.action == "enable" || a.action == "disable" || a.action == "toggle") {
                 const auto out = envh::hostsToggle(parsed, lineIndex);
                 if (!out.success)
                     return {notify(out.failure.message), winshun::effect::keep()};
@@ -760,13 +858,21 @@ struct EnvHosts : winshun::Plugin {
                     return {notify(tr(zh, "写入失败：", "Write failed: ") + werr), winshun::effect::keep()};
                 }
                 editorwin::onExternalChange("hosts");
-                return {notify(tr(zh, "已切换注释状态", "Toggled comment")), winshun::effect::setQuery("hosts " + hostname), winshun::effect::hide()};
+                // Keep the launcher list open: the query refreshes with the
+                // same filter and shows the updated record.
+                return {notify(tr(zh, "已切换注释状态", "Toggled comment")), winshun::effect::setQuery("hosts " + hostname), winshun::effect::keep()};
             }
             if (a.action == "delete") {
-                const std::string target = data["primary"].toString();
-                return {winshun::effect::replace(winshun::Items {confirmRow("hosts:del:" + envh::toLower(hostname), "hostsDeleteConfirm", target,
-                                                                         tr(zh, "删除行 ", "delete line ") + target,
-                                                                         tr(zh, "Enter 确认删除，Ctrl+Enter 取消", "Enter confirms, Ctrl+Enter cancels"), zh)}),
+                // The confirm row carries the full identity (stable id with
+                // occurrence, raw line) so the confirmed delete lands on this
+                // exact line, not on the first text match.
+                winshun::Json extra = winshun::Json(winshun::Json::Object {});
+                extra.set("id", id);
+                extra.set("raw", data["primary"].toString());
+                extra.set("hostname", hostname);
+                return {winshun::effect::replace(winshun::Items {confirmRow("hosts:del:" + envh::toLower(hostname), "hostsDeleteConfirm", data["primary"].toString(),
+                                                                         tr(zh, "删除行 ", "delete line ") + data["primary"].toString(),
+                                                                         tr(zh, "Enter 确认删除，Ctrl+Enter 取消", "Enter confirms, Ctrl+Enter cancels"), zh, extra)}),
                         winshun::effect::keep()};
             }
             return {notify(tr(zh, "未支持的动作", "Unsupported action")), winshun::effect::hide()};
@@ -784,16 +890,13 @@ struct EnvHosts : winshun::Plugin {
             if (!r.ok)
                 return {notify(r.errMsg), winshun::effect::keep()};
             envh::HostsParsed parsed = envh::parseHosts(r.content);
-            // The target string is the raw line; match by raw text.
-            const std::string target = data["target"].toString();
+            // Resolve by the identity carried from the queried row (stable id
+            // with occurrence) and verify the raw line before deleting.
             int lineIndex = -1;
-            for (std::size_t i = 0; i < parsed.lines.size(); ++i)
-                if (parsed.lines[i].text == target) {
-                    lineIndex = static_cast<int>(i);
-                    break;
-                }
-            if (lineIndex < 0)
-                return {notify(tr(zh, "找不到该行", "Line not found")), winshun::effect::keep()};
+            if (!envh::findHostsEntryById(parsed, data["id"].toString(), lineIndex)
+                || parsed.lines[std::size_t(lineIndex)].text != data["raw"].toString())
+                return {notify(tr(zh, "该行已被外部修改，列表已刷新", "The line changed externally; the list was refreshed")),
+                        winshun::effect::setQuery("hosts " + data["hostname"].toString()), winshun::effect::keep()};
             const auto out = envh::hostsDelete(parsed, lineIndex);
             if (!out.success)
                 return {notify(out.failure.message), winshun::effect::keep()};
@@ -803,7 +906,7 @@ struct EnvHosts : winshun::Plugin {
             if (!store.write(envh::serializeHosts(out.value), werr))
                 return {notify(tr(zh, "写入失败：", "Write failed: ") + werr), winshun::effect::keep()};
             editorwin::onExternalChange("hosts");
-            return {notify(tr(zh, "已删除该行", "Deleted line")), winshun::effect::setQuery("hosts"), winshun::effect::hide()};
+            return {notify(tr(zh, "已删除该行", "Deleted line")), winshun::effect::setQuery("hosts " + data["hostname"].toString()), winshun::effect::hide()};
         }
 
         // ---- hosts add confirm ----

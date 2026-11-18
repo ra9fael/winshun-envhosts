@@ -15,6 +15,7 @@
 #include <algorithm>
 #include <cstddef>
 #include <cstdint>
+#include <charconv>
 #include <map>
 #include <string>
 #include <vector>
@@ -310,6 +311,25 @@ inline std::string hostsEntryId(const HostsEntry& e)
     return "hosts:" + fnv1aHex(hostsNormKey(e));
 }
 
+// Parse a decimal integer without throwing. Anything that is not a plain
+// (optionally signed) decimal number, or overflows int, yields the fallback,
+// so a malformed settings value cannot fail a query.
+inline int parseIntOr(const std::string& text, int fallback)
+{
+    std::size_t begin = 0, end = text.size();
+    while (begin < end && (text[begin] == ' ' || text[begin] == '\t'))
+        ++begin;
+    while (end > begin && (text[end - 1] == ' ' || text[end - 1] == '\t'))
+        --end;
+    int value = 0;
+    const char* first = text.data() + begin;
+    const char* last = text.data() + end;
+    const auto result = std::from_chars(first, last, value);
+    if (result.ec != std::errc() || result.ptr != last)
+        return fallback;
+    return value;
+}
+
 // ---- hosts transforms (pure; the OS write happens in native.h) ---------------
 
 inline Outcome<HostsParsed> hostsToggle(const HostsParsed& in, int lineIndex)
@@ -417,12 +437,29 @@ inline Outcome<HostsParsed> hostsAdd(const HostsParsed& in, const std::string& i
 }
 
 // Locate an entry by its stable id among the current parse (robust to external
-// edits between list and action).
+// edits between list and action). Query results suffix the second and later
+// occurrences of one normalized key with "-2", "-3", ... so each duplicate row
+// keeps its own identity; the suffix selects that occurrence in file order.
 inline bool findHostsEntryById(const HostsParsed& h, const std::string& id, int& outIndex)
 {
-    const std::vector<HostsEntry> entries = hostsEntries(h);
-    for (const HostsEntry& e : entries) {
-        if (hostsEntryId(e) == id) {
+    std::string base = id;
+    int occurrence = 1;
+    const std::size_t dash = id.rfind('-');
+    if (dash != std::string::npos && dash + 1 < id.size()) {
+        const std::string tail = id.substr(dash + 1);
+        if (tail.find_first_not_of("0123456789") == std::string::npos) {
+            const int parsed = parseIntOr(tail, 0);
+            if (parsed >= 2) {
+                base = id.substr(0, dash);
+                occurrence = parsed;
+            }
+        }
+    }
+    int seen = 0;
+    for (const HostsEntry& e : hostsEntries(h)) {
+        if (hostsEntryId(e) != base)
+            continue;
+        if (++seen == occurrence) {
             outIndex = e.lineIndex;
             return true;
         }

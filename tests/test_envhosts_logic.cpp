@@ -302,6 +302,42 @@ void testIds()
     }
 }
 
+// ---- occurrence-aware hosts id resolution + safe integer parsing --------------
+void testResolveAndParse()
+{
+    // Two identical live lines separated by other content: the query side ids
+    // them base + base-2.
+    const std::string content = "127.0.0.1 a.test\r\n"
+                                "other line\r\n"
+                                "\r\n"
+                                "127.0.0.1 a.test\r\n";
+    const envh::HostsParsed parsed = envh::parseHosts(content);
+    const std::vector<envh::HostsEntry> entries = envh::hostsEntries(parsed);
+    const std::string base = envh::hostsEntryId(entries[0]);
+    CHECK(envh::hostsEntryId(entries.back()) == base, "identical lines share the base id");
+
+    int line = -1;
+    CHECK(envh::findHostsEntryById(parsed, base, line) && line == 0, "unsuffixed id resolves to the first occurrence");
+    CHECK(envh::findHostsEntryById(parsed, base + "-2", line) && line == 3, "suffix -2 resolves to the second occurrence");
+    CHECK(envh::findHostsEntryById(parsed, base + "-3", line) == false, "a missing occurrence is not found");
+    CHECK(envh::findHostsEntryById(parsed, base + "-1", line) == false, "suffix -1 is never generated and never matches");
+    CHECK(envh::findHostsEntryById(parsed, base + "-x", line) == false, "non-numeric suffix never matches");
+
+    // Deleting the first occurrence must not make -2 act on the survivor's
+    // first match of a different key.
+    envh::HostsParsed mixed = envh::parseHosts("127.0.0.1 a.test\r\n127.0.0.1 b.test\r\n");
+    CHECK(envh::findHostsEntryById(mixed, envh::hostsEntryId(envh::hostsEntries(mixed)[1]) + "-2", line) == false,
+          "suffix does not leak into a different key");
+
+    CHECK(envh::parseIntOr("50", 7) == 50, "parseIntOr plain");
+    CHECK(envh::parseIntOr(" 10 ", 7) == 10, "parseIntOr trims spaces");
+    CHECK(envh::parseIntOr("-5", 7) == -5, "parseIntOr negative");
+    CHECK(envh::parseIntOr("abc", 7) == 7, "parseIntOr letters -> fallback");
+    CHECK(envh::parseIntOr("", 7) == 7, "parseIntOr empty -> fallback");
+    CHECK(envh::parseIntOr("50x", 7) == 7, "parseIntOr trailing junk -> fallback");
+    CHECK(envh::parseIntOr("99999999999999999999", 7) == 7, "parseIntOr overflow -> fallback");
+}
+
 } // namespace
 
 int main(int argc, char** argv)
@@ -315,6 +351,7 @@ int main(int argc, char** argv)
     testEnv();
     testGrammar();
     testIds();
+    testResolveAndParse();
 
     std::cerr << (g_failed ? "FAILED" : "PASS") << ": " << (g_total - g_failed) << "/" << g_total << " checks\n";
     return g_failed ? 1 : 0;
