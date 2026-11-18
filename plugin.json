@@ -6,7 +6,7 @@
     "zh": "环境变量 / hosts 编辑",
     "en": "Env & hosts editor"
   },
-  "version": "0.9.0",
+  "version": "0.10.0",
   "description": {
     "zh": "可视化编辑用户环境变量与 hosts 条目：交互窗口支持多选批量、分隔项编辑与中英文界面；改写前自动备份，系统级目标未提权时明确降级",
     "en": "Visual editor for user env vars and hosts: multi-select batch commands, split-item editing and a zh/en UI; auto-backup before writes; honest degradation for admin-only targets"
@@ -50,14 +50,17 @@
         "en": "Environment variables"
       },
       "hint": {
-        "zh": "如 env path；回车进入行内编辑",
-        "en": "e.g. env path; Enter edits inline"
+        "zh": "如 env path；回车打开编辑器并定位",
+        "en": "e.g. env path; Enter opens the editor at that variable"
       },
       "icon": "glyph:U+E713",
       "actions": [
-        { "id": "edit", "title": { "zh": "编辑", "en": "Edit" }, "key": "Enter" },
-        { "id": "copyValue", "title": { "zh": "复制值", "en": "Copy value" }, "key": "Ctrl+Enter" },
+        { "id": "open", "title": { "zh": "打开编辑器", "en": "Open editor" }, "key": "Enter" },
+        { "id": "copyValue", "title": { "zh": "复制原始值", "en": "Copy value" }, "key": "Ctrl+Enter" },
         { "id": "copyExpanded", "title": { "zh": "复制展开值", "en": "Copy expanded" }, "key": "Shift+Enter" },
+        { "id": "copyName", "title": { "zh": "复制变量名", "en": "Copy name" }, "key": "" },
+        { "id": "copyAssign", "title": { "zh": "复制 NAME=value", "en": "Copy NAME=value" }, "key": "" },
+        { "id": "inlineEdit", "title": { "zh": "行内编辑", "en": "Quick edit" }, "key": "" },
         { "id": "delete", "title": { "zh": "删除", "en": "Delete" }, "key": "" }
       ]
     },
@@ -69,12 +72,16 @@
         "en": "hosts file"
       },
       "hint": {
-        "zh": "如 hosts docker；回车注释 / 启用",
-        "en": "e.g. hosts docker; Enter toggles"
+        "zh": "如 hosts docker；回车启用/禁用该行",
+        "en": "e.g. hosts docker; Enter enables/disables that line"
       },
       "icon": "glyph:U+E774",
       "actions": [
-        { "id": "toggle", "title": { "zh": "注释 / 启用", "en": "Toggle" }, "key": "Enter" },
+        { "id": "enable", "title": { "zh": "启用", "en": "Enable" }, "key": "Enter" },
+        { "id": "disable", "title": { "zh": "禁用", "en": "Disable" }, "key": "Enter" },
+        { "id": "edit", "title": { "zh": "编辑并定位", "en": "Edit and locate" }, "key": "" },
+        { "id": "copyIp", "title": { "zh": "复制 IP", "en": "Copy IP" }, "key": "" },
+        { "id": "copyHostname", "title": { "zh": "复制主机名", "en": "Copy hostname" }, "key": "" },
         { "id": "copyLine", "title": { "zh": "复制整行", "en": "Copy line" }, "key": "Ctrl+Enter" },
         { "id": "openFile", "title": { "zh": "打开 hosts 文件", "en": "Open hosts file" }, "key": "Shift+Enter" },
         { "id": "delete", "title": { "zh": "删除该行", "en": "Delete line" }, "key": "" }
