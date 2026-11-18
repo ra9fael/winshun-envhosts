@@ -77,16 +77,27 @@ See [edition instructions](docs/DUAL_EDITIONS.md) and [CONTRIBUTING.md](CONTRIBU
 | `env` / `hosts` (Enter on the **top row**) | Open the interactive editor window (always the first result) |
 | `env` | List all user env vars (plus system vars when enabled) |
 | `env path` | Filter vars whose name or value contains `path` |
-| `env:set NAME=value` | Inline edit row for `NAME`; Ctrl+Enter saves |
+| `env:set NAME=value` | Inline edit row for `NAME`; Enter saves, Ctrl+Enter cancels |
 | `env:del` | List recent env backups for restore |
 | `hosts` | List hosts entries |
 | `hosts docker` | Filter entries matching `docker` |
 | `hosts:add 127.0.0.1 my.dev` | Add-row with confirm |
 | `hosts:del` | List recent hosts backups for restore |
 
-Actions are keyboard-first and ordered by key: **Enter** (edit / toggle /
-confirm), **Ctrl+Enter** (save / copy), **Shift+Enter** (copy expanded value /
-open hosts file in the default editor).
+Each row's action menu covers everything from read-only to write: env rows can
+open the editor at that variable, copy the raw / expanded value, the name or
+`NAME=value`, quick-edit a single-line value in place, or delete; hosts rows can
+enable / disable, edit and locate, copy the IP / hostname / whole line, open the
+hosts file, or delete the line. Actions are keyboard-first and ordered by key:
+**Enter** (env opens the editor; hosts enables / disables), **Ctrl+Enter**
+(copy raw value / line), **Shift+Enter** (copy expanded value / open hosts file).
+
+Duplicate hosts entries (the same hostname on several lines) each carry their
+own identity: enable / disable / delete act on the selected line and never touch
+its twins. Quick-editing an env row keeps that row's scope and registry type —
+editing on a system variable writes to the system scope. On a read-only hosts
+file the copy and open actions still work; only write actions return the
+`E_DENIED` error row.
 
 ## Runtime dependencies
 
@@ -148,9 +159,9 @@ All data stays local under `WS_DATA_DIR`:
 ## Failure handling
 
 - hosts read-only (normal user on `System32\drivers\etc\hosts`): the row shows
-  a 🔒 marker; actions return an explicit `E_DENIED` error row with a
-  Shift+Enter escape hatch that opens the file in an external editor. No
-  silent degradation, no fake success.
+  a 🔒 marker; the copy and open actions keep working, while write actions
+  return an explicit `E_DENIED` error row and point at "Open hosts file" to
+  edit externally. No silent degradation, no fake success.
 - hosts saved as UTF-16 by Notepad: refused with `E_HOSTS_UTF16` instead of
   corrupting the encoding.
 - hosts locked by another process: `E_HOSTS_BUSY`.

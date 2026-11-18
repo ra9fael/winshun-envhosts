@@ -63,15 +63,23 @@ GDI 使用 `python tools/package.py`。QML 使用 `python tools/package.py --exe
 | `env` / `hosts`（在**首行**按 Enter） | 打开交互式编辑窗口（永远是第一条结果） |
 | `env` | 列出全部用户环境变量（启用后含系统变量） |
 | `env path` | 筛选名称或值包含 `path` 的变量 |
-| `env:set NAME=value` | `NAME` 的行内编辑行；Ctrl+Enter 保存 |
+| `env:set NAME=value` | `NAME` 的行内编辑行；Enter 保存，Ctrl+Enter 取消 |
 | `env:del` | 列出最近的环境变量备份以供恢复 |
 | `hosts` | 列出 hosts 条目 |
 | `hosts docker` | 筛选匹配 `docker` 的条目 |
 | `hosts:add 127.0.0.1 my.dev` | 带确认的新增行 |
 | `hosts:del` | 列出最近的 hosts 备份以供恢复 |
 
-动作以键盘优先、按 key 排序：**Enter**（编辑 / 切换 / 确认）、
-**Ctrl+Enter**（保存 / 复制）、**Shift+Enter**（复制展开值 / 用默认编辑器打开 hosts 文件）。
+每行结果的动作菜单覆盖了从只读到写入的全部操作：env 行可以打开编辑器并定位、
+复制原始值 / 展开值 / 变量名 / `NAME=value`、对单行值直接行内编辑、删除；
+hosts 行可以启用 / 禁用、编辑并定位、复制 IP / 主机名 / 整行、打开 hosts 文件、删除该行。
+动作以键盘优先、按 key 排序：**Enter**（env 打开编辑器；hosts 启用 / 禁用）、
+**Ctrl+Enter**（复制原始值 / 整行）、**Shift+Enter**（复制展开值 / 打开 hosts 文件）。
+
+重复的 hosts 条目（同一域名多行）每行有独立身份：启用 / 禁用 / 删除都作用于
+所选的那一行，不会碰到同名的其他行。环境变量的行内编辑保留该行的作用域与
+注册表类型：在系统变量行上编辑，写入的就是系统作用域。只读的 hosts 上，
+复制与打开文件类动作仍然可用；写类动作才返回 `E_DENIED` 拒绝行。
 
 ## 运行时依赖
 
@@ -127,8 +135,8 @@ GDI 使用 `python tools/package.py`。QML 使用 `python tools/package.py --exe
 ## 失败处理
 
 - hosts 只读（普通用户面对 `System32\drivers\etc\hosts`）：该行显示 🔒 标记，
-  动作返回明确的 `E_DENIED` 错误行，并提供 Shift+Enter 的逃生口——用外部编辑器
-  打开文件。不静默降级，也不假装成功。
+  复制与打开文件类动作照常可用；写类动作返回明确的 `E_DENIED` 错误行，
+  并提示用「打开 hosts 文件」到外部编辑器修改。不静默降级，也不假装成功。
 - hosts 被记事本存成 UTF-16：返回 `E_HOSTS_UTF16`，而不是破坏编码。
 - hosts 被其他进程占用：`E_HOSTS_BUSY`。
 - hosts 写入采用**原地写入**（打开 + 截断 + 写入），以保留文件 ACL。这不是原子操作；

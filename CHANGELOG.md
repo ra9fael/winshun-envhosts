@@ -7,6 +7,44 @@ single source of truth; release tags are `<gdi|qml>/v<version>`.
 
 ## [Unreleased]
 
+## [0.10.0] - 2026-11-18
+
+### Added
+
+- Per-row actions on the launcher list. Env rows: open the editor at that
+  variable (Enter), copy the raw value (Ctrl+Enter), copy the expanded value
+  (Shift+Enter, expandable rows), copy the name, copy `NAME=value`, quick-edit a
+  single-line value in place, delete. Hosts rows: enable / disable (Enter, named
+  after the outcome), edit and locate, copy the IP, hostname or whole line
+  (Ctrl+Enter), open the hosts file (Shift+Enter), delete the line.
+- Duplicate hosts entries (the same hostname on several lines) now have row
+  identities: the second and later occurrences get `-2`/`-3` id suffixes and
+  enable / disable / delete resolve that exact occurrence in file order, so
+  identical lines can be acted on independently.
+- A successful hosts enable / disable now keeps the launcher list open and
+  refreshes the same filter, instead of hiding the results.
+
+### Changed
+
+- Editing an env variable keeps its scope and registry type end to end. The
+  edit row carries the scope of the existing variable (user or system), inline
+  edits replace the list directly instead of re-routing through the
+  `env:set` re-query, and the save path writes to that scope — a system
+  variable can no longer land in user scope when both hold the same name.
+- Deleting a hosts entry carries the full identity (stable id, raw line,
+  hostname) into the confirm row; the confirmed delete re-checks the raw line
+  and refreshes instead of deleting the first text match of a changed file.
+- Read-only hosts no longer blocks the whole action menu: copy IP / hostname /
+  line and open-file work as a normal user; only write actions return the
+  `E_DENIED` error row (which now points at "Open hosts file" instead of
+  Shift+Enter).
+- The `hosts <filter>` edit action opens the editor at the record's current
+  line when it can still be located; a record changed externally opens without
+  a stale line number.
+- Malformed numeric settings (`backupCount`, `maxResults`) no longer throw
+  during a query: values are parsed without exceptions and fall back to the
+  defaults.
+
 ## [0.9.0] - 2026-11-15
 
 ### Changed
