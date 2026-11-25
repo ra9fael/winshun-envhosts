@@ -973,9 +973,9 @@ ApplicationWindow {
                     width: privateKeyList.width
                     height: tokens.rowHeight
                     color: root.agentAddName === modelData ? root.accentSoft
-                         : keyHover.hovered ? root.hoverColor : "transparent"
+                         : privateKeyHover.hovered ? root.hoverColor : "transparent"
 
-                    HoverHandler { id: keyHover }
+                    HoverHandler { id: privateKeyHover }
 
                     Rectangle {
                         anchors.bottom: parent.bottom
