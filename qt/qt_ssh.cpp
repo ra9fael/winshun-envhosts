@@ -8,10 +8,12 @@
 
 #include <QClipboard>
 #include <QDir>
+#include <QElapsedTimer>
 #include <QGuiApplication>
 #include <QFile>
 #include <QJsonDocument>
 #include <QJsonObject>
+#include <QProcess>
 #include <QRegularExpression>
 #include <QUrl>
 #include <QStringList>
@@ -821,6 +823,7 @@ void SshBridge::selectConn(int row)
     if (row < 0 || row >= static_cast<int>(m_visibleConn.size()) || row == m_connSel)
         return;
     m_connSel = row;
+    cancelConnectionTest();
     emit selectionChanged();
     emit detailChanged();
     emit previewChanged();
@@ -1186,7 +1189,7 @@ QVariantMap SshBridge::openWindowsTerminal()
     return launch.launched ? actionResult(QString()) : actionResult(QStringLiteral("launch"), qs(launch.err));
 }
 
-QVariantMap SshBridge::connectMotty()
+QVariantMap SshBridge::connectSshUrl()
 {
     const int ci = selectedConnIndex();
     if (ci < 0)
@@ -1213,6 +1216,102 @@ QVariantMap SshBridge::connectMotty()
     if (!envh::native::openUrl(encoded.toStdWString(), error))
         return actionResult(QStringLiteral("launch"), qs(error));
     return actionResult(QString(), QString(), encoded);
+}
+
+QVariantMap SshBridge::startConnectionTest()
+{
+    if (m_testProcess)
+        return actionResult(QStringLiteral("busy"));
+    const int ci = selectedConnIndex();
+    if (ci < 0)
+        return actionResult(QStringLiteral("noSelection"));
+    const envh::ssh::Block* b = m_cfg.connection(ci);
+    if (!b || b->type != envh::ssh::BlockType::Host || envh::ssh::isLocked(*b)
+        || envh::ssh::trim(b->fields.alias).empty())
+        return actionResult(QStringLiteral("unsupported"));
+    const QString alias = qs(envh::ssh::trim(b->fields.alias));
+    const std::wstring ssh = envh::native::findProgram(L"ssh.exe");
+    if (ssh.empty())
+        return actionResult(QStringLiteral("notFound"), QStringLiteral("ssh.exe"));
+
+    auto* process = new QProcess(this);
+    m_testProcess = process;
+    m_connectionTest = QVariantMap {
+        {"state", QStringLiteral("running")},
+        {"alias", alias},
+        {"detail", QString()},
+        {"ms", 0},
+    };
+    emit connectionTestChanged();
+
+    connect(process, &QProcess::finished, this, [this, process, alias](int exitCode, QProcess::ExitStatus status) {
+        if (process != m_testProcess) {
+            process->deleteLater();
+            return;
+        }
+        const std::string output = process->readAll().toStdString();
+        const envh::ssh::TestOutcome outcome = envh::ssh::testOutcome(
+            status == QProcess::NormalExit ? exitCode : 1, output);
+        m_connectionTest = QVariantMap {
+            {"state", outcome.ok ? QStringLiteral("ok") : QStringLiteral("fail")},
+            {"alias", alias},
+            {"detail", status == QProcess::NormalExit ? qs(outcome.detail)
+                                                      : (m_args.zh ? QStringLiteral("测试被中止") : QStringLiteral("the test was cancelled"))},
+            {"ms", static_cast<int>(m_testTimer.elapsed())},
+        };
+        m_testProcess = nullptr;
+        process->deleteLater();
+        emit connectionTestChanged();
+    });
+    connect(process, &QProcess::errorOccurred, this, [this, process, alias](QProcess::ProcessError error) {
+        if (error != QProcess::FailedToStart || process != m_testProcess)
+            return;
+        m_connectionTest = QVariantMap {
+            {"state", QStringLiteral("fail")},
+            {"alias", alias},
+            {"detail", m_args.zh ? QStringLiteral("无法启动 ssh.exe") : QStringLiteral("ssh.exe could not be started")},
+            {"ms", 0},
+        };
+        m_testProcess = nullptr;
+        process->deleteLater();
+        emit connectionTestChanged();
+    });
+    const QString config = m_configText;
+    const std::vector<std::string> rawArgs = envh::ssh::connectionTestArgs(config.toStdString(), alias.toStdString(), 10);
+    QStringList args;
+    for (const std::string& arg : rawArgs)
+        args.append(qs(arg));
+    m_testTimer.start();
+    process->setProcessChannelMode(QProcess::MergedChannels);
+    process->start(QString::fromStdWString(ssh), args);
+    return actionResult(QString());
+}
+
+void SshBridge::cancelConnectionTest()
+{
+    if (!m_testProcess) {
+        if (m_connectionTest.value(QStringLiteral("state")).toString() == QStringLiteral("idle"))
+            return;
+        m_connectionTest = QVariantMap {
+            {"state", QStringLiteral("idle")},
+            {"alias", QString()},
+            {"detail", QString()},
+            {"ms", 0},
+        };
+        emit connectionTestChanged();
+        return;
+    }
+    QProcess* process = m_testProcess;
+    m_testProcess = nullptr;
+    m_connectionTest = QVariantMap {
+        {"state", QStringLiteral("idle")},
+        {"alias", QString()},
+        {"detail", QString()},
+        {"ms", 0},
+    };
+    process->kill();
+    process->deleteLater();
+    emit connectionTestChanged();
 }
 
 bool SshBridge::copyPublicKey()

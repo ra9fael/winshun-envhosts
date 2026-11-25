@@ -1,4 +1,5 @@
 #include "ssh_model.h"
+#include <algorithm>
 #include <iostream>
 #include <stdexcept>
 
@@ -20,6 +21,17 @@ int main()
         require(envh::ssh::fuzzyScore("bastion", "bas") > envh::ssh::fuzzyScore("backup-bastion", "bas"), "fuzzy score ranks prefix");
         const auto key = envh::ssh::parsePublicKey("ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIAABAgMEBQYHCAkKCwwNDg8QERITFBUWFxgZGhscHR4f me@host");
         require(key.ok && key.type == "ed25519", "public key parses");
+        const auto testArgs = envh::ssh::connectionTestArgs("C:\\ssh\\config", "bastion", 7);
+        require(!testArgs.empty() && testArgs.back() == "exit", "connection test ends with exit");
+        require(std::find(testArgs.begin(), testArgs.end(), "bastion") != testArgs.end(), "connection test uses the alias");
+        require(std::find(testArgs.begin(), testArgs.end(), "BatchMode=yes") != testArgs.end(), "connection test never prompts");
+        require(std::find(testArgs.begin(), testArgs.end(), "ConnectTimeout=7") != testArgs.end(), "connection test honours the timeout");
+        const auto okOutcome = envh::ssh::testOutcome(0, "banner\n");
+        require(okOutcome.ok && okOutcome.detail.empty(), "exit 0 is a passing test");
+        const auto failOutcome = envh::ssh::testOutcome(255, "Pseudo-terminal will not be allocated\nPermission denied (publickey).\n");
+        require(!failOutcome.ok && failOutcome.detail == "Permission denied (publickey).", "failure keeps the last line");
+        const auto longOutcome = envh::ssh::testOutcome(255, std::string(2000, 'x'));
+        require(longOutcome.detail.size() == 400, "failure detail is capped");
         std::cout << "ssh model: parsing and wildcard handling passed\n";
         return 0;
     } catch (const std::exception& error) {

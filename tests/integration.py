@@ -532,6 +532,10 @@ def main():
           "sshm:keys lists public keys")
     before_ssh = hashlib.sha256(open(ssh_config, "rb").read()).hexdigest()
     if ssh_conn is not None:
+        action_ids = [action.get("id", "") for action in ssh_conn.get("actions", [])]
+        check("sshUrl" in action_ids, "SSH connections offer the ssh:// action", str(action_ids))
+        check(not any("motty" in action_id.lower() for action_id in action_ids),
+              "no client-specific action remains", str(action_ids))
         copied = parse(ssh_driver.action("sshm", "copySshCommand", ssh_conn))
         copied_text = [effect.get("text", "") for effect in copied["result"]["effects"] if effect.get("type") == "copy"]
         check(copied_text and copied_text[0].endswith('"bastion"'), "SSH command action uses the alias", str(copied_text))

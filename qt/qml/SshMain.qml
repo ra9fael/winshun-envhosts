@@ -140,13 +140,17 @@ ApplicationWindow {
         deleteSelected: "删除选中项",
          selectedCount: n => "已选 " + n + " 项",
          selectAll: "全选", clearSelection: "取消选择", readonly: "只读",
-         connNotice: "Windows Terminal 使用当前 SSH config 和 alias；Motty 当前按地址连接，可能不会复用 alias 专属配置。",
+         connNotice: "Windows Terminal 使用当前 SSH config 和 alias；ssh:// 由系统关联的程序打开，是否复用 alias 设置取决于该程序。",
          connPreviewNote: "预览只读。外部工具动作请从连接行右侧 ⋯ 菜单进入。",
          editConn: "编辑连接", copySshCommand: "复制 SSH 命令", openTerminal: "用 Windows Terminal 打开",
-         connectMotty: "用 Motty 连接", connectMottyAlias: "用 Motty 按 alias 连接",
-         mottyAliasUnavailable: "需要 Motty 提供按 OpenSSH alias 连接的 URL 入口",
+         connectSshUrl: "使用 ssh:// 连接",
          toastSshCommand: "已复制 SSH 命令", toastTerminal: "已在 Windows Terminal 中打开",
-         toastMotty: "已请求 Motty 按地址连接", toastMottyAlias: "Motty 当前不支持按 OpenSSH alias 直连",
+         toastSshUrl: "已交给 ssh:// 关联程序",
+         btnTest: "测试连接", btnConnect: "连接",
+         testRunning: a => "正在测试 " + a + " …",
+         testOk: (a, ms) => a + " 连接成功 · " + ms + " ms",
+         testFail: (a, d) => a + " 连接失败 · " + d,
+         testCancel: "已取消测试",
          noConnection: "未选择连接",
         keyDeleteTitle: "删除公钥文件？",
         keyDelete: "删除公钥",
@@ -248,13 +252,17 @@ ApplicationWindow {
         deleteSelected: "Delete selected",
          selectedCount: n => n + " selected",
          selectAll: "Select all", clearSelection: "Clear selection", readonly: "Read-only",
-         connNotice: "Windows Terminal uses the current SSH config and alias; Motty currently connects by address and may not reuse alias-specific settings.",
+         connNotice: "Windows Terminal uses the current SSH config and alias; ssh:// opens in whichever app is registered for it, and alias-specific settings apply only if that app reads the config.",
          connPreviewNote: "Read-only preview. Use the ⋯ menu at the end of a connection row for external tools.",
          editConn: "Edit connection", copySshCommand: "Copy SSH command", openTerminal: "Open in Windows Terminal",
-         connectMotty: "Connect with Motty", connectMottyAlias: "Connect with Motty by alias",
-         mottyAliasUnavailable: "Requires a Motty URL entry for OpenSSH aliases",
+         connectSshUrl: "Connect via ssh://",
          toastSshCommand: "SSH command copied", toastTerminal: "Opened in Windows Terminal",
-         toastMotty: "Motty was asked to connect by address", toastMottyAlias: "Motty does not support direct OpenSSH alias connections yet",
+         toastSshUrl: "Handed to the ssh:// handler",
+         btnTest: "Test connection", btnConnect: "Connect",
+         testRunning: a => "Testing " + a + " …",
+         testOk: (a, ms) => a + " connected · " + ms + " ms",
+         testFail: (a, d) => a + " failed · " + d,
+         testCancel: "Test cancelled",
          noConnection: "No connection selected",
         keyDeleteTitle: "Delete public key files?",
         keyDelete: "Delete public keys",
@@ -482,20 +490,43 @@ ApplicationWindow {
         bridge.setConnSelection([menuConnRow]);
         const result = action === "copy" ? bridge.copySshCommand()
                      : action === "terminal" ? bridge.openWindowsTerminal()
-                     : bridge.connectMotty();
+                     : bridge.connectSshUrl();
         if (result.code === "") {
             if (action === "copy")
                 showToast(str.toastSshCommand, false);
             else if (action === "terminal")
                 showToast(str.toastTerminal, false);
             else
-                showToast(str.toastMotty, false);
+                showToast(str.toastSshUrl, false);
         } else if (result.code === "unsupported") {
             showToast(str.errReadOnly, true);
         } else {
             showToast(result.detail || result.code, true);
         }
         connMenu.close();
+    }
+
+    function openSelectedConnection() {
+        if (!bridge || selectedConns.length !== 1)
+            return;
+        const result = bridge.openWindowsTerminal();
+        if (result.code === "")
+            showToast(str.toastTerminal, false);
+        else if (result.code === "unsupported")
+            showToast(str.errReadOnly, true);
+        else
+            showToast(result.detail || result.code, true);
+    }
+
+    function connectionTestText() {
+        const t = bridge ? bridge.connectionTest : null;
+        if (!t || !t.state || t.state === "idle")
+            return "";
+        if (t.state === "running")
+            return str.testRunning(t.alias || "");
+        if (t.state === "ok")
+            return str.testOk(t.alias || "", t.ms || 0);
+        return str.testFail(t.alias || "", t.detail || "");
     }
 
     function updateSelection(kind, index, modifiers) {
@@ -851,8 +882,7 @@ ApplicationWindow {
         MenuItem { text: root.str.editConn; onTriggered: root.editConnection() }
         MenuItem { text: root.str.copySshCommand; onTriggered: root.externalConnectionAction("copy") }
         MenuItem { text: root.str.openTerminal; onTriggered: root.externalConnectionAction("terminal") }
-        MenuItem { text: root.str.connectMotty; onTriggered: root.externalConnectionAction("motty") }
-        MenuItem { text: root.str.connectMottyAlias; enabled: false }
+        MenuItem { text: root.str.connectSshUrl; onTriggered: root.externalConnectionAction("sshUrl") }
         MenuSeparator {}
         MenuItem { text: root.str.btnDelete; onTriggered: root.askDelete() }
     }
@@ -1991,11 +2021,51 @@ ApplicationWindow {
                             }
                             Item { Layout.fillWidth: true }
                             Btn {
+                                objectName: "sshConnectButton"
+                                visible: root.tab === "conn" && root.selectedConns.length === 1
+                                primary: true
+                                text: root.str.btnConnect
+                                enabled: root.bridge && root.bridge.connDetail.conn !== undefined
+                                         && !root.bridge.connDetail.locked
+                                onClicked: root.openSelectedConnection()
+                            }
+                            Btn {
+                                objectName: "sshTestButton"
+                                visible: root.tab === "conn" && root.selectedConns.length === 1
+                                text: root.str.btnTest
+                                enabled: root.bridge && root.bridge.connDetail.conn !== undefined
+                                         && !root.bridge.connDetail.locked && !root.bridge.testing
+                                onClicked: if (root.bridge) root.bridge.startConnectionTest()
+                            }
+                            Btn {
                                 visible: root.tab === "conn" && root.selectedConns.length === 1
                                  text: root.str.copyRow
                                  enabled: root.bridge && root.bridge.connDetail.conn !== undefined
                                  onClicked: if (root.bridge) root.bridge.copyConnection()
                              }
+                        }
+                    }
+
+                    Rectangle {
+                        objectName: "sshTestStrip"
+                        Layout.fillWidth: true
+                        implicitHeight: visible ? 26 : 0
+                        visible: root.tab === "conn" && root.bridge
+                                 && root.bridge.connectionTest.state !== "idle"
+                        color: root.panelAlt
+                        border.color: root.ruleColor
+                        Text {
+                            anchors.fill: parent
+                            anchors.leftMargin: 12
+                            anchors.rightMargin: 12
+                            verticalAlignment: Text.AlignVCenter
+                            elide: Text.ElideRight
+                            text: root.connectionTestText()
+                            color: !root.bridge ? root.dimColor
+                                 : root.bridge.connectionTest.state === "ok" ? root.okColor
+                                 : root.bridge.connectionTest.state === "fail" ? root.dangerColor
+                                 : root.accentColor
+                            font.pixelSize: 11
                         }
                     }
 

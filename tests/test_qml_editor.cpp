@@ -519,6 +519,11 @@ private slots:
         QVERIFY(detailSplit->property("visible").toBool());
         QVERIFY(!object->findChild<QObject*>("dockTabs"));
         QVERIFY(!object->findChild<QObject*>("dockSplitView"));
+        QVERIFY(object->findChild<QObject*>("sshTestButton"));
+        QVERIFY(object->findChild<QObject*>("sshConnectButton"));
+        QVERIFY(object->findChild<QObject*>("sshTestStrip"));
+        QCOMPARE(bridge.connectionTest().value("state").toString(), QStringLiteral("idle"));
+        QVERIFY(!bridge.testing());
         const auto preview = bridge.previewLines();
         QVERIFY(!preview.isEmpty());
         bool hasConnection = false;
@@ -543,6 +548,37 @@ private slots:
         QVERIFY(selectedDemo);
         QVERIFY(selectedStaging);
         QVERIFY2(warnings.isEmpty(), qPrintable(warnings.join('\n')));
+        QDir(testRoot).removeRecursively();
+    }
+
+    void sshConnectionTestReportsResult() {
+        const auto testRoot = QDir::current().filePath("ssh-connection-test");
+        QDir(testRoot).removeRecursively();
+        QVERIFY(QDir().mkpath(testRoot + "/ssh"));
+        const auto sshDir = testRoot + "/ssh";
+        QFile config(sshDir + "/config");
+        QVERIFY(config.open(QIODevice::WriteOnly | QIODevice::Text));
+        config.write("Host demo\n    HostName demo.example.com\n    User ops\n");
+        config.close();
+
+        OpenArgs args;
+        args.kind = "ssh";
+        args.sshDir = sshDir.toStdWString();
+        args.dataDir = testRoot.toStdString();
+        args.setLang(envh::i18n::Lang::EnUS);
+        SshBridge bridge(args);
+        QString loadError;
+        QVERIFY2(bridge.load(loadError), qPrintable(loadError));
+        bridge.selectConn(0);
+
+        const QVariantMap started = bridge.startConnectionTest();
+        QVERIFY2(started.value("code").toString().isEmpty(), qPrintable(started.value("detail").toString()));
+        QVERIFY(bridge.testing());
+        QTRY_VERIFY_WITH_TIMEOUT(!bridge.testing(), 25000);
+        const QVariantMap result = bridge.connectionTest();
+        QCOMPARE(result.value("alias").toString(), QStringLiteral("demo"));
+        QCOMPARE(result.value("state").toString(), QStringLiteral("fail"));
+        QVERIFY(!result.value("detail").toString().isEmpty());
         QDir(testRoot).removeRecursively();
     }
 };

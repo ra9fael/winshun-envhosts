@@ -13,7 +13,9 @@
 #pragma once
 
 #include <QAbstractListModel>
+#include <QElapsedTimer>
 #include <QObject>
+#include <QProcess>
 #include <QStringList>
 #include <QVariantList>
 #include <QVariantMap>
@@ -138,6 +140,8 @@ class SshBridge : public QObject {
     Q_PROPERTY(QVariantMap connDetail READ connDetail NOTIFY detailChanged)
     Q_PROPERTY(QVariantMap keyDetail READ keyDetail NOTIFY detailChanged)
     Q_PROPERTY(QVariantList previewLines READ previewLines NOTIFY previewChanged)
+    Q_PROPERTY(QVariantMap connectionTest READ connectionTest NOTIFY connectionTestChanged)
+    Q_PROPERTY(bool testing READ testing NOTIFY connectionTestChanged)
     Q_PROPERTY(QVariantList changes READ changes NOTIFY changed)
     Q_PROPERTY(QVariantList conflictDiff READ conflictDiff NOTIFY conflictChanged)
     Q_PROPERTY(bool conflictVisible READ conflictVisible NOTIFY conflictChanged)
@@ -176,6 +180,8 @@ public:
     QVariantMap connDetail() const;
     QVariantMap keyDetail() const;
     QVariantList previewLines() const;
+    QVariantMap connectionTest() const { return m_connectionTest; }
+    bool testing() const { return m_testProcess != nullptr; }
     QVariantList changes() const;
     QVariantList knownHosts() const;
     QString knownHostsError() const { return m_knownHostsError; }
@@ -211,7 +217,9 @@ public:
     Q_INVOKABLE bool copyConnection();
     Q_INVOKABLE QVariantMap copySshCommand();
     Q_INVOKABLE QVariantMap openWindowsTerminal();
-    Q_INVOKABLE QVariantMap connectMotty();
+    Q_INVOKABLE QVariantMap connectSshUrl();
+    Q_INVOKABLE QVariantMap startConnectionTest();
+    Q_INVOKABLE void cancelConnectionTest();
     Q_INVOKABLE bool copyPublicKey();
     Q_INVOKABLE void undo();
     Q_INVOKABLE void redo();
@@ -234,6 +242,7 @@ signals:
     void keygenFinished();
     void knownHostsChanged();
     void agentChanged();
+    void connectionTestChanged();
     void toast(const QString& code, const QString& detail);
 
 private:
@@ -269,6 +278,9 @@ private:
     QVariantList m_selectedKeys;
     QVariantList m_agentKeys;
     QVariantList m_conflictDiff;
+    QVariantMap m_connectionTest {{QStringLiteral("state"), QStringLiteral("idle")}};
+    QProcess* m_testProcess = nullptr;
+    QElapsedTimer m_testTimer;
     bool m_hasConfig = false;
     bool m_keygenAvailable = false;
     bool m_conflictVisible = false;

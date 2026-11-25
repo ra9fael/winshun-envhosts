@@ -1276,5 +1276,46 @@ inline bool keyMatches(const KeyFile& k, const std::string& filter)
     return fuzzyScore(k.name + " " + k.pub.type + " " + k.pub.comment + " " + k.pub.fingerprint, filter) > -1000000;
 }
 
+// A one-shot connection test runs the connection's own alias through ssh, so it
+// exercises the same config the terminal will use. BatchMode turns a password
+// prompt into an immediate failure instead of a hang, and the trailing `exit`
+// keeps the server from starting a shell.
+inline std::vector<std::string> connectionTestArgs(const std::string& config, const std::string& alias,
+                                                   int timeoutSeconds)
+{
+    return {"-F",
+            config,
+            "-o",
+            "BatchMode=yes",
+            "-o",
+            "ConnectTimeout=" + std::to_string(timeoutSeconds > 0 ? timeoutSeconds : 10),
+            alias,
+            "exit"};
+}
+
+struct TestOutcome {
+    bool ok = false;
+    std::string detail;
+};
+
+// ssh reports the reason on the last stderr line; the lines before it are
+// banners such as "Pseudo-terminal will not be allocated".
+inline TestOutcome testOutcome(int exitCode, const std::string& output)
+{
+    TestOutcome outcome;
+    outcome.ok = exitCode == 0;
+    if (outcome.ok)
+        return outcome;
+    std::string text = trim(output);
+    const std::size_t line = text.find_last_of('\n');
+    if (line != std::string::npos && !trim(text.substr(line + 1)).empty())
+        text = trim(text.substr(line + 1));
+    constexpr std::size_t kMaxDetail = 400;
+    if (text.size() > kMaxDetail)
+        text = text.substr(text.size() - kMaxDetail);
+    outcome.detail = text;
+    return outcome;
+}
+
 } // namespace ssh
 } // namespace envh

@@ -104,8 +104,7 @@
         { "id": "edit", "title": { "zh": "编辑", "en": "Edit" }, "key": "Enter" },
         { "id": "copySshCommand", "title": { "zh": "复制 SSH 命令", "en": "Copy SSH command" }, "key": "" },
         { "id": "openTerminal", "title": { "zh": "用 Windows Terminal 打开", "en": "Open in Windows Terminal" }, "key": "" },
-        { "id": "motty", "title": { "zh": "用 Motty 连接", "en": "Connect with Motty" }, "key": "" },
-        { "id": "mottyAlias", "title": { "zh": "用 Motty 按 alias 连接", "en": "Connect with Motty by alias" }, "key": "" },
+        { "id": "sshUrl", "title": { "zh": "使用 ssh:// 连接", "en": "Connect via ssh://" }, "key": "" },
         { "id": "delete", "title": { "zh": "删除", "en": "Delete" }, "key": "" }
       ]
     }
