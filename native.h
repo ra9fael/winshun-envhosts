@@ -21,6 +21,7 @@
 #include <windows.h>
 #include <shellapi.h>
 #include <shlobj.h>
+#include <shobjidl.h>
 
 #include <chrono>
 #include <cstdio>
@@ -456,7 +457,7 @@ public:
         for (const auto& pub : pubs) { const auto stem = pub.substr(0, pub.size() - 4); const auto it = std::find(privs.begin(), privs.end(), stem); const bool has = it != privs.end(); if (has) paired[static_cast<size_t>(it - privs.begin())] = true; std::ifstream in(m_dir / std::filesystem::path(pub), std::ios::binary); const std::string text((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>()); out.push_back(ssh::makeKeyFile(has ? stem : pub, has, true, text)); }
         for (size_t i = 0; i < privs.size(); ++i) if (!paired[i]) out.push_back(ssh::makeKeyFile(privs[i], true, false, "")); return out;
     }
-    bool deletePublicKeys(const std::vector<std::string>& names, std::string& error) { for (const auto& name : names) { if (!ssh::validKeyFileName(name)) { error = "E_KEYNAME"; return false; } const auto path = m_dir / std::filesystem::path(name); if (!DeleteFileW(path.c_str()) && GetLastError() != ERROR_FILE_NOT_FOUND) { error = "E_SSH_DELETE"; return false; } } return true; }
+    bool deleteKeys(const std::vector<std::string>& names, std::string& error) { for (const auto& name : names) { if (!ssh::validKeyFileName(name)) { error = "E_KEYNAME"; return false; } const auto path = m_dir / std::filesystem::path(name); if (!DeleteFileW(path.c_str()) && GetLastError() != ERROR_FILE_NOT_FOUND) { error = "E_SSH_DELETE"; return false; } } return true; }
 private:
     bool writeFile(const std::wstring& path, const std::string& content, std::string& error) { std::error_code ec; std::filesystem::create_directories(m_dir, ec); const HANDLE fh = CreateFileW(path.c_str(), GENERIC_WRITE, 0, nullptr, OPEN_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr); if (fh == INVALID_HANDLE_VALUE) { error = GetLastError() == ERROR_ACCESS_DENIED ? "E_DENIED" : "E_SSH_WRITE"; return false; } SetFilePointer(fh, 0, nullptr, FILE_BEGIN); SetEndOfFile(fh); DWORD wrote = 0; const BOOL ok = WriteFile(fh, content.data(), static_cast<DWORD>(content.size()), &wrote, nullptr); CloseHandle(fh); if (!ok || wrote != content.size()) { error = "E_SSH_WRITE"; return false; } return true; }
     std::wstring m_dir, m_config;
@@ -518,6 +519,42 @@ inline ProcResult runInteractiveProcess(const std::wstring& program, const std::
     DWORD code = 1; GetExitCodeProcess(pi.hProcess, &code);
     CloseHandle(pi.hThread); CloseHandle(pi.hProcess);
     r.exitCode = static_cast<int>(code); r.ok = code == 0; return r;
+}
+// Shell "open file" picker. The QML front-end runs on WinShun's shared host Qt,
+// which does not ship the Qt Quick Dialogs module, so the picker comes from the
+// shell instead of a QML dialog.
+inline std::wstring pickOpenFile(const std::wstring& title, const std::wstring& startDir, HWND owner)
+{
+    const HRESULT init = CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED);
+    std::wstring picked;
+    IFileOpenDialog* dialog = nullptr;
+    if (SUCCEEDED(CoCreateInstance(CLSID_FileOpenDialog, nullptr, CLSCTX_INPROC_SERVER, IID_PPV_ARGS(&dialog)))) {
+        DWORD options = 0;
+        if (SUCCEEDED(dialog->GetOptions(&options)))
+            dialog->SetOptions(options | FOS_FORCEFILESYSTEM | FOS_FILEMUSTEXIST | FOS_PATHMUSTEXIST);
+        if (!title.empty()) dialog->SetTitle(title.c_str());
+        if (!startDir.empty()) {
+            IShellItem* folder = nullptr;
+            if (SUCCEEDED(SHCreateItemFromParsingName(startDir.c_str(), nullptr, IID_PPV_ARGS(&folder)))) {
+                dialog->SetFolder(folder);
+                folder->Release();
+            }
+        }
+        if (SUCCEEDED(dialog->Show(owner))) {
+            IShellItem* item = nullptr;
+            if (SUCCEEDED(dialog->GetResult(&item))) {
+                PWSTR path = nullptr;
+                if (SUCCEEDED(item->GetDisplayName(SIGDN_FILESYSPATH, &path))) {
+                    picked = path;
+                    CoTaskMemFree(path);
+                }
+                item->Release();
+            }
+        }
+        dialog->Release();
+    }
+    if (SUCCEEDED(init)) CoUninitialize();
+    return picked;
 }
 inline bool openUrl(const std::wstring& url, std::string& error) { const HINSTANCE r=ShellExecuteW(nullptr,L"open",url.c_str(),nullptr,nullptr,SW_SHOWNORMAL);if(reinterpret_cast<INT_PTR>(r)<=32){error="cannot open URL";return false;}return true; }
 inline ProcResult runProcess(const std::wstring& program, const std::vector<std::wstring>& args) { ProcResult r; std::wstring command=quoteLaunchArg(program);for(const auto& arg:args)command+=L" "+quoteLaunchArg(arg);STARTUPINFOW si{};si.cb=sizeof(si);si.dwFlags=STARTF_USESHOWWINDOW;si.wShowWindow=SW_HIDE;PROCESS_INFORMATION pi{};if(!CreateProcessW(program.c_str(),command.data(),nullptr,nullptr,FALSE,CREATE_NO_WINDOW,nullptr,nullptr,&si,&pi)){r.err="cannot start process";return r;}r.launched=true;WaitForSingleObject(pi.hProcess,60000);DWORD code=1;GetExitCodeProcess(pi.hProcess,&code);CloseHandle(pi.hThread);CloseHandle(pi.hProcess);r.exitCode=static_cast<int>(code);r.ok=code==0;return r; }

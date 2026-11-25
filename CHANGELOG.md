@@ -14,6 +14,16 @@ single source of truth; release tags are `<gdi|qml>/v<version>`.
   load private keys from any file path; private-key contents remain with
   `ssh-add`.
 
+### Changed
+
+- The SSH connection notice can be dismissed for the current window session.
+- The private-key picker is centered and uses the same list and button styling
+  as the SSH window; its confirmation action is labeled `Load`.
+- The Save shortcut hint is shown in the connection status bar while the
+  toolbar action is labeled `Save`.
+- Deleting a key removes the private key and its `.pub` file together when
+  both exist; deleting a single-sided entry removes the file that exists.
+
 ## [0.10.0] - 2026-11-18
 
 ### Added

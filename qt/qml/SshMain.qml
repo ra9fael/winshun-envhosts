@@ -9,7 +9,6 @@ pragma ComponentBehavior: Bound
 
 import QtQuick
 import QtQuick.Controls.Basic
-import QtQuick.Dialogs
 import QtQuick.Layouts
 import "controls"
 
@@ -61,6 +60,7 @@ ApplicationWindow {
     readonly property bool dialogOpen: saveDlg.visible || conflictDlg.visible || deleteDlg.visible
                                        || keygenDlg.visible || infoDlg.visible || closeDlg.visible
                                        || keyDeleteDlg.visible || knownDeleteDlg.visible
+                                       || agentPicker.visible
 
     property string tab: "conn"
     property string connFilter: ""
@@ -71,6 +71,7 @@ ApplicationWindow {
     property bool toastBad: false
     property bool closePending: false
     property bool forceClose: false
+    property bool connNoticeClosed: false
     property int menuConnRow: -1
     property var selectedConns: []
     property var selectedKeys: []
@@ -110,7 +111,7 @@ ApplicationWindow {
     readonly property var zh: ({
         tabConn: "连接", tabKeys: "密钥", tabAgent: "Agent", tabKnown: "已知主机",
         filterConn: "筛选连接（名称 / 主机 / 用户）", filterKeys: "筛选密钥（文件 / 类型 / 注释）", filterKnown: "筛选已知主机（主机 / 算法 / 指纹）",
-        add: "新增连接", gen: "生成密钥", save: "保存", saveShort: "保存 (Ctrl+S)",
+        add: "新增连接", gen: "生成密钥", save: "保存",
         undo: "撤销", redo: "重做", info: "说明",
         colName: "名称", colHost: "主机", colUser: "用户", colPort: "端口", colKey: "密钥",
         colFile: "文件", colType: "类型", colComment: "注释", colFp: "指纹", colState: "状态",
@@ -133,7 +134,7 @@ ApplicationWindow {
         previewEmpty: "文件为空。",
         keyPath: "路径", keyType: "类型", keyFp: "指纹（SHA256）", keyUsed: "关联连接",
         keyPub: "公钥", keyPriv: "私钥内容",
-        keyPrivNote: "本界面不显示、不复制、不记录私钥内容；删除密钥或修改口令请用 ssh-keygen。",
+        keyPrivNote: "本界面不显示、不复制、不记录私钥内容；修改口令请用 ssh-keygen。",
         keyNoPub: "缺少对应的公钥文件，无法复制公钥。",
         keyNoPrivate: "目录中没有对应的私钥文件。",
         keyNoneUsed: "（未被任何连接使用）",
@@ -153,11 +154,10 @@ ApplicationWindow {
          testFail: (a, d) => a + " 连接失败 · " + d,
          testCancel: "已取消测试",
          noConnection: "未选择连接",
-        keyDeleteTitle: "删除公钥文件？",
-        keyDelete: "删除公钥",
-        keyDeleteBody: files => "将删除以下公钥文件，私钥文件保留：\n" + files.join("\n"),
-        keyDeletePrivateOnly: "所选项中没有可删除的公钥文件。仅有私钥的项已跳过。",
-        keyDeleteSuccess: files => "已删除公钥文件：" + files.join("、"),
+        keyDeleteTitle: "删除密钥？",
+        keyDelete: "删除密钥",
+        keyDeleteBody: files => "将永久删除以下文件，无法撤销：\n" + files.join("\n"),
+        keyDeleteSuccess: files => "已删除：" + files.join("、"),
         knownHostWarning: "新指纹不会自动信任。删除旧记录前，请通过可信渠道核对服务器的新指纹。",
         knownHostEmpty: "没有可显示的已知主机记录。",
         knownHostConflict: "known_hosts 在读取后被外部修改，请重新选择记录。",
@@ -165,13 +165,13 @@ ApplicationWindow {
         keyStateBoth: "私钥 + 公钥", keyStatePub: "仅公钥", keyStatePriv: "仅私钥（缺公钥）",
         keyBits: n => n + " 位",
         copyPub: "复制公钥", copyRow: "复制整行",
-        statusDirty: n => "● " + n + " 项未保存", statusClean: "已保存",
+        statusDirty: n => "● " + n + " 项未保存", statusClean: "已保存", statusSave: "Ctrl+S 保存",
         statusCount: n => "共 " + n + " 个连接",
         statusKeys: n => "共 " + n + " 个密钥",
         statusAgent: n => "Agent 中有 " + n + " 个密钥",
         agentEmpty: "当前 agent 没有已加载的密钥。",
         agentAdd: "加载密钥", agentRemove: "移除选中", agentClear: "清空 Agent", agentRefresh: "刷新",
-        agentPick: "选择要加载的私钥", agentBrowse: "浏览…", filterAgent: "筛选 Agent 密钥（指纹 / 注释 / 类型）", agentFingerprint: "指纹", agentComment: "注释", agentSource: "来源",
+        agentPick: "选择要加载的私钥", agentLoad: "加载", agentBrowse: "浏览…", agentNoKeys: "没有可加载的私钥文件。", filterAgent: "筛选 Agent 密钥（指纹 / 注释 / 类型）", agentFingerprint: "指纹", agentComment: "注释", agentSource: "来源",
         agentHint: "Agent 来源：" + (bridge ? bridge.agentSourceLabel : "auto") + "。只操作当前用户的 agent；私钥正文和 passphrase 不会进入插件。",
         bannerKeygen: "未检测到 ssh-keygen：生成密钥不可用。浏览、复制与编辑配置不受影响。",
         bannerLocked: "检测到 Include / Match / 通配符块：这些块只读，保存时原样保留。",
@@ -221,7 +221,7 @@ ApplicationWindow {
     readonly property var en: ({
         tabConn: "Connections", tabKeys: "Keys", tabAgent: "Agent", tabKnown: "Known hosts",
         filterConn: "Filter connections (name / host / user)", filterKeys: "Filter keys (file / type / comment)", filterKnown: "Filter known hosts (host / type / fingerprint)",
-        add: "New connection", gen: "Generate key", save: "Save", saveShort: "Save (Ctrl+S)",
+        add: "New connection", gen: "Generate key", save: "Save",
         undo: "Undo", redo: "Redo", info: "About",
         colName: "Name", colHost: "Host", colUser: "User", colPort: "Port", colKey: "Key",
         colFile: "File", colType: "Type", colComment: "Comment", colFp: "Fingerprint", colState: "State",
@@ -245,7 +245,7 @@ ApplicationWindow {
         previewEmpty: "The file is empty.",
         keyPath: "Path", keyType: "Type", keyFp: "Fingerprint (SHA256)", keyUsed: "Used by",
         keyPub: "Public key", keyPriv: "Private key",
-        keyPrivNote: "Private key content is never shown, copied or logged; use ssh-keygen to delete a key or change its passphrase.",
+        keyPrivNote: "Private key content is never shown, copied or logged; use ssh-keygen to change a passphrase.",
         keyNoPub: "No matching public key file: there is nothing to copy.",
         keyNoPrivate: "No matching private key file in the folder.",
         keyNoneUsed: "(not used by any connection)",
@@ -265,11 +265,10 @@ ApplicationWindow {
          testFail: (a, d) => a + " failed · " + d,
          testCancel: "Test cancelled",
          noConnection: "No connection selected",
-        keyDeleteTitle: "Delete public key files?",
-        keyDelete: "Delete public keys",
-        keyDeleteBody: files => "These public key files will be deleted. Private keys are kept:\n" + files.join("\n"),
-        keyDeletePrivateOnly: "No selected item has a deletable public key. Private-only entries were skipped.",
-        keyDeleteSuccess: files => "Deleted public key files: " + files.join(", "),
+        keyDeleteTitle: "Delete keys?",
+        keyDelete: "Delete keys",
+        keyDeleteBody: files => "These files are deleted permanently and cannot be restored:\n" + files.join("\n"),
+        keyDeleteSuccess: files => "Deleted: " + files.join(", "),
         knownHostWarning: "New fingerprints are never trusted automatically. Verify the server's new fingerprint through a trusted channel before removing an old record.",
         knownHostEmpty: "No known-host records to show.",
         knownHostConflict: "known_hosts changed on disk. Reload the list and select the records again.",
@@ -277,13 +276,13 @@ ApplicationWindow {
         keyStateBoth: "Private + public", keyStatePub: "Public only", keyStatePriv: "Private only (no public key)",
         keyBits: n => n + " bit",
         copyPub: "Copy public key", copyRow: "Copy line",
-        statusDirty: n => "● " + n + " unsaved", statusClean: "Saved",
+        statusDirty: n => "● " + n + " unsaved", statusClean: "Saved", statusSave: "Ctrl+S saves",
         statusCount: n => n + " connection(s)",
         statusKeys: n => n + " key(s)",
         statusAgent: n => n + " key(s) in agent",
         agentEmpty: "No keys are loaded in the current agent.",
         agentAdd: "Load key", agentRemove: "Remove selected", agentClear: "Clear agent", agentRefresh: "Refresh",
-        agentPick: "Choose a private key", agentBrowse: "Browse…", filterAgent: "Filter agent keys (fingerprint / comment / type)", agentFingerprint: "Fingerprint", agentComment: "Comment", agentSource: "Source",
+        agentPick: "Choose a private key", agentLoad: "Load", agentBrowse: "Browse…", agentNoKeys: "No private key files to load.", filterAgent: "Filter agent keys (fingerprint / comment / type)", agentFingerprint: "Fingerprint", agentComment: "Comment", agentSource: "Source",
         agentHint: "Agent source: " + (bridge ? bridge.agentSourceLabel : "auto") + ". Only the selected agent is affected; private-key text and passphrases never enter the plugin.",
         bannerKeygen: "ssh-keygen was not found: key generation is unavailable. Browsing, copying and editing the config are unaffected.",
         bannerLocked: "Include / Match / wildcard blocks found: they are read-only and written back verbatim.",
@@ -569,7 +568,8 @@ ApplicationWindow {
             return [];
         const needle = agentFilter.trim().toLowerCase();
         const rows = bridge.agentKeys.map(function (row, index) {
-            const score = root.fuzzyScore(row.fingerprint + " " + row.comment + " " + row.type + " " + row.source, needle);
+            const source = row.sourcePath || row.source;
+            const score = root.fuzzyScore(row.fingerprint + " " + row.comment + " " + row.type + " " + source, needle);
             return { row: row, index: index, score: score };
         });
         return rows.filter(function (item) { return item.score > -1000000; })
@@ -607,11 +607,11 @@ ApplicationWindow {
             showToast(result.detail || result.code, true);
     }
 
-    function addExternalAgentKey(path) {
-        if (!bridge || !path)
+    function pickExternalAgentKey() {
+        if (!bridge)
             return;
-        const result = bridge.addAgentKeyPath(path);
-        if (result.code !== "")
+        const result = bridge.browseAgentKey();
+        if (result.code !== undefined && result.code !== "")
             showToast(result.detail || result.code, true);
     }
 
@@ -649,11 +649,9 @@ ApplicationWindow {
     function deleteKeys() {
         if (!bridge || selectedKeys.length === 0)
             return;
-        const names = bridge.publicKeyFiles(selectedKeys);
-        if (names.length === 0) {
-            showToast(str.keyDeletePrivateOnly, true);
+        const names = bridge.keyFiles(selectedKeys);
+        if (names.length === 0)
             return;
-        }
         keyDeleteDlg.files = names;
         keyDeleteDlg.open();
     }
@@ -896,53 +894,147 @@ ApplicationWindow {
         MenuItem { text: root.str.btnDelete; onTriggered: root.askDelete() }
     }
 
-    FileDialog {
-        id: agentFileDialog
-        objectName: "agentFileDialog"
-        title: root.str.agentBrowse
-        fileMode: FileDialog.OpenFile
-        nameFilters: ["SSH private keys (*)", "All files (*)"]
-        onAccepted: root.addExternalAgentKey(selectedFile.toLocalFile())
-    }
-
     Dialog {
         id: agentPicker
+        parent: root.contentItem
+        anchors.centerIn: parent
         modal: true
-        title: root.str.agentPick
-        width: Math.min(420, root.width - 48)
-        footer: DialogButtonBox {
-            alignment: Qt.AlignLeft
-            Button {
-                text: root.str.agentBrowse
-                onClicked: {
-                    agentPicker.close();
-                    agentFileDialog.open();
-                }
-            }
-            Button {
-                text: root.str.btnCancel
-                DialogButtonBox.buttonRole: DialogButtonBox.RejectRole
-            }
-            Button {
-                text: root.str.btnSave
-                DialogButtonBox.buttonRole: DialogButtonBox.AcceptRole
-                enabled: root.agentAddName !== ""
-            }
+        padding: 0
+        width: Math.min(440, root.width - 40)
+        closePolicy: Popup.CloseOnEscape
+        onOpened: {
+            root.agentAddName = "";
+            privateKeyList.forceActiveFocus();
         }
-        height: Math.min(420, root.height - 48)
         onAccepted: root.addAgentKey()
         onRejected: root.agentAddName = ""
-        contentItem: ListView {
-            id: privateKeyList
-            clip: true
-            model: root.bridge ? root.bridge.privateKeyNames : []
-            ScrollBar.vertical: ScrollBar {}
-            delegate: ItemDelegate {
-                required property string modelData
-                width: privateKeyList.width
-                text: modelData
-                highlighted: root.agentAddName === modelData
-                onClicked: root.agentAddName = modelData
+
+        background: Rectangle {
+            color: root.panelColor
+            radius: tokens.cardRadius
+            border.width: 1
+            border.color: root.ruleColor
+        }
+
+        header: Rectangle {
+            implicitHeight: 44
+            color: root.panelColor
+            radius: tokens.cardRadius
+            Text {
+                anchors.fill: parent
+                anchors.leftMargin: 16
+                anchors.rightMargin: 16
+                verticalAlignment: Text.AlignVCenter
+                text: root.str.agentPick
+                color: root.inkColor
+                font.pixelSize: 15
+                font.bold: true
+                elide: Text.ElideRight
+            }
+            Rectangle {
+                anchors.bottom: parent.bottom
+                anchors.left: parent.left
+                anchors.right: parent.right
+                height: 1
+                color: root.ruleColor
+            }
+        }
+
+        contentItem: Item {
+            implicitHeight: Math.max(tokens.rowHeight, Math.min(320, privateKeyList.contentHeight)) + 8
+
+            ListView {
+                id: privateKeyList
+                anchors.fill: parent
+                anchors.margins: 4
+                clip: true
+                model: root.bridge ? root.bridge.privateKeyNames : []
+                ScrollBar.vertical: ScrollBar {}
+                Keys.onPressed: (event) => {
+                    const names = root.bridge ? root.bridge.privateKeyNames : [];
+                    if (event.key === Qt.Key_Down || event.key === Qt.Key_Up) {
+                        if (names.length > 0) {
+                            const step = event.key === Qt.Key_Down ? 1 : -1;
+                            const at = names.indexOf(root.agentAddName);
+                            const next = Math.max(0, Math.min(names.length - 1, at + step));
+                            root.agentAddName = names[next];
+                            privateKeyList.currentIndex = next;
+                        }
+                        event.accepted = true;
+                    } else if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
+                        if (root.agentAddName !== "")
+                            agentPicker.accept();
+                        event.accepted = true;
+                    }
+                }
+                delegate: Rectangle {
+                    id: keyRow
+                    required property string modelData
+                    width: privateKeyList.width
+                    height: tokens.rowHeight
+                    color: root.agentAddName === modelData ? root.accentSoft
+                         : keyHover.hovered ? root.hoverColor : "transparent"
+
+                    HoverHandler { id: keyHover }
+
+                    Rectangle {
+                        anchors.bottom: parent.bottom
+                        width: parent.width
+                        height: 1
+                        color: root.ruleColor
+                        opacity: 0.6
+                    }
+                    Text {
+                        anchors.fill: parent
+                        anchors.leftMargin: 10
+                        anchors.rightMargin: 10
+                        verticalAlignment: Text.AlignVCenter
+                        text: keyRow.modelData
+                        color: root.inkColor
+                        font.pixelSize: 12
+                        elide: Text.ElideRight
+                    }
+                    MouseArea {
+                        anchors.fill: parent
+                        onClicked: root.agentAddName = keyRow.modelData
+                    }
+                }
+            }
+
+            Text {
+                anchors.centerIn: parent
+                visible: privateKeyList.count === 0
+                text: root.str.agentNoKeys
+                color: root.dimColor
+                font.pixelSize: 12
+            }
+        }
+
+        footer: Item {
+            implicitHeight: 52
+            RowLayout {
+                anchors.fill: parent
+                anchors.margins: 10
+                spacing: 8
+                Btn {
+                    objectName: "agentBrowseButton"
+                    text: root.str.agentBrowse
+                    onClicked: {
+                        agentPicker.close();
+                        root.pickExternalAgentKey();
+                    }
+                }
+                Item { Layout.fillWidth: true }
+                Btn {
+                    primary: true
+                    text: root.str.agentLoad
+                    enabled: root.agentAddName !== ""
+                    onClicked: agentPicker.accept()
+                }
+                Btn {
+                    text: root.str.btnCancel
+                    onClicked: agentPicker.reject()
+                }
             }
         }
     }
@@ -1229,7 +1321,7 @@ ApplicationWindow {
                 }
                 Btn {
                     primary: true
-                    text: root.str.saveShort
+                    text: root.str.save
                     enabled: root.bridge && root.bridge.canSave
                     onClicked: root.requestSave()
                 }
@@ -1239,7 +1331,10 @@ ApplicationWindow {
         StatusBanner {
             theme: tokens
             text: root.str.connNotice
-            visible: root.tab === "conn"
+            closable: true
+            closeLabel: root.str.infoClose
+            visible: root.tab === "conn" && !root.connNoticeClosed
+            onClosed: root.connNoticeClosed = true
         }
         // banners
         ColumnLayout {
@@ -1951,8 +2046,11 @@ ApplicationWindow {
                                     height: 52
                                     color: root.selectedAgent.indexOf(index) >= 0 ? root.accentSoft
                                            : agentHover.hovered ? root.hoverColor : "transparent"
-                                    HoverHandler { id: agentHover }
-                                    Rectangle {
+                                     HoverHandler { id: agentHover }
+                                     ToolTip.visible: agentHover.hovered && Boolean(modelData.sourcePath)
+                                     ToolTip.text: modelData.sourcePath || ""
+                                     ToolTip.delay: 500
+                                     Rectangle {
                                         anchors.bottom: parent.bottom
                                         width: parent.width
                                         height: 1
@@ -1973,12 +2071,12 @@ ApplicationWindow {
                                             font.pixelSize: 12
                                             font.bold: true
                                             elide: Text.ElideRight
-                                        }
-                                        Text {
-                                            Layout.fillWidth: true
-                                            text: modelData.fingerprint + (modelData.comment ? " · " + modelData.comment : "")
-                                                   + (modelData.source ? " · " + modelData.source : "")
-                                            color: root.dimColor
+                                         }
+                                         Text {
+                                             Layout.fillWidth: true
+                                             text: modelData.fingerprint + (modelData.comment ? " · " + modelData.comment : "")
+                                                    + ((modelData.sourcePath || modelData.source) ? " · " + (modelData.sourcePath || modelData.source) : "")
+                                             color: root.dimColor
                                             font.family: root.monoFont
                                             font.pixelSize: 11
                                             elide: Text.ElideMiddle
@@ -2703,6 +2801,12 @@ ApplicationWindow {
                         return root.str.statusKeys(keyList.count);
                     }
                 }
+                Text {
+                    visible: root.tab === "conn"
+                    font.pixelSize: 11
+                    color: root.dimColor
+                    text: root.str.statusSave
+                }
             }
         }
     }
@@ -3117,13 +3221,13 @@ ApplicationWindow {
                     danger: true
                     text: root.str.keyDelete
                     onClicked: {
-                        const result = root.bridge.deletePublicKeys(root.selectedKeys);
+                        const result = root.bridge.deleteKeys(root.selectedKeys);
                         keyDeleteDlg.close();
                         if (result.code === "") {
                             root.selectedKeys = [];
                             root.showToast(root.str.keyDeleteSuccess(result.files), false);
                         } else {
-                            root.showToast(result.detail || root.str.keyDeletePrivateOnly, true);
+                            root.showToast(result.detail || result.code, true);
                         }
                     }
                 }

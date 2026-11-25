@@ -207,12 +207,13 @@ public:
     Q_INVOKABLE void setConnSelection(const QVariantList& rows);
     Q_INVOKABLE void setKeySelection(const QVariantList& rows);
     Q_INVOKABLE int deleteConnections(const QVariantList& rows);
-    Q_INVOKABLE QStringList publicKeyFiles(const QVariantList& rows) const;
-    Q_INVOKABLE QVariantMap deletePublicKeys(const QVariantList& rows);
+    Q_INVOKABLE QStringList keyFiles(const QVariantList& rows) const;
+    Q_INVOKABLE QVariantMap deleteKeys(const QVariantList& rows);
     Q_INVOKABLE QVariantMap deleteKnownHosts(const QVariantList& rows);
     Q_INVOKABLE QVariantMap refreshAgent();
     Q_INVOKABLE QVariantMap addAgentKey(const QString& name);
     Q_INVOKABLE QVariantMap addAgentKeyPath(const QString& path);
+    Q_INVOKABLE QVariantMap browseAgentKey();
     Q_INVOKABLE QVariantMap removeAgentKeys(const QVariantList& fingerprints);
     Q_INVOKABLE QVariantMap clearAgent();
     Q_INVOKABLE void reloadKnownHosts() { refreshKnownHosts(); }

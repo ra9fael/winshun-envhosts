@@ -30,6 +30,18 @@ namespace {
 
 QString qs(const std::string& s) { return QString::fromStdString(s); }
 
+std::vector<std::string> keyFileNames(const envh::ssh::KeyFile& key)
+{
+    switch (key.state) {
+    case envh::ssh::KeyState::Both:
+        return {key.name, key.name + ".pub"};
+    case envh::ssh::KeyState::PublicOnly:
+    case envh::ssh::KeyState::PrivateOnly:
+        return {key.name};
+    }
+    return {};
+}
+
 QString fieldLabel(const std::string& key)
 {
     if (key == "alias")
@@ -525,6 +537,16 @@ QVariantMap SshBridge::addAgentKeyPath(const QString& path)
     return refreshAgent();
 }
 
+QVariantMap SshBridge::browseAgentKey()
+{
+    const std::wstring file = envh::native::pickOpenFile(
+        (m_args.zh ? QStringLiteral("选择要加载的私钥") : QStringLiteral("Choose a private key")).toStdWString(),
+        QDir::toNativeSeparators(m_dirText).toStdWString(), GetActiveWindow());
+    if (file.empty())
+        return QVariantMap();
+    return addAgentKeyPath(QString::fromStdWString(file));
+}
+
 QVariantMap SshBridge::removeAgentKeys(const QVariantList& fingerprints)
 {
     const std::wstring tool = envh::native::findSshAdd();
@@ -606,7 +628,7 @@ int SshBridge::deleteConnections(const QVariantList& rows)
     return deleted;
 }
 
-QStringList SshBridge::publicKeyFiles(const QVariantList& rows) const
+QStringList SshBridge::keyFiles(const QVariantList& rows) const
 {
     QStringList files;
     std::vector<std::string> names;
@@ -615,18 +637,17 @@ QStringList SshBridge::publicKeyFiles(const QVariantList& rows) const
         if (visible < 0 || visible >= static_cast<int>(m_visibleKeys.size()))
             continue;
         const auto& key = m_keys[static_cast<size_t>(m_visibleKeys[static_cast<size_t>(visible)])];
-        if (key.state == envh::ssh::KeyState::PrivateOnly)
-            continue;
-        const std::string file = key.state == envh::ssh::KeyState::PublicOnly ? key.name : key.name + ".pub";
-        if (std::find(names.begin(), names.end(), file) == names.end()) {
-            names.push_back(file);
-            files.append(qs(file));
+        for (const std::string& file : keyFileNames(key)) {
+            if (std::find(names.begin(), names.end(), file) == names.end()) {
+                names.push_back(file);
+                files.append(qs(file));
+            }
         }
     }
     return files;
 }
 
-QVariantMap SshBridge::deletePublicKeys(const QVariantList& rows)
+QVariantMap SshBridge::deleteKeys(const QVariantList& rows)
 {
     QVariantMap result;
     QStringList names;
@@ -637,22 +658,21 @@ QVariantMap SshBridge::deletePublicKeys(const QVariantList& rows)
         if (visible < 0 || visible >= static_cast<int>(m_visibleKeys.size()))
             continue;
         const auto& key = m_keys[static_cast<size_t>(m_visibleKeys[static_cast<size_t>(visible)])];
-        if (key.state == envh::ssh::KeyState::PrivateOnly)
-            continue;
-        const std::string file = key.state == envh::ssh::KeyState::PublicOnly ? key.name : key.name + ".pub";
-        if (std::find(selectedFiles.begin(), selectedFiles.end(), file) == selectedFiles.end()) {
-            selectedFiles.push_back(file);
-            files.push_back(file);
-            names.append(qs(file));
+        for (const std::string& file : keyFileNames(key)) {
+            if (std::find(selectedFiles.begin(), selectedFiles.end(), file) == selectedFiles.end()) {
+                selectedFiles.push_back(file);
+                files.push_back(file);
+                names.append(qs(file));
+            }
         }
     }
     if (files.empty()) {
-        result["code"] = QStringLiteral("noPublicKeys");
+        result["code"] = QStringLiteral("noKeys");
         return result;
     }
     envh::native::SshStore store(m_args.sshDir, m_dirText.toStdWString() + L"\\config");
     std::string error;
-    if (!store.deletePublicKeys(files, error)) {
+    if (!store.deleteKeys(files, error)) {
         result["code"] = QStringLiteral("delete");
         result["detail"] = qs(error);
         return result;

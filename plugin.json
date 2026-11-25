@@ -60,7 +60,7 @@
         "zh": "如 env path；回车打开编辑器并定位",
         "en": "e.g. env path; Enter opens the editor at that variable"
       },
-      "icon": "glyph:U+E713",
+      "icon": "ph:sliders",
       "actions": [
         { "id": "open", "title": { "zh": "打开编辑器", "en": "Open editor" }, "key": "Enter" },
         { "id": "copyValue", "title": { "zh": "复制原始值", "en": "Copy value" }, "key": "Ctrl+Enter" },
@@ -82,7 +82,7 @@
         "zh": "如 hosts docker；回车启用/禁用该行",
         "en": "e.g. hosts docker; Enter enables/disables that line"
       },
-      "icon": "glyph:U+E774",
+      "icon": "ph:globe",
       "actions": [
         { "id": "enable", "title": { "zh": "启用", "en": "Enable" }, "key": "Enter" },
         { "id": "disable", "title": { "zh": "禁用", "en": "Disable" }, "key": "Enter" },

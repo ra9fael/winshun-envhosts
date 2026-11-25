@@ -523,7 +523,7 @@ private slots:
         QVERIFY(object->findChild<QObject*>("sshTestButton"));
         QVERIFY(object->findChild<QObject*>("sshConnectButton"));
         QVERIFY(object->findChild<QObject*>("sshTestStrip"));
-        QVERIFY(object->findChild<QObject*>("agentFileDialog"));
+        QVERIFY(bridge.metaObject()->indexOfMethod("browseAgentKey()") >= 0);
         QCOMPARE(bridge.agentSourceLabel(), QStringLiteral(R"(\\.\pipe\custom-agent)"));
         QCOMPARE(bridge.connectionTest().value("state").toString(), QStringLiteral("idle"));
         QVERIFY(!bridge.testing());
@@ -551,6 +551,43 @@ private slots:
         QVERIFY(selectedDemo);
         QVERIFY(selectedStaging);
         QVERIFY2(warnings.isEmpty(), qPrintable(warnings.join('\n')));
+        QDir(testRoot).removeRecursively();
+    }
+    void sshKeyDeleteRemovesPair() {
+        const auto testRoot = QDir::current().filePath("ssh-key-delete-test");
+        QDir(testRoot).removeRecursively();
+        QVERIFY(QDir().mkpath(testRoot + "/ssh"));
+        const auto sshDir = testRoot + "/ssh";
+        QVERIFY(QDir().mkpath(sshDir));
+        QFile config(sshDir + "/config");
+        QVERIFY(config.open(QIODevice::WriteOnly | QIODevice::Text));
+        config.write("Host demo\n    HostName demo.example.com\n");
+        config.close();
+
+        QFile privateKey(sshDir + "/id_ed25519");
+        QVERIFY(privateKey.open(QIODevice::WriteOnly | QIODevice::Text));
+        privateKey.write("-----BEGIN OPENSSH PRIVATE KEY-----\n");
+        privateKey.close();
+        QFile publicKey(sshDir + "/id_ed25519.pub");
+        QVERIFY(publicKey.open(QIODevice::WriteOnly | QIODevice::Text));
+        publicKey.write("not-a-public-key test@host\n");
+        publicKey.close();
+
+        OpenArgs args;
+        args.kind = "ssh";
+        args.sshDir = sshDir.toStdWString();
+        args.dataDir = testRoot.toStdString();
+        args.setLang(envh::i18n::Lang::EnUS);
+        SshBridge bridge(args);
+        QString loadError;
+        QVERIFY2(bridge.load(loadError), qPrintable(loadError));
+
+        const QStringList files = bridge.keyFiles({0});
+        QCOMPARE(files, QStringList({"id_ed25519", "id_ed25519.pub"}));
+        const QVariantMap result = bridge.deleteKeys({0});
+        QCOMPARE(result.value("code").toString(), QString());
+        QVERIFY(!QFile::exists(privateKey.fileName()));
+        QVERIFY(!QFile::exists(publicKey.fileName()));
         QDir(testRoot).removeRecursively();
     }
 
