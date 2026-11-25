@@ -28,6 +28,7 @@
 #include "native.h"
 #ifdef ENVHOSTS_QML_EDITOR
 #include <QGuiApplication>
+#include <QLocalSocket>
 #include "qt_window_icon.h"
 #include <QMetaObject>
 #include <thread>
@@ -1089,6 +1090,29 @@ struct EnvHosts : winshun::Plugin {
 
 } // namespace
 
+#ifdef ENVHOSTS_QML_EDITOR
+namespace {
+int runSshAskpassClient(int argc, char** argv)
+{
+    QCoreApplication app(argc, argv);
+    if (argc < 2)
+        return 1;
+    QLocalSocket socket;
+    socket.connectToServer(qEnvironmentVariable("WINSHUN_SSH_ASKPASS_SOCKET"));
+    if (!socket.waitForConnected(1500))
+        return 1;
+    socket.write(QString::fromLocal8Bit(argv[1]).toUtf8());
+    socket.write("\n");
+    socket.flush();
+    if (!socket.waitForReadyRead(300000))
+        return 1;
+    const QByteArray value = socket.readLine();
+    std::cout.write(value.constData(), value.size()) << std::flush;
+    return value.isEmpty() ? 1 : 0;
+}
+}
+#endif
+
 int main(int argc, char** argv)
 {
     if(argc==2&&std::string(argv[1])=="--build-info") {
@@ -1096,6 +1120,10 @@ int main(int argc, char** argv)
                   << "\",\"backend\":\"" << ENVHOSTS_BACKEND << "\"}\n";
         return 0;
     }
+#ifdef _WIN32
+    if (winshun::env("WINSHUN_SSH_ASKPASS") == "1" && argc >= 2)
+        return runSshAskpassClient(argc, argv);
+#endif
 #ifdef ENVHOSTS_QML_EDITOR
     // Qt Quick requires the GUI thread, so the Qt loop owns the main thread and
     // the JSON-RPC loop moves to a worker. stdio stays owned by the protocol

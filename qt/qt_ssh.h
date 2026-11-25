@@ -14,6 +14,8 @@
 
 #include <QAbstractListModel>
 #include <QElapsedTimer>
+#include <QLocalServer>
+#include <QLocalSocket>
 #include <QObject>
 #include <QProcess>
 #include <QStringList>
@@ -135,6 +137,9 @@ class SshBridge : public QObject {
     Q_PROPERTY(QString knownHostsError READ knownHostsError NOTIFY knownHostsChanged)
     Q_PROPERTY(QVariantList agentKeys READ agentKeys NOTIFY agentChanged)
     Q_PROPERTY(QString agentError READ agentError NOTIFY agentChanged)
+    Q_PROPERTY(bool agentLoading READ agentLoading NOTIFY agentLoadingChanged)
+    Q_PROPERTY(bool passphrasePromptVisible READ passphrasePromptVisible NOTIFY passphrasePromptChanged)
+    Q_PROPERTY(QString passphrasePrompt READ passphrasePrompt NOTIFY passphrasePromptChanged)
     Q_PROPERTY(QString agentSource READ agentSource CONSTANT)
     Q_PROPERTY(QString agentSourceLabel READ agentSourceLabel CONSTANT)
     Q_PROPERTY(QStringList privateKeyNames READ privateKeyNames NOTIFY metaChanged)
@@ -190,6 +195,9 @@ public:
     QString knownHostsError() const { return m_knownHostsError; }
     QVariantList agentKeys() const { return m_agentKeys; }
     QString agentError() const { return m_agentError; }
+    bool agentLoading() const { return m_agentLoadProcess != nullptr; }
+    bool passphrasePromptVisible() const { return m_askpassClient != nullptr; }
+    QString passphrasePrompt() const { return m_passphrasePrompt; }
     QString agentSource() const { return m_args.sshAgent.empty() ? QStringLiteral("auto") : QString::fromStdString(m_args.sshAgent); }
     QString agentSourceLabel() const;
     QStringList privateKeyNames() const;
@@ -216,6 +224,8 @@ public:
     Q_INVOKABLE QVariantMap browseAgentKey();
     Q_INVOKABLE QVariantMap removeAgentKeys(const QVariantList& fingerprints);
     Q_INVOKABLE QVariantMap clearAgent();
+    Q_INVOKABLE void respondPassphrase(const QString& value);
+    Q_INVOKABLE void cancelPassphrase();
     Q_INVOKABLE void reloadKnownHosts() { refreshKnownHosts(); }
     Q_INVOKABLE int addConnection();
     Q_INVOKABLE void createConfig();
@@ -249,11 +259,14 @@ signals:
     void keygenFinished();
     void knownHostsChanged();
     void agentChanged();
+    void agentLoadingChanged();
+    void passphrasePromptChanged();
     void connectionTestChanged();
     void toast(const QString& code, const QString& detail);
 
 private:
     void parseAppearance(const std::string& appearanceJson);
+    void startAskpassServer();
     int selectedConnIndex() const;
     void rebuild();
     void refreshKeys();
@@ -289,6 +302,12 @@ private:
     QVariantList m_conflictDiff;
     QVariantMap m_connectionTest {{QStringLiteral("state"), QStringLiteral("idle")}};
     QProcess* m_testProcess = nullptr;
+    QProcess* m_agentLoadProcess = nullptr;
+    QString m_agentLoadPath;
+    QLocalServer* m_askpassServer = nullptr;
+    QLocalSocket* m_askpassClient = nullptr;
+    QString m_askpassServerName;
+    QString m_passphrasePrompt;
     QElapsedTimer m_testTimer;
     bool m_hasConfig = false;
     bool m_keygenAvailable = false;

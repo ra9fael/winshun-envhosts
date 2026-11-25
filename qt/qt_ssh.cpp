@@ -18,6 +18,7 @@
 #include <QRegularExpression>
 #include <QUrl>
 #include <QStringList>
+#include <QCoreApplication>
 
 #include <algorithm>
 #include <array>
@@ -235,7 +236,36 @@ SshBridge::SshBridge(OpenArgs args, QObject* parent) : QObject(parent), m_args(s
     parseAppearance(m_args.appearanceJson);
     refreshKnownHosts();
     m_keygenAvailable = !envh::native::findSshKeygen().empty();
+    startAskpassServer();
     refreshAgent();
+}
+
+void SshBridge::startAskpassServer()
+{
+    m_askpassServer = new QLocalServer(this);
+    m_askpassServerName = QStringLiteral("winshun-ssh-askpass-%1-%2")
+        .arg(QCoreApplication::applicationPid()).arg(reinterpret_cast<quintptr>(this));
+    QLocalServer::removeServer(m_askpassServerName);
+    if (!m_askpassServer->listen(m_askpassServerName))
+        return;
+    connect(m_askpassServer, &QLocalServer::newConnection, this, [this] {
+        if (m_askpassClient)
+            m_askpassClient->deleteLater();
+        m_askpassClient = m_askpassServer->nextPendingConnection();
+        connect(m_askpassClient, &QLocalSocket::readyRead, this, [this] {
+            const QString prompt = QString::fromUtf8(m_askpassClient->readLine()).trimmed();
+            if (prompt.isEmpty())
+                return;
+            m_passphrasePrompt = prompt;
+            emit passphrasePromptChanged();
+        });
+        connect(m_askpassClient, &QLocalSocket::disconnected, this, [this] {
+            m_askpassClient->deleteLater();
+            m_askpassClient = nullptr;
+            m_passphrasePrompt.clear();
+            emit passphrasePromptChanged();
+        });
+    });
 }
 
 QString SshBridge::title() const
@@ -530,11 +560,85 @@ QVariantMap SshBridge::addAgentKeyPath(const QString& path)
     const QString file = QDir::toNativeSeparators(path.trimmed());
     if (file.isEmpty())
         return actionResult(QStringLiteral("key"), m_args.zh ? QStringLiteral("请选择私钥文件") : QStringLiteral("Choose a private key file"));
-    const envh::native::ProcResult proc = envh::native::runInteractiveProcess(tool, {L"--", file.toStdWString()}, agentSocket(m_args.sshAgent));
-    if (!proc.launched || !proc.ok)
-        return actionResult(QStringLiteral("agent"), proc.err.empty() ? QStringLiteral("ssh-add failed") : qs(proc.err));
-    m_pendingAgentPath = file;
-    return refreshAgent();
+    if (m_agentLoadProcess)
+        return actionResult(QStringLiteral("busy"), m_args.zh ? QStringLiteral("正在加载密钥") : QStringLiteral("A key is already loading"));
+    auto* process = new QProcess(this);
+    process->setProcessChannelMode(QProcess::MergedChannels);
+    QProcessEnvironment environment = QProcessEnvironment::systemEnvironment();
+    environment.insert(QStringLiteral("SSH_AUTH_SOCK"), QString::fromStdWString(agentSocket(m_args.sshAgent)));
+    const QString askpass = QString::fromStdWString(envh::native::currentExecutable());
+    if (!askpass.isEmpty()) {
+        environment.insert(QStringLiteral("SSH_ASKPASS"), askpass);
+        environment.insert(QStringLiteral("SSH_ASKPASS_REQUIRE"), QStringLiteral("force"));
+        environment.insert(QStringLiteral("DISPLAY"), QStringLiteral("winshun"));
+        environment.insert(QStringLiteral("WINSHUN_SSH_ASKPASS"), QStringLiteral("1"));
+        environment.insert(QStringLiteral("WINSHUN_SSH_ASKPASS_ZH"), m_args.zh ? QStringLiteral("1") : QStringLiteral("0"));
+        environment.insert(QStringLiteral("WINSHUN_SSH_ASKPASS_DARK"), m_args.dark ? QStringLiteral("1") : QStringLiteral("0"));
+        environment.insert(QStringLiteral("WINSHUN_SSH_ASKPASS_APPEARANCE"),
+                           QString::fromUtf8(QJsonDocument::fromVariant(m_appearance).toJson(QJsonDocument::Compact)));
+        environment.insert(QStringLiteral("WINSHUN_SSH_ASKPASS_SOCKET"), m_askpassServerName);
+    }
+    process->setProcessEnvironment(environment);
+#ifdef Q_OS_WIN
+    process->setCreateProcessArgumentsModifier([](QProcess::CreateProcessArguments* arguments) {
+        arguments->flags |= CREATE_NO_WINDOW;
+        arguments->startupInfo->dwFlags |= STARTF_USESHOWWINDOW;
+        arguments->startupInfo->wShowWindow = SW_HIDE;
+    });
+#endif
+    m_agentLoadPath = file;
+    m_agentLoadProcess = process;
+    emit agentLoadingChanged();
+    connect(process, &QProcess::finished, this, [this, process](int exitCode, QProcess::ExitStatus status) {
+        if (process != m_agentLoadProcess)
+            return;
+        const QString output = QString::fromLocal8Bit(process->readAll()).trimmed();
+        const QString path = m_agentLoadPath;
+        m_agentLoadPath.clear();
+        m_agentLoadProcess = nullptr;
+        process->deleteLater();
+        emit agentLoadingChanged();
+        if (status != QProcess::NormalExit || exitCode != 0) {
+            emit toast(QStringLiteral("load"), output.isEmpty() ? QStringLiteral("ssh-add failed") : output);
+            return;
+        }
+        m_pendingAgentPath = path;
+        refreshAgent();
+        emit toast(QStringLiteral("agentLoaded"), path);
+    });
+    connect(process, &QProcess::errorOccurred, this, [this, process](QProcess::ProcessError error) {
+        if (error != QProcess::FailedToStart || process != m_agentLoadProcess)
+            return;
+        const QString path = m_agentLoadPath;
+        m_agentLoadPath.clear();
+        m_agentLoadProcess = nullptr;
+        process->deleteLater();
+        emit agentLoadingChanged();
+        emit toast(QStringLiteral("load"), QStringLiteral("cannot start ssh-add"));
+        Q_UNUSED(path);
+    });
+    process->start(QString::fromStdWString(tool), {QStringLiteral("--"), file});
+    return actionResult(QString(), QString());
+}
+
+void SshBridge::respondPassphrase(const QString& value)
+{
+    if (!m_askpassClient)
+        return;
+    m_askpassClient->write(value.toUtf8());
+    m_askpassClient->write("\n");
+    m_askpassClient->flush();
+    m_askpassClient->disconnectFromServer();
+    m_passphrasePrompt.clear();
+    emit passphrasePromptChanged();
+}
+
+void SshBridge::cancelPassphrase()
+{
+    if (m_askpassClient)
+        m_askpassClient->disconnectFromServer();
+    m_passphrasePrompt.clear();
+    emit passphrasePromptChanged();
 }
 
 QVariantMap SshBridge::browseAgentKey()
@@ -564,7 +668,7 @@ QVariantMap SshBridge::removeAgentKeys(const QVariantList& fingerprints)
             }
         }
         if (source.isEmpty())
-            return actionResult(QStringLiteral("source"), m_args.zh ? QStringLiteral("选中的 agent 密钥没有对应的本地公钥/私钥文件") : QStringLiteral("The selected agent key has no matching local key file"));
+            return actionResult(QStringLiteral("source"), m_args.zh ? QStringLiteral("选中的代理密钥没有对应的本地公钥/私钥文件") : QStringLiteral("The selected agent key has no matching local key file"));
         const envh::native::ProcResult proc = envh::native::runProcessCapture(tool, {L"-d", source.toStdWString()}, agentSocket(m_args.sshAgent));
         if (!proc.ok)
             return actionResult(QStringLiteral("agent"), proc.out.empty() ? QStringLiteral("ssh-add -d failed") : QString::fromUtf8(proc.out.data(), static_cast<int>(proc.out.size())).trimmed());
@@ -1037,6 +1141,7 @@ QVariantMap SshBridge::keyDetail() const
     QVariantMap m;
     if (m_keySel < 0 || m_keySel >= static_cast<int>(m_visibleKeys.size())) {
         m["hasPub"] = false;
+        m["hasPrivate"] = false;
         m["name"] = QString();
         m["usedBy"] = QStringList {};
         m["pubText"] = QString();
@@ -1051,6 +1156,7 @@ QVariantMap SshBridge::keyDetail() const
     m["fingerprint"] = qs(k.pub.fingerprint);
     m["state"] = qs(envh::ssh::keyStateName(k.state));
     m["hasPub"] = k.pub.ok;
+    m["hasPrivate"] = k.state != envh::ssh::KeyState::PublicOnly;
     QStringList used;
     for (int i = 0; i < static_cast<int>(m_cfg.connectionIndexes().size()); ++i) {
         const envh::ssh::Block* b = m_cfg.connection(i);

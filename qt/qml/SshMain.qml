@@ -22,6 +22,47 @@ ApplicationWindow {
     component Field: CompactTextField {
         theme: tokens
     }
+    component SshHeaderCell: Item {
+        property string title: ""
+        property real columnWidth: 100
+        property bool fills: false
+        signal resized(real delta)
+        implicitWidth: columnWidth
+        Layout.preferredWidth: columnWidth
+        Layout.fillWidth: fills
+        Layout.fillHeight: true
+        Text {
+            anchors.fill: parent
+            anchors.leftMargin: 7
+            anchors.rightMargin: 10
+            verticalAlignment: Text.AlignVCenter
+            text: parent.title
+            color: root.dimColor
+            font.pixelSize: 11
+            elide: Text.ElideRight
+        }
+        MouseArea {
+            anchors.right: parent.right
+            width: 9
+            height: parent.height
+            cursorShape: Qt.SizeHorCursor
+            property real originX: 0
+            property real originWidth: 0
+            onPressed: {
+                originX = mapToItem(parent, mouse.x, mouse.y).x;
+                originWidth = parent.columnWidth;
+            }
+            onPositionChanged: if (pressed)
+                parent.resized(mapToItem(parent, mouse.x, mouse.y).x - originX)
+        }
+        Rectangle {
+            anchors.right: parent.right
+            anchors.verticalCenter: parent.verticalCenter
+            width: 1
+            height: parent.height - 10
+            color: root.ruleColor
+        }
+    }
 
 
     property var bridge: null
@@ -60,7 +101,7 @@ ApplicationWindow {
     readonly property bool dialogOpen: saveDlg.visible || conflictDlg.visible || deleteDlg.visible
                                        || keygenDlg.visible || infoDlg.visible || closeDlg.visible
                                        || keyDeleteDlg.visible || knownDeleteDlg.visible
-                                       || agentPicker.visible
+                                       || agentPicker.visible || passphraseDlg.visible
 
     property string tab: "conn"
     property string connFilter: ""
@@ -78,9 +119,27 @@ ApplicationWindow {
     property var selectedHosts: []
     property var selectedAgent: []
     property string agentAddName: ""
+    property var connWidths: ({name: 190, user: 88, port: 48, key: 176})
+    property var keyWidths: ({file: 190, type: 80, fingerprint: 180, state: 100})
     property real connMenuX: 0
     property real connMenuY: 0
     property int rangeAnchor: -1
+
+    function resizeSshColumn(table, key, delta, minimum, maximum) {
+        const source = table === "conn" ? connWidths : keyWidths;
+        const next = {};
+        for (const name in source)
+            next[name] = source[name];
+        if (delta === 0) {
+            next[key] = minimum;
+        } else {
+            next[key] = Math.max(minimum, Math.min(maximum, source[key] + delta));
+        }
+        if (table === "conn")
+            connWidths = next;
+        else
+            keyWidths = next;
+    }
 
     width: tokens.windowWidth
     height: tokens.windowHeight
@@ -109,7 +168,7 @@ ApplicationWindow {
     // ---- strings -------------------------------------------------------------
 
     readonly property var zh: ({
-        tabConn: "连接", tabKeys: "密钥", tabAgent: "Agent", tabKnown: "已知主机",
+        tabConn: "连接", tabKeys: "密钥", tabAgent: "代理", tabKnown: "已知主机",
         filterConn: "筛选连接（名称 / 主机 / 用户）", filterKeys: "筛选密钥（文件 / 类型 / 注释）", filterKnown: "筛选已知主机（主机 / 算法 / 指纹）",
         add: "新增连接", gen: "生成密钥", save: "保存",
         undo: "撤销", redo: "重做", info: "说明",
@@ -133,10 +192,8 @@ ApplicationWindow {
         previewLegend: "保存时将写入的内容；背景高亮对应列表中的选中连接，● 标记本次变更。",
         previewEmpty: "文件为空。",
         keyPath: "路径", keyType: "类型", keyFp: "指纹（SHA256）", keyUsed: "关联连接",
-        keyPub: "公钥", keyPriv: "私钥内容",
-        keyPrivNote: "本界面不显示、不复制、不记录私钥内容；修改口令请用 ssh-keygen。",
-        keyNoPub: "缺少对应的公钥文件，无法复制公钥。",
-        keyNoPrivate: "目录中没有对应的私钥文件。",
+         keyPub: "公钥",
+         keyNoPub: "缺少对应的公钥文件，无法复制公钥。",
         keyNoneUsed: "（未被任何连接使用）",
         selectHint: "选择一项查看详情",
         deleteSelected: "删除选中项",
@@ -168,11 +225,12 @@ ApplicationWindow {
         statusDirty: n => "● " + n + " 项未保存", statusClean: "已保存", statusSave: "Ctrl+S 保存",
         statusCount: n => "共 " + n + " 个连接",
         statusKeys: n => "共 " + n + " 个密钥",
-        statusAgent: n => "Agent 中有 " + n + " 个密钥",
-        agentEmpty: "当前 agent 没有已加载的密钥。",
-        agentAdd: "加载密钥", agentRemove: "移除选中", agentClear: "清空 Agent", agentRefresh: "刷新",
-        agentPick: "选择要加载的私钥", agentLoad: "加载", agentBrowse: "浏览…", agentNoKeys: "没有可加载的私钥文件。", filterAgent: "筛选 Agent 密钥（指纹 / 注释 / 类型）", agentFingerprint: "指纹", agentComment: "注释", agentSource: "来源",
-        agentHint: "Agent 来源：" + (bridge ? bridge.agentSourceLabel : "auto") + "。只操作当前用户的 agent；私钥正文和 passphrase 不会进入插件。",
+        statusAgent: n => "代理中有 " + n + " 个密钥",
+        agentEmpty: "当前代理没有已加载的密钥。",
+        agentAdd: "加载密钥", agentRemove: "移除选中", agentClear: "清空代理", agentRefresh: "刷新",
+        agentPick: "选择要加载的私钥", agentLoad: "加载", agentLoading: "正在加载…", agentBrowse: "浏览…", agentNoKeys: "没有可加载的私钥文件。", filterAgent: "筛选代理密钥（指纹 / 注释 / 类型）", agentFingerprint: "指纹", agentComment: "注释", agentSource: "来源",
+        agentHint: "代理来源：" + (bridge ? bridge.agentSourceLabel : "auto") + "。只操作当前用户的代理；私钥正文和 passphrase 不会进入插件。",
+        addToAgent: "添加到代理", agentLoaded: "密钥已添加到代理",
         bannerKeygen: "未检测到 ssh-keygen：生成密钥不可用。浏览、复制与编辑配置不受影响。",
         bannerLocked: "检测到 Include / Match / 通配符块：这些块只读，保存时原样保留。",
         bannerCreated: "已新建配置文件，保存后写入磁盘。",
@@ -244,10 +302,8 @@ ApplicationWindow {
         previewLegend: "Exactly what will be written; highlighted blocks are selected in the list, and ● marks changed lines.",
         previewEmpty: "The file is empty.",
         keyPath: "Path", keyType: "Type", keyFp: "Fingerprint (SHA256)", keyUsed: "Used by",
-        keyPub: "Public key", keyPriv: "Private key",
-        keyPrivNote: "Private key content is never shown, copied or logged; use ssh-keygen to change a passphrase.",
-        keyNoPub: "No matching public key file: there is nothing to copy.",
-        keyNoPrivate: "No matching private key file in the folder.",
+         keyPub: "Public key",
+         keyNoPub: "No matching public key file: there is nothing to copy.",
         keyNoneUsed: "(not used by any connection)",
         selectHint: "Select an item to see its details",
         deleteSelected: "Delete selected",
@@ -282,7 +338,8 @@ ApplicationWindow {
         statusAgent: n => n + " key(s) in agent",
         agentEmpty: "No keys are loaded in the current agent.",
         agentAdd: "Load key", agentRemove: "Remove selected", agentClear: "Clear agent", agentRefresh: "Refresh",
-        agentPick: "Choose a private key", agentLoad: "Load", agentBrowse: "Browse…", agentNoKeys: "No private key files to load.", filterAgent: "Filter agent keys (fingerprint / comment / type)", agentFingerprint: "Fingerprint", agentComment: "Comment", agentSource: "Source",
+        agentPick: "Choose a private key", agentLoad: "Load", agentLoading: "Loading…", agentBrowse: "Browse…", agentNoKeys: "No private key files to load.", filterAgent: "Filter agent keys (fingerprint / comment / type)", agentFingerprint: "Fingerprint", agentComment: "Comment", agentSource: "Source",
+        addToAgent: "Add to agent", agentLoaded: "Key added to agent",
         agentHint: "Agent source: " + (bridge ? bridge.agentSourceLabel : "auto") + ". Only the selected agent is affected; private-key text and passphrases never enter the plugin.",
         bannerKeygen: "ssh-keygen was not found: key generation is unavailable. Browsing, copying and editing the config are unaffected.",
         bannerLocked: "Include / Match / wildcard blocks found: they are read-only and written back verbatim.",
@@ -603,6 +660,17 @@ ApplicationWindow {
         const result = bridge.addAgentKey(agentAddName);
         agentAddName = "";
         agentPicker.close();
+        if (result.code !== "")
+            showToast(result.detail || result.code, true);
+    }
+
+    function addSelectedKeyToAgent() {
+        if (!bridge || selectedKeys.length !== 1)
+            return;
+        const key = bridge.keyDetail || ({ });
+        if (!key.name || key.state === "public")
+            return;
+        const result = bridge.addAgentKey(key.name);
         if (result.code !== "")
             showToast(result.detail || result.code, true);
     }
@@ -1012,7 +1080,7 @@ ApplicationWindow {
 
         footer: Item {
             implicitHeight: 52
-            RowLayout {
+                                 RowLayout {
                 anchors.fill: parent
                 anchors.margins: 10
                 spacing: 8
@@ -1034,6 +1102,97 @@ ApplicationWindow {
                 Btn {
                     text: root.str.btnCancel
                     onClicked: agentPicker.reject()
+                }
+            }
+        }
+    }
+
+    Dialog {
+        id: passphraseDlg
+        parent: root.contentItem
+        anchors.centerIn: parent
+        modal: true
+        padding: 0
+        width: Math.min(460, root.width - 40)
+        closePolicy: Popup.CloseOnEscape
+        visible: root.bridge && root.bridge.passphrasePromptVisible
+        onVisibleChanged: if (visible) passphraseField.forceActiveFocus()
+        onRejected: if (root.bridge) root.bridge.cancelPassphrase()
+
+        background: Rectangle {
+            color: root.panelColor
+            radius: tokens.cardRadius
+            border.width: 1
+            border.color: root.ruleColor
+        }
+        header: Rectangle {
+            implicitHeight: 44
+            color: root.panelColor
+            Text {
+                anchors.fill: parent
+                anchors.leftMargin: 16
+                verticalAlignment: Text.AlignVCenter
+                text: root.bridge && root.bridge.zh ? "SSH 口令" : "SSH passphrase"
+                color: root.inkColor
+                font.pixelSize: 15
+                font.bold: true
+            }
+            Rectangle {
+                anchors.bottom: parent.bottom
+                anchors.left: parent.left
+                anchors.right: parent.right
+                height: 1
+                color: root.ruleColor
+            }
+        }
+        contentItem: Item {
+            implicitHeight: 84
+            id: passphraseContent
+            ColumnLayout {
+                id: passphraseColumn
+                anchors.fill: parent
+                anchors.margins: 14
+                spacing: 8
+                Text {
+                    Layout.fillWidth: true
+                    text: {
+                        if (!root.bridge)
+                            return "";
+                        if (!root.bridge.zh)
+                            return root.bridge.passphrasePrompt;
+                        const prompt = root.bridge.passphrasePrompt;
+                        const marker = prompt.lastIndexOf(" for ");
+                        return marker >= 0 ? "请输入私钥口令：" + prompt.slice(marker + 5) : "请输入私钥口令";
+                    }
+                    color: root.dimColor
+                    font.pixelSize: 11
+                    elide: Text.ElideMiddle
+                }
+                Field {
+                    id: passphraseField
+                    Layout.fillWidth: true
+                    echoMode: TextInput.Password
+                    placeholderText: root.bridge && root.bridge.zh ? "口令" : "Passphrase"
+                    onAccepted: if (root.bridge) root.bridge.respondPassphrase(text)
+                }
+            }
+        }
+        footer: Item {
+            implicitHeight: 48
+            RowLayout {
+                anchors.fill: parent
+                anchors.margins: 10
+                spacing: 8
+                Item { Layout.fillWidth: true }
+                Btn {
+                    primary: true
+                    text: root.bridge && root.bridge.zh ? "确定" : "Continue"
+                    enabled: passphraseField.text.length > 0
+                    onClicked: if (root.bridge) root.bridge.respondPassphrase(passphraseField.text)
+                }
+                Btn {
+                    text: root.str.btnCancel
+                    onClicked: if (root.bridge) root.bridge.cancelPassphrase()
                 }
             }
         }
@@ -1068,6 +1227,8 @@ ApplicationWindow {
                 root.showToast(root.str.toastCreated, false);
             else if (code === "keygen")
                 root.showToast(root.str.toastKeygen(detail), false);
+            else if (code === "agentLoaded")
+                root.showToast(root.str.agentLoaded, false);
             else if (code === "load" || code === "write")
                 root.showToast(detail, true);
         }
@@ -1393,10 +1554,8 @@ ApplicationWindow {
                             anchors.fill: parent
                             anchors.leftMargin: 4
                             anchors.rightMargin: 8
-                            spacing: 8
-                     property bool connTab: root.tab === "conn"
+                            spacing: 0
                             Rectangle {
-                                visible: !root.narrow
                                 Layout.preferredWidth: root.selectionColumnWidth
                                 Layout.fillHeight: true
                                 color: root.panelAlt
@@ -1411,83 +1570,67 @@ ApplicationWindow {
                                                ? root.clearCurrentSelection() : root.selectAllVisible()
                                 }
                             }
-                            Text {
-                                visible: parent.connTab
-                                text: root.str.colName
-                                font.pixelSize: 11
-                                color: root.dimColor
-                                Layout.preferredWidth: 190
-                                elide: Text.ElideRight
+                            SshHeaderCell {
+                                visible: root.tab === "conn"
+                                title: root.str.colName
+                                columnWidth: root.connWidths.name
+                                onResized: root.resizeSshColumn("conn", "name", delta, 120, 360)
                             }
-                            Text {
-                                visible: parent.connTab
-                                text: root.str.colHost
-                                font.pixelSize: 11
-                                color: root.dimColor
-                                Layout.fillWidth: true
-                                elide: Text.ElideRight
+                            SshHeaderCell {
+                                visible: root.tab === "conn"
+                                title: root.str.colHost
+                                fills: true
+                                columnWidth: 180
                             }
-                            Text {
-                                visible: parent.connTab
-                                text: root.str.colUser
-                                font.pixelSize: 11
-                                color: root.dimColor
-                                Layout.preferredWidth: 88
-                                elide: Text.ElideRight
+                            SshHeaderCell {
+                                visible: root.tab === "conn"
+                                title: root.str.colUser
+                                columnWidth: root.connWidths.user
+                                onResized: root.resizeSshColumn("conn", "user", delta, 60, 220)
                             }
-                            Text {
-                                visible: parent.connTab
-                                text: root.str.colPort
-                                font.pixelSize: 11
-                                color: root.dimColor
-                                Layout.preferredWidth: 48
+                            SshHeaderCell {
+                                visible: root.tab === "conn"
+                                title: root.str.colPort
+                                columnWidth: root.connWidths.port
+                                onResized: root.resizeSshColumn("conn", "port", delta, 40, 120)
                             }
-                            Text {
-                                visible: parent.connTab
-                                text: root.str.colKey
-                                font.pixelSize: 11
-                                color: root.dimColor
-                                Layout.preferredWidth: 176
-                                elide: Text.ElideRight
+                            SshHeaderCell {
+                                visible: root.tab === "conn"
+                                title: root.str.colKey
+                                columnWidth: root.connWidths.key
+                                onResized: root.resizeSshColumn("conn", "key", delta, 100, 360)
                             }
-                                 Text {
-                                     visible: !parent.connTab && root.tab === "keys"
-                                text: root.str.colFile
-                                font.pixelSize: 11
-                                color: root.dimColor
-                                Layout.preferredWidth: 190
-                                elide: Text.ElideRight
+                            Item { visible: root.tab === "conn"; Layout.preferredWidth: 16; Layout.fillHeight: true }
+                            Item { visible: root.tab === "conn"; Layout.preferredWidth: 30; Layout.fillHeight: true }
+                            SshHeaderCell {
+                                visible: root.tab === "keys"
+                                title: root.str.colFile
+                                columnWidth: root.keyWidths.file
+                                onResized: root.resizeSshColumn("keys", "file", delta, 120, 360)
                             }
-                            Text {
-                                visible: !parent.connTab
-                                text: root.str.colType
-                                font.pixelSize: 11
-                                color: root.dimColor
-                                Layout.preferredWidth: 80
+                            SshHeaderCell {
+                                visible: root.tab === "keys"
+                                title: root.str.colType
+                                columnWidth: root.keyWidths.type
+                                onResized: root.resizeSshColumn("keys", "type", delta, 60, 160)
                             }
-                            Text {
-                                visible: !parent.connTab
-                                text: root.str.colComment
-                                font.pixelSize: 11
-                                color: root.dimColor
-                                Layout.fillWidth: true
-                                elide: Text.ElideRight
+                            SshHeaderCell {
+                                visible: root.tab === "keys"
+                                title: root.str.colComment
+                                fills: true
+                                columnWidth: 160
                             }
-                            Text {
-                                visible: !parent.connTab
-                                text: root.str.colFp
-                                font.pixelSize: 11
-                                color: root.dimColor
-                                Layout.preferredWidth: 180
-                                elide: Text.ElideRight
+                            SshHeaderCell {
+                                visible: root.tab === "keys"
+                                title: root.str.colFp
+                                columnWidth: root.keyWidths.fingerprint
+                                onResized: root.resizeSshColumn("keys", "fingerprint", delta, 120, 360)
                             }
-                            Text {
-                                visible: !parent.connTab
-                                text: root.str.colState
-                                font.pixelSize: 11
-                                color: root.dimColor
-                                Layout.preferredWidth: 100
-                                elide: Text.ElideRight
+                            SshHeaderCell {
+                                visible: root.tab === "keys"
+                                title: root.str.colState
+                                columnWidth: root.keyWidths.state
+                                onResized: root.resizeSshColumn("keys", "state", delta, 80, 220)
                             }
                         }
                     }
@@ -1509,7 +1652,7 @@ ApplicationWindow {
                             ColumnLayout {
                                 anchors.fill: parent
                                 anchors.margins: 12
-                                spacing: 8
+                                          spacing: 0
                                 Text {
                                     Layout.fillWidth: true
                                     text: root.str.knownHostWarning
@@ -1663,7 +1806,7 @@ ApplicationWindow {
                                         anchors.fill: parent
                                          anchors.leftMargin: 4
                                         anchors.rightMargin: 10
-                                         spacing: 8
+                                          spacing: 0
                                          visible: !root.narrow
 
                                           CompactCheckBox {
@@ -1681,7 +1824,7 @@ ApplicationWindow {
                                             font.bold: true
                                             font.strikeout: deleted
                                             color: deleted ? root.dangerColor : root.inkColor
-                                            Layout.preferredWidth: 190
+                                            Layout.preferredWidth: root.connWidths.name
                                             elide: Text.ElideRight
                                         }
                                         Text {
@@ -1696,21 +1839,21 @@ ApplicationWindow {
                                             text: user
                                             font.pixelSize: 12
                                             color: root.dimColor
-                                            Layout.preferredWidth: 88
+                                            Layout.preferredWidth: root.connWidths.user
                                             elide: Text.ElideRight
                                         }
                                         Text {
                                             text: port
                                             font.pixelSize: 12
                                             color: root.dimColor
-                                            Layout.preferredWidth: 48
+                                            Layout.preferredWidth: root.connWidths.port
                                         }
                                         Text {
                                             text: key
                                             font.pixelSize: 12
                                             font.family: root.monoFont
                                             color: root.dimColor
-                                            Layout.preferredWidth: 176
+                                            Layout.preferredWidth: root.connWidths.key
                                             elide: Text.ElideMiddle
                                         }
                                          Text {
@@ -1924,14 +2067,14 @@ ApplicationWindow {
                                             font.pixelSize: 12
                                             font.bold: true
                                             color: root.inkColor
-                                             Layout.preferredWidth: 190
+                                             Layout.preferredWidth: root.keyWidths.file
                                             elide: Text.ElideRight
                                         }
                                         Text {
                                             text: type
                                             font.pixelSize: 12
                                             color: root.dimColor
-                                             Layout.preferredWidth: 80
+                                              Layout.preferredWidth: root.keyWidths.type
                                         }
                                         Text {
                                             text: comment
@@ -1945,14 +2088,14 @@ ApplicationWindow {
                                             font.pixelSize: 11
                                             font.family: root.monoFont
                                             color: root.dimColor
-                                             Layout.preferredWidth: 180
+                                              Layout.preferredWidth: root.keyWidths.fingerprint
                                             elide: Text.ElideMiddle
                                         }
                                         Text {
                                             text: root.stateText(keyState)
                                             font.pixelSize: 11
                                             color: keyState === "private" ? root.warnColor : root.dimColor
-                                             Layout.preferredWidth: 100
+                                              Layout.preferredWidth: root.keyWidths.state
                                             elide: Text.ElideRight
                                         }
                                     }
@@ -2724,38 +2867,20 @@ ApplicationWindow {
                                     Layout.leftMargin: 14
                                     Layout.rightMargin: 14
                                     spacing: 8
-                                    Btn {
-                                        text: root.str.copyPub
-                                        enabled: root.bridge && root.bridge.keyDetail.hasPub
-                                        onClicked: if (root.bridge) root.bridge.copyPublicKey()
-                                    }
-                                    Item { Layout.fillWidth: true }
-                                }
-
-                                Text {
-                                    Layout.fillWidth: true
-                                    Layout.leftMargin: 14
-                                    Layout.rightMargin: 14
-                                    Layout.topMargin: 10
-                                    text: root.str.keyPriv
-                                    color: root.dimColor
-                                    font.pixelSize: 11
-                                }
-                                Text {
-                                    Layout.fillWidth: true
-                                    Layout.leftMargin: 14
-                                    Layout.rightMargin: 14
-                                    text: {
-                                        const k = root.bridge ? root.bridge.keyDetail : ({});
-                                        if (k.state === "public")
-                                            return root.str.keyNoPrivate;
-                                        return root.str.keyPrivNote;
-                                    }
-                                    color: root.dimColor
-                                    font.pixelSize: 11
-                                    wrapMode: Text.WordWrap
-                                }
-                                Item { Layout.preferredHeight: 14 }
+                                     Btn {
+                                         text: root.str.copyPub
+                                         enabled: root.bridge && root.bridge.keyDetail.hasPub
+                                         onClicked: if (root.bridge) root.bridge.copyPublicKey()
+                                     }
+                                     Btn {
+                                         objectName: "addAgentKeyButton"
+                                         text: root.bridge && root.bridge.agentLoading ? root.str.agentLoading : root.str.addToAgent
+                                         enabled: root.bridge && root.bridge.keyDetail.hasPrivate && !root.bridge.agentLoading
+                                         onClicked: root.addSelectedKeyToAgent()
+                                     }
+                                     Item { Layout.fillWidth: true }
+                                 }
+                                 Item { Layout.preferredHeight: 14 }
                             }
                         }
 

@@ -6,7 +6,7 @@
     "zh": "环境变量 / hosts / SSH 编辑",
     "en": "Env, hosts & SSH editor"
   },
-  "version": "0.10.1",
+  "version": "0.10.2",
   "description": {
     "zh": "可视化编辑用户环境变量与 hosts 条目：交互窗口支持多选批量、分隔项编辑与中英文界面；改写前自动备份，系统级目标未提权时明确降级",
     "en": "Visual editor for user env vars and hosts: multi-select batch commands, split-item editing and a zh/en UI; auto-backup before writes; honest degradation for admin-only targets"
@@ -127,7 +127,7 @@
     {
       "key": "sshAgent",
       "type": "text",
-      "title": { "zh": "SSH Agent", "en": "SSH agent" },
+      "title": { "zh": "SSH 代理", "en": "SSH agent" },
       "hint": { "zh": "auto 使用系统 OpenSSH 管道；env 使用 SSH_AUTH_SOCK；也可填写自定义管道或 socket 路径", "en": "auto uses the system OpenSSH pipe; env uses SSH_AUTH_SOCK; enter a custom pipe or socket path" },
       "default": "auto"
     },
