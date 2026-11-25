@@ -7,6 +7,8 @@ single source of truth; release tags are `<gdi|qml>/v<version>`.
 
 ## [Unreleased]
 
+## [0.10.1] - 2026-11-26
+
 ### Added
 
 - SSH agent source setting for the system OpenSSH named pipe, inherited
