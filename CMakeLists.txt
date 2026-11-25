@@ -17,7 +17,7 @@ add_executable(envhosts main.cpp envhosts.rc)
 target_compile_definitions(envhosts PRIVATE UNICODE _UNICODE NOMINMAX WIN32_LEAN_AND_MEAN)
 # Registry (advapi32) for environment writes, user32 for the launcher window glue,
 # gdi32 for the interactive editor window's GDI double-buffered painting.
-target_link_libraries(envhosts PRIVATE advapi32 user32 gdi32)
+target_link_libraries(envhosts PRIVATE advapi32 user32 gdi32 shell32 ole32)
 
 if(MSVC)
     target_compile_options(envhosts PRIVATE /utf-8 /W4 /permissive-)
@@ -66,10 +66,11 @@ if(ENVHOSTS_QML_EDITOR)
     endif()
     target_compile_definitions(envhosts PRIVATE ENVHOSTS_QML_EDITOR)
     add_library(envhosts_qml STATIC qt/editor_types.h qt/editor_session.h qt/editor_session.cpp
-        qt/editor_models.h qt/editor_models.cpp qt/write_service.h qt/write_service.cpp qt/qt_editor.h qt/qt_editor.cpp)
+        qt/editor_models.h qt/editor_models.cpp qt/write_service.h qt/write_service.cpp qt/qt_editor.h qt/qt_editor.cpp
+        qt/qt_ssh.h qt/qt_ssh.cpp ssh_model.h)
     target_include_directories(envhosts_qml PUBLIC "${CMAKE_SOURCE_DIR}" "${CMAKE_SOURCE_DIR}/qt")
     target_compile_definitions(envhosts_qml PUBLIC UNICODE _UNICODE NOMINMAX WIN32_LEAN_AND_MEAN)
-    target_link_libraries(envhosts_qml PUBLIC Qt6::Core Qt6::Gui Qt6::Qml Qt6::Quick Qt6::QuickControls2 Qt6::Concurrent Qt6::Network advapi32 user32)
+    target_link_libraries(envhosts_qml PUBLIC Qt6::Core Qt6::Gui Qt6::Qml Qt6::Quick Qt6::QuickControls2 Qt6::Concurrent Qt6::Network advapi32 user32 shell32 ole32)
     if(MSVC)
         target_compile_options(envhosts_qml PRIVATE /utf-8 /W4 /permissive-)
     endif()
@@ -110,6 +111,7 @@ if(ENVHOSTS_QML_EDITOR)
             qt/qml/pages/HostsEntriesPage.qml
             qt/qml/pages/HostsRawPage.qml
             qt/qml/pages/BackupsPage.qml
+            qt/qml/SshMain.qml
             qt/qml/dialogs/SaveReview.qml
             qt/qml/dialogs/ConflictReview.qml
             qt/qml/dialogs/DraftRecovery.qml
@@ -183,3 +185,11 @@ if(MSVC)
     target_compile_options(edition_storage_tests PRIVATE /utf-8 /W4 /permissive-)
 endif()
 add_test(NAME edition_storage COMMAND edition_storage_tests)
+
+add_executable(ssh_model_tests tests/test_ssh_model.cpp)
+target_include_directories(ssh_model_tests PRIVATE "${CMAKE_SOURCE_DIR}")
+target_compile_definitions(ssh_model_tests PRIVATE NOMINMAX WIN32_LEAN_AND_MEAN _CRT_SECURE_NO_WARNINGS)
+if(MSVC)
+    target_compile_options(ssh_model_tests PRIVATE /utf-8 /W4 /permissive-)
+endif()
+add_test(NAME ssh_model COMMAND ssh_model_tests)

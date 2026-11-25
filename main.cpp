@@ -43,6 +43,7 @@ namespace {
 
 struct Settings {
     std::string hostsPath = "%SystemRoot%\\System32\\drivers\\etc\\hosts";
+    std::string sshDir;
     int backupCount = 10;
     int maxResults = 50;
     bool showSystem = true;
@@ -61,6 +62,7 @@ Settings readSettings(const winshun::Json& s)
         return fallback;
     };
     st.hostsPath = text("hostsPath", st.hostsPath);
+    st.sshDir = text("sshDir", st.sshDir);
     st.uiLanguage = text("uiLanguage", st.uiLanguage);
     st.backupCount = envh::parseIntOr(text("backupCount", "10"), st.backupCount);
     st.maxResults = envh::parseIntOr(text("maxResults", "50"), st.maxResults);
@@ -348,6 +350,13 @@ struct EnvHosts : winshun::Plugin {
         return s.empty() ? expandPathVars(st.hostsPath) : s;
     }
 
+    std::wstring sshDirPath(const Settings& st)
+    {
+        const std::string test = winshun::env("WS_ENVHOSTS_TEST_SSH");
+        if (!test.empty()) return winshun::wide(test);
+        return st.sshDir.empty() ? envh::native::defaultSshDir() : winshun::wide(expandPathVars(st.sshDir));
+    }
+
     // Host locale (zh / en) plus the plugin's own override. Everything visible
     // is resolved from this at query time, so a language change needs no restart.
     envh::i18n::Lang uiLang() const
@@ -368,6 +377,7 @@ struct EnvHosts : winshun::Plugin {
         oa.userSubkey = testUserSubkey();
         oa.sysSubkey = testSystemSubkey();
         oa.hostsPath = winshun::wide(testHostsPath(st));
+        oa.sshDir = sshDirPath(st);
         oa.dataDir = dataDir();
         oa.backupCount = st.backupCount;
         oa.showSystem = st.showSystem;
@@ -416,9 +426,9 @@ struct EnvHosts : winshun::Plugin {
         const Settings st = readSettings(settings());
         std::string command = q.command;
         std::string text = winshun::trim(q.text);
-        if (command != "env" && command != "hosts") {
+        if (command != "env" && command != "hosts" && command != "sshm" && command != "ssh") {
             const std::string raw = winshun::trim(q.raw);
-            for (const char* kw : {"env", "hosts"}) {
+            for (const char* kw : {"env", "hosts", "sshm", "ssh"}) {
                 const std::string prefix = std::string(kw) + " ";
                 const std::string cprefix = std::string(kw) + ":";
                 if (envh::startsWith(raw, prefix)) {
@@ -442,6 +452,18 @@ struct EnvHosts : winshun::Plugin {
         // inline-edit / sub-command forms (e.g. "env:set NAME=v" -> text ":set NAME=v").
         if (!text.empty() && text[0] == ':')
             text = winshun::trim(text.substr(1));
+        if (command == "sshm" || command == "ssh") {
+            const bool keysMode = text == "keys" || envh::startsWith(text, "keys ");
+            const std::string filter = keysMode ? winshun::trim(text.substr(4)) : text;
+            winshun::Items items;
+            editorwin::OpenArgs oa; oa.kind = "ssh"; oa.sshDir = sshDirPath(st); oa.dataDir = dataDir(); oa.backupCount = st.backupCount; oa.filter = filter; oa.select = keysMode ? "key:" : ""; oa.setLang(uiLang()); oa.dark = theme() == "dark";
+            winshun::Item open("sshm:editor", tr(zh, "进入 SSH 管理器", "Open SSH manager"), tr(zh, "管理 SSH 客户端配置、密钥与 known_hosts", "Manage SSH config, keys and known_hosts"));
+            open.withScore(1000).withData(rowData({{"kind","openSshEditor"},{"filter",filter},{"mode",keysMode?"keys":"conn"},{"primary","SSH"},{"detail",""},{"chain",""},{"expand",false}})).withActions({{"open",tr(zh,"打开","Open"),"Enter"}}); items.push_back(open);
+            envh::native::SshStore store(oa.sshDir, oa.sshDir + L"\\config"); const auto read = store.read();
+            if (keysMode) { const auto keys = store.keys(); int shown=0; for(size_t i=0;i<keys.size()&&shown<st.maxResults;++i) if(envh::ssh::keyMatches(keys[i],filter)){ const auto& k=keys[i]; winshun::Item row("sshm:key:"+std::to_string(i),k.name,tr(zh,"SSH 密钥","SSH key")); row.withData(rowData({{"kind","sshKey"},{"name",k.name},{"pub",k.pub.ok?k.pub.algo+" "+envh::ssh::base64(k.pub.blob):""},{"primary",k.name},{"detail",""},{"chain","sshm:keys "+k.name},{"expand",false}})).withActions({{"open",tr(zh,"打开","Open"),"Enter"}});items.push_back(row);++shown;} }
+            else if (read.ok && !read.missing) { const auto cfg=envh::ssh::parseConfig(read.content); int shown=0; for(int i=0;i<static_cast<int>(cfg.connectionIndexes().size())&&shown<st.maxResults;++i){const auto* b=cfg.connection(i);if(!b||!envh::ssh::connMatches(*b,filter))continue;const auto name=envh::ssh::displayName(*b);winshun::Item row("sshm:conn:"+std::to_string(i),name,b->fields.hostname);row.withData(rowData({{"kind","sshConn"},{"alias",name},{"locked",envh::ssh::isLocked(*b)},{"text",envh::ssh::trim(envh::ssh::serializeBlock(*b,cfg.eol()))},{"primary",name},{"detail",b->fields.hostname},{"chain","sshm "+name},{"expand",false}})).withActions({{"edit",tr(zh,"编辑","Edit"),"Enter"},{"copySshCommand",tr(zh,"复制 SSH 命令","Copy SSH command"),""},{"openTerminal",tr(zh,"用 Windows Terminal 打开","Open in Windows Terminal"),""},{"motty",tr(zh,"用 Motty 连接","Connect with Motty"),""},{"mottyAlias",tr(zh,"用 Motty 按 alias 连接","Connect with Motty by alias"),""},{"delete",tr(zh,"删除","Delete"),""}});items.push_back(row);++shown;} }
+            return items;
+        }
         envh::ParsedQuery pq = envh::parseQuery(command, text);
         if (pq.hasError)
             return {errorRow("error." + pq.errorCode, pq.errorCode, tr(zh, "输入有误", "Invalid input") + " · " + pq.errorCode,
@@ -631,6 +653,46 @@ struct EnvHosts : winshun::Plugin {
         if (kind == "openEditor") {
             const std::string target = data["target"].toString(); // "env" | "hosts"
             return openEditorTarget(target, data["filter"].toString(), data["select"].toString(), st, zh);
+        }
+
+        if (kind == "openSshEditor")
+            return openEditorTarget("ssh", data["filter"].toString(), data["mode"].toString() == "keys" ? "key:" : "", st, zh);
+
+        if (kind == "sshConn") {
+            const std::wstring dir = sshDirPath(st);
+            envh::native::SshStore store(dir, dir + L"\\config");
+            const auto disk = store.read();
+            if (!disk.ok) return {notify(disk.errMsg), winshun::effect::keep()};
+            const auto cfg = disk.missing ? envh::ssh::Config::empty() : envh::ssh::parseConfig(disk.content);
+            const std::string alias = data["alias"].toString();
+            const envh::ssh::Block* block = nullptr;
+            for (int i=0;i<static_cast<int>(cfg.connectionIndexes().size());++i) if (const auto* b=cfg.connection(i); b && envh::ssh::displayName(*b)==alias) { block=b; break; }
+            if (!block) return {notify(tr(zh,"找不到该连接","Connection not found")), winshun::effect::keep()};
+            if (envh::ssh::isLocked(*block))
+                return {notify(tr(zh,"该块只读，不能执行此动作","This block is read-only; the action is unavailable")), winshun::effect::keep()};
+            if (a.action == "edit") return openEditorTarget("ssh", "", alias, st, zh);
+            if (a.action == "copySshCommand") return {winshun::effect::copy("ssh.exe -F \""+winshun::utf8(dir+L"\\config")+"\" \""+alias+"\""), notify(tr(zh,"已复制 SSH 命令","SSH command copied")), winshun::effect::keep()};
+            if (a.action == "mottyAlias") return {notify(tr(zh,"Motty 当前不支持按 OpenSSH alias 直连","Motty does not support direct OpenSSH alias connections yet")), winshun::effect::keep()};
+            if (a.action == "openTerminal") { const auto wt=envh::native::findProgram(L"wt.exe"); const auto ssh=envh::native::findProgram(L"ssh.exe"); if(wt.empty()||ssh.empty())return {notify(tr(zh,"找不到 Windows Terminal 或 ssh.exe","Windows Terminal or ssh.exe was not found")),winshun::effect::keep()}; const auto launch=envh::native::launchProcess(wt,{L"new-tab",ssh,L"-F",dir+L"\\config",envh::native::toWide(alias)}); return launch.launched?winshun::Effects{notify(tr(zh,"已在 Windows Terminal 中打开","Opened in Windows Terminal")),winshun::effect::hide()}:winshun::Effects{notify(launch.err),winshun::effect::keep()}; }
+            if (a.action == "motty") { const std::string host=envh::ssh::trim(block->fields.hostname); const std::string user=envh::ssh::trim(block->fields.user); const std::string port=envh::ssh::trim(block->fields.port).empty()?"22":envh::ssh::trim(block->fields.port); const std::string url="ssh://"+(user.empty()?"":user+"@")+host+":"+port; std::string error; if(!envh::native::openUrl(winshun::wide(url),error))return {notify(error),winshun::effect::keep()}; return {notify(tr(zh,"已请求 Motty 按地址连接","Motty was asked to connect by address")),winshun::effect::hide()}; }
+            if (a.action == "delete") {
+                return {winshun::effect::replace(winshun::Items {confirmRow("sshm:del:" + envh::toLower(alias), "sshDeleteConfirm", alias,
+                                                                           tr(zh, "删除 ", "Delete ") + alias,
+                                                                           tr(zh, "Enter 确认删除，Ctrl+Enter 取消", "Enter confirms deletion, Ctrl+Enter cancels"), zh)}),
+                        winshun::effect::keep()};
+            }
+        }
+
+        if (kind == "sshDeleteConfirm") {
+            if (a.action == "cancel") return {winshun::effect::setQuery("sshm"), winshun::effect::keep()};
+            const std::wstring dir = sshDirPath(st); envh::native::SshStore store(dir, dir + L"\\config"); const auto disk = store.read();
+            if (!disk.ok || disk.missing) return {notify(tr(zh,"SSH 配置读不到","Cannot read the SSH config")), winshun::effect::keep()};
+            auto cfg = envh::ssh::parseConfig(disk.content); const std::string alias = data["target"].toString(); int target = -1;
+            for (int i=0;i<static_cast<int>(cfg.connectionIndexes().size());++i) if (const auto* b=cfg.connection(i); b && !envh::ssh::isLocked(*b) && envh::ssh::displayName(*b)==alias) { target=i; break; }
+            if (target < 0) return {notify(tr(zh,"找不到该连接","Connection not found")), winshun::effect::keep()};
+            envh::native::BackupStore backups(dataDir(), st.backupCount); backups.saveSsh(disk.content); if (!cfg.toggleDelete(target)) return {notify(tr(zh,"删除失败","Delete failed")), winshun::effect::keep()};
+            std::string error; if (!store.write(cfg.serialize(), error)) return {notify(error), winshun::effect::keep()}; editorwin::onExternalChange("ssh");
+            return {notify(tr(zh,"已删除 ","Deleted ") + alias), winshun::effect::setQuery("sshm"), winshun::effect::hide()};
         }
 
         // ---- env actions ----

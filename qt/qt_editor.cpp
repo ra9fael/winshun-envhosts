@@ -1,4 +1,5 @@
 #include "qt_editor.h"
+#include "qt_ssh.h"
 #include <QClipboard>
 #include <QCoreApplication>
 #include <QGuiApplication>
@@ -436,7 +437,7 @@ void applyUiFont(){
     QFont font(families.first());font.setHintingPreference(QFont::PreferVerticalHinting);
     QGuiApplication::setFont(font);
 }
-struct WindowState {QPointer<QQuickWindow> window;QPointer<EditorBridge> bridge;};
+struct WindowState {QPointer<QQuickWindow> window;QPointer<EditorBridge> bridge;QPointer<SshBridge> ssh;};
 class EditorController : public QObject {
 public:
     std::unique_ptr<QQmlEngine> engine;
@@ -460,16 +461,28 @@ public:
     }
     bool create(const OpenArgs& args,std::string& error){
         if(shuttingDown){error="E_SHUTDOWN";return false;}
-        if(auto it=windows.find(args.kind);it!=windows.end()&&it->second.window){auto* win=it->second.window.data();it->second.bridge->applyFocus(args);win->showNormal();win->raise();win->requestActivate();return true;}
+        if(auto it=windows.find(args.kind);it!=windows.end()&&it->second.window){auto* win=it->second.window.data();if(it->second.ssh)it->second.ssh->applyFocus(args);else it->second.bridge->applyFocus(args);win->showNormal();win->raise();win->requestActivate();return true;}
         if(!engine)engine=std::make_unique<QQmlEngine>();
         applyColorScheme(args.dark);
+        if (args.kind == "ssh") {
+            auto* ssh = new SshBridge(args);
+            QString loadError; ssh->load(loadError);
+            QQmlComponent component(engine.get(), QUrl("qrc:/qt/qml/EnvHosts/Editor/qt/qml/SshMain.qml"));
+            if (component.isError()) { error = component.errorString().toStdString(); delete ssh; releaseWhenUnused(); return false; }
+            auto* object = component.createWithInitialProperties({{"bridge", QVariant::fromValue(static_cast<QObject*>(ssh))}});
+            auto* window = qobject_cast<QQuickWindow*>(object);
+            if (!window) { error = component.errorString().toStdString(); delete object; delete ssh; releaseWhenUnused(); return false; }
+            ssh->setParent(window); windows[args.kind] = {window, nullptr, ssh}; mark(args.kind, true);
+            connect(window, &QObject::destroyed, this, [this,kind=args.kind]{ windows.erase(kind); mark(kind,false); releaseWhenUnused(); });
+            window->show(); window->raise(); window->requestActivate(); return true;
+        }
         auto* bridge=new EditorBridge(args);
         QQmlComponent component(engine.get(),QUrl("qrc:/qt/qml/EnvHosts/Editor/qt/qml/Main.qml"));
         if(component.isError()){error=component.errorString().toStdString();delete bridge;releaseWhenUnused();return false;}
         auto* object=component.createWithInitialProperties({{"bridge",QVariant::fromValue(bridge)}});
         auto* window=qobject_cast<QQuickWindow*>(object);
         if(!window){error=component.errorString().toStdString();delete object;delete bridge;releaseWhenUnused();return false;}
-        bridge->setParent(window);windows[args.kind]={window,bridge};mark(args.kind,true);
+        bridge->setParent(window);windows[args.kind]={window,bridge,nullptr};mark(args.kind,true);
         connect(bridge,&EditorBridge::closeReady,window,[window]{window->close();});
         connect(bridge,&EditorBridge::closeAccepted,window,[window]{
             window->setPersistentGraphics(false);
@@ -480,7 +493,7 @@ public:
         connect(window,&QObject::destroyed,this,[this,kind=args.kind]{windows.erase(kind);mark(kind,false);releaseWhenUnused();});
         window->show();window->raise();window->requestActivate();bridge->load();return true;
     }
-    void shutdown(){shuttingDown=true;if(windows.empty()){releaseWhenUnused();return;}for(auto& item:windows)if(item.second.bridge)item.second.bridge->requestClose(true);}
+    void shutdown(){shuttingDown=true;if(windows.empty()){releaseWhenUnused();return;}for(auto& item:windows){if(item.second.bridge)item.second.bridge->requestClose(true);else if(item.second.window)item.second.window->close();}}
 };
 EditorController* controller=nullptr;
 }
@@ -515,8 +528,8 @@ bool openEditorDeferred(const OpenArgs& a){
     },Qt::QueuedConnection);
 }
 bool isEditorOpen(const std::string& kind){if(!controller)return false;std::lock_guard<std::mutex> lock(controller->mutex);return controller->opened[kind];}
-void onExternalChange(const std::string& kind){if(controller)QMetaObject::invokeMethod(controller,[kind]{auto it=controller->windows.find(kind);if(it!=controller->windows.end()&&it->second.bridge)it->second.bridge->poll();},Qt::QueuedConnection);}
-void onAppearanceChanged(envh::i18n::Lang lang,bool dark,const std::string& appearanceJson){if(controller)QMetaObject::invokeMethod(controller,[lang,dark,appearanceJson]{applyColorScheme(dark);for(auto& item:controller->windows)if(item.second.bridge)item.second.bridge->appearance(lang,dark,appearanceJson);},Qt::QueuedConnection);}
+void onExternalChange(const std::string& kind){if(controller)QMetaObject::invokeMethod(controller,[kind]{auto it=controller->windows.find(kind);if(it!=controller->windows.end()&&it->second.bridge)it->second.bridge->poll();else if(it!=controller->windows.end()&&it->second.ssh)it->second.ssh->reload();},Qt::QueuedConnection);}
+void onAppearanceChanged(envh::i18n::Lang lang,bool dark,const std::string& appearanceJson){if(controller)QMetaObject::invokeMethod(controller,[lang,dark,appearanceJson]{applyColorScheme(dark);for(auto& item:controller->windows){if(item.second.bridge)item.second.bridge->appearance(lang,dark,appearanceJson);else if(item.second.ssh)item.second.ssh->setAppearance(lang,dark,appearanceJson);}},Qt::QueuedConnection);}
 void closeAllEditors(unsigned timeoutMs){
     if(!controller)return;QMetaObject::invokeMethod(controller,[]{controller->shutdown();},Qt::QueuedConnection);
     if(timeoutMs&&QThread::currentThread()!=qApp->thread()){

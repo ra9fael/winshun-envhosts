@@ -19,6 +19,8 @@
 #ifdef _WIN32
 
 #include <windows.h>
+#include <shellapi.h>
+#include <shlobj.h>
 
 #include <chrono>
 #include <cstdio>
@@ -34,6 +36,7 @@
 #include "winshun.h"
 #include "logic.h"
 #include "backup_format.h"
+#include "ssh_model.h"
 
 namespace envh {
 namespace native {
@@ -384,6 +387,132 @@ private:
     std::wstring m_path;
 };
 
+struct SshReadResult {
+    bool ok = true;
+    bool missing = false;
+    bool utf16 = false;
+    std::string content;
+    std::string errCode;
+    std::string errMsg;
+};
+
+inline std::wstring defaultSshDir()
+{
+    PWSTR knownProfile = nullptr;
+    if (SHGetKnownFolderPath(FOLDERID_Profile, KF_FLAG_DEFAULT, nullptr, &knownProfile) == S_OK && knownProfile) {
+        const std::wstring result = std::wstring(knownProfile) + L"\\.ssh";
+        CoTaskMemFree(knownProfile);
+        return result;
+    }
+    if (knownProfile)
+        CoTaskMemFree(knownProfile);
+    wchar_t profile[32768]{};
+    const DWORD n = GetEnvironmentVariableW(L"USERPROFILE", profile, 32768);
+    return n > 0 && n < 32768 ? std::wstring(profile, n) + L"\\.ssh" : std::wstring();
+}
+
+class SshStore {
+public:
+    SshStore(std::wstring dir, std::wstring configPath) : m_dir(std::move(dir)), m_config(std::move(configPath)) {}
+    void ensureDir() { std::error_code ec; std::filesystem::create_directories(m_dir, ec); }
+    SshReadResult read()
+    {
+        SshReadResult r;
+        if (GetFileAttributesW(m_config.c_str()) == INVALID_FILE_ATTRIBUTES) { r.missing = true; return r; }
+        std::ifstream in(m_config, std::ios::binary);
+        if (!in) { r.ok = false; r.errCode = "E_SSH_READ"; r.errMsg = "cannot read the SSH config"; return r; }
+        r.content.assign((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
+        const bool le = r.content.size() >= 2 && static_cast<unsigned char>(r.content[0]) == 0xFF && static_cast<unsigned char>(r.content[1]) == 0xFE;
+        const bool be = r.content.size() >= 2 && static_cast<unsigned char>(r.content[0]) == 0xFE && static_cast<unsigned char>(r.content[1]) == 0xFF;
+        if (le || be) { r.ok = false; r.utf16 = true; r.errCode = "E_SSH_UTF16"; r.errMsg = "the SSH config is UTF-16; convert it to UTF-8 before editing"; }
+        return r;
+    }
+    SshReadResult readKnownHosts() const
+    {
+        SshReadResult r; const std::wstring path = m_dir + L"\\known_hosts";
+        if (GetFileAttributesW(path.c_str()) == INVALID_FILE_ATTRIBUTES) { r.missing = true; return r; }
+        std::ifstream in(path, std::ios::binary); if (!in) { r.ok = false; r.errCode = "E_SSH_READ"; r.errMsg = "cannot read known_hosts"; return r; }
+        r.content.assign((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>()); return r;
+    }
+    bool write(const std::string& content, std::string& error) { return writeFile(m_config, content, error); }
+    bool writeKnownHosts(const std::string& content, std::string& error) { return writeFile(m_dir + L"\\known_hosts", content, error); }
+    std::vector<std::string> fileNames() const
+    {
+        std::vector<std::string> out; std::error_code ec; if (!std::filesystem::exists(m_dir, ec)) return out;
+        for (const auto& entry : std::filesystem::directory_iterator(m_dir, ec)) if (entry.is_regular_file(ec)) out.push_back(entry.path().filename().u8string());
+        std::sort(out.begin(), out.end()); return out;
+    }
+    std::vector<ssh::KeyFile> keys() const
+    {
+        std::vector<ssh::KeyFile> out; std::error_code ec; if (!std::filesystem::exists(m_dir, ec)) return out;
+        std::vector<std::string> pubs, privs;
+        for (const auto& entry : std::filesystem::directory_iterator(m_dir, ec)) {
+            if (!entry.is_regular_file(ec)) continue; const auto name = entry.path().filename().u8string();
+            if (name == "config" || name == "known_hosts" || name == "known_hosts.old" || name == "known_hosts2") continue;
+            if (name.size() > 4 && name.compare(name.size() - 4, 4, ".pub") == 0) pubs.push_back(name);
+            else { std::ifstream in(entry.path(), std::ios::binary); std::string head(64, '\0'); in.read(head.data(), 63); head.resize(static_cast<size_t>(in.gcount())); if (head.find("PRIVATE KEY-----") != std::string::npos) privs.push_back(name); }
+        }
+        std::sort(pubs.begin(), pubs.end()); std::sort(privs.begin(), privs.end()); std::vector<bool> paired(privs.size(), false);
+        for (const auto& pub : pubs) { const auto stem = pub.substr(0, pub.size() - 4); const auto it = std::find(privs.begin(), privs.end(), stem); const bool has = it != privs.end(); if (has) paired[static_cast<size_t>(it - privs.begin())] = true; std::ifstream in(m_dir / std::filesystem::path(pub), std::ios::binary); const std::string text((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>()); out.push_back(ssh::makeKeyFile(has ? stem : pub, has, true, text)); }
+        for (size_t i = 0; i < privs.size(); ++i) if (!paired[i]) out.push_back(ssh::makeKeyFile(privs[i], true, false, "")); return out;
+    }
+    bool deletePublicKeys(const std::vector<std::string>& names, std::string& error) { for (const auto& name : names) { if (!ssh::validKeyFileName(name)) { error = "E_KEYNAME"; return false; } const auto path = m_dir / std::filesystem::path(name); if (!DeleteFileW(path.c_str()) && GetLastError() != ERROR_FILE_NOT_FOUND) { error = "E_SSH_DELETE"; return false; } } return true; }
+private:
+    bool writeFile(const std::wstring& path, const std::string& content, std::string& error) { std::error_code ec; std::filesystem::create_directories(m_dir, ec); const HANDLE fh = CreateFileW(path.c_str(), GENERIC_WRITE, 0, nullptr, OPEN_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr); if (fh == INVALID_HANDLE_VALUE) { error = GetLastError() == ERROR_ACCESS_DENIED ? "E_DENIED" : "E_SSH_WRITE"; return false; } SetFilePointer(fh, 0, nullptr, FILE_BEGIN); SetEndOfFile(fh); DWORD wrote = 0; const BOOL ok = WriteFile(fh, content.data(), static_cast<DWORD>(content.size()), &wrote, nullptr); CloseHandle(fh); if (!ok || wrote != content.size()) { error = "E_SSH_WRITE"; return false; } return true; }
+    std::wstring m_dir, m_config;
+};
+
+struct ProcResult { bool launched = false; bool ok = false; int exitCode = -1; std::string out; std::string err; };
+struct LaunchResult { bool launched = false; std::string err; };
+inline std::wstring findProgram(const wchar_t* name) { wchar_t found[32768]{}; const DWORD n = SearchPathW(nullptr, name, nullptr, 32768, found, nullptr); return n ? std::wstring(found, n) : std::wstring(); }
+inline std::wstring findSshKeygen() { const auto path = findProgram(L"ssh-keygen.exe"); if (!path.empty()) return path; const std::wstring bundled = L"C:\\Windows\\System32\\OpenSSH\\ssh-keygen.exe"; return GetFileAttributesW(bundled.c_str()) == INVALID_FILE_ATTRIBUTES ? std::wstring() : bundled; }
+inline std::wstring findSshAdd() { const auto path = findProgram(L"ssh-add.exe"); if (!path.empty()) return path; const std::wstring bundled = L"C:\\Windows\\System32\\OpenSSH\\ssh-add.exe"; return GetFileAttributesW(bundled.c_str()) == INVALID_FILE_ATTRIBUTES ? std::wstring() : bundled; }
+inline std::wstring quoteLaunchArg(const std::wstring& arg) { if (!arg.empty() && arg.find_first_of(L" \t\"") == std::wstring::npos) return arg; std::wstring out=L"\""; int slashes=0; for(const wchar_t c:arg){if(c==L'\\')++slashes;else if(c==L'\"'){out.append(static_cast<size_t>(slashes*2+1),L'\\');out.push_back(L'\"');slashes=0;}else{out.append(static_cast<size_t>(slashes),L'\\');slashes=0;out.push_back(c);}}out.append(static_cast<size_t>(slashes*2),L'\\');out.push_back(L'\"');return out; }
+inline LaunchResult launchProcess(const std::wstring& program, const std::vector<std::wstring>& args) { LaunchResult result; std::wstring command=quoteLaunchArg(program);for(const auto& arg:args)command+=L" "+quoteLaunchArg(arg);STARTUPINFOW si{};si.cb=sizeof(si);si.lpDesktop=const_cast<wchar_t*>(L"winsta0\\default");PROCESS_INFORMATION pi{};if(!CreateProcessW(program.c_str(),command.data(),nullptr,nullptr,FALSE,CREATE_UNICODE_ENVIRONMENT|CREATE_NEW_CONSOLE,nullptr,nullptr,&si,&pi)){result.err="cannot start process";return result;}CloseHandle(pi.hThread);CloseHandle(pi.hProcess);result.launched=true;return result; }
+inline ProcResult runInteractiveProcess(const std::wstring& program, const std::vector<std::wstring>& args)
+{
+    ProcResult r;
+    std::wstring command = quoteLaunchArg(program);
+    for (const auto& arg : args) command += L" " + quoteLaunchArg(arg);
+    STARTUPINFOW si{}; si.cb = sizeof(si); si.lpDesktop = const_cast<wchar_t*>(L"winsta0\\default");
+    PROCESS_INFORMATION pi{};
+    if (!CreateProcessW(program.c_str(), command.data(), nullptr, nullptr, FALSE,
+                        CREATE_UNICODE_ENVIRONMENT | CREATE_NEW_CONSOLE, nullptr, nullptr, &si, &pi)) {
+        r.err = "cannot start process"; return r;
+    }
+    r.launched = true;
+    WaitForSingleObject(pi.hProcess, 300000);
+    DWORD code = 1; GetExitCodeProcess(pi.hProcess, &code);
+    CloseHandle(pi.hThread); CloseHandle(pi.hProcess);
+    r.exitCode = static_cast<int>(code); r.ok = code == 0; return r;
+}
+inline bool openUrl(const std::wstring& url, std::string& error) { const HINSTANCE r=ShellExecuteW(nullptr,L"open",url.c_str(),nullptr,nullptr,SW_SHOWNORMAL);if(reinterpret_cast<INT_PTR>(r)<=32){error="cannot open URL";return false;}return true; }
+inline ProcResult runProcess(const std::wstring& program, const std::vector<std::wstring>& args) { ProcResult r; std::wstring command=quoteLaunchArg(program);for(const auto& arg:args)command+=L" "+quoteLaunchArg(arg);STARTUPINFOW si{};si.cb=sizeof(si);si.dwFlags=STARTF_USESHOWWINDOW;si.wShowWindow=SW_HIDE;PROCESS_INFORMATION pi{};if(!CreateProcessW(program.c_str(),command.data(),nullptr,nullptr,FALSE,CREATE_NO_WINDOW,nullptr,nullptr,&si,&pi)){r.err="cannot start process";return r;}r.launched=true;WaitForSingleObject(pi.hProcess,60000);DWORD code=1;GetExitCodeProcess(pi.hProcess,&code);CloseHandle(pi.hThread);CloseHandle(pi.hProcess);r.exitCode=static_cast<int>(code);r.ok=code==0;return r; }
+inline ProcResult runProcessCapture(const std::wstring& program, const std::vector<std::wstring>& args)
+{
+    ProcResult r;
+    SECURITY_ATTRIBUTES sa{sizeof(sa), nullptr, TRUE};
+    HANDLE readPipe = nullptr, writePipe = nullptr;
+    if (!CreatePipe(&readPipe, &writePipe, &sa, 0)) { r.err = "cannot create process pipe"; return r; }
+    SetHandleInformation(readPipe, HANDLE_FLAG_INHERIT, 0);
+    std::wstring command = quoteLaunchArg(program);
+    for (const auto& arg : args) command += L" " + quoteLaunchArg(arg);
+    STARTUPINFOW si{}; si.cb = sizeof(si); si.dwFlags = STARTF_USESHOWWINDOW | STARTF_USESTDHANDLES;
+    si.wShowWindow = SW_HIDE; si.hStdOutput = writePipe; si.hStdError = writePipe; si.hStdInput = GetStdHandle(STD_INPUT_HANDLE);
+    PROCESS_INFORMATION pi{};
+    if (!CreateProcessW(program.c_str(), command.data(), nullptr, nullptr, TRUE, CREATE_NO_WINDOW, nullptr, nullptr, &si, &pi)) {
+        CloseHandle(readPipe); CloseHandle(writePipe); r.err = "cannot start process"; return r;
+    }
+    CloseHandle(writePipe); r.launched = true;
+    char buffer[4096]; DWORD got = 0;
+    while (ReadFile(readPipe, buffer, sizeof(buffer), &got, nullptr) && got > 0) r.out.append(buffer, got);
+    CloseHandle(readPipe);
+    WaitForSingleObject(pi.hProcess, 60000);
+    DWORD code = 1; GetExitCodeProcess(pi.hProcess, &code);
+    CloseHandle(pi.hThread); CloseHandle(pi.hProcess);
+    r.exitCode = static_cast<int>(code); r.ok = code == 0; return r;
+}
+
 // ---- backups ------------------------------------------------------------------
 
 class BackupStore {
@@ -428,6 +557,26 @@ public:
         const std::string path = m_dir + "/backups/hosts/" + id + ".hosts";
         writeFile(path, content);
         prune(m_dir + "/backups/hosts");
+        return id;
+    }
+
+    std::string saveSsh(const std::string& content)
+    {
+        const std::string id = stamp();
+        const std::string path = m_dir + "/backups/ssh/" + id + ".config";
+        ensureDir(m_dir + "/backups/ssh");
+        writeFile(path, content);
+        prune(m_dir + "/backups/ssh");
+        return id;
+    }
+
+    std::string saveKnownHosts(const std::string& content)
+    {
+        const std::string id = stamp();
+        const std::string path = m_dir + "/backups/ssh/" + id + ".known_hosts";
+        ensureDir(m_dir + "/backups/ssh");
+        writeFile(path, content);
+        prune(m_dir + "/backups/ssh");
         return id;
     }
 
@@ -613,7 +762,8 @@ private:
     }
     void prune(const std::string& dir)
     {
-        std::vector<Entry> all = listDir(dir, dir.find("hosts") != std::string::npos ? ".hosts" : ".json");
+        const std::string suffix = dir.find("ssh") != std::string::npos ? ".config" : (dir.find("hosts") != std::string::npos ? ".hosts" : ".json");
+        std::vector<Entry> all = listDir(dir, suffix);
         while (all.size() > static_cast<std::size_t>(m_keep)) {
             std::error_code ec;
             std::filesystem::remove(std::filesystem::u8path(all.back().path), ec);

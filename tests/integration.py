@@ -87,7 +87,7 @@ def reg_make_key():
 
 
 class Driver:
-    def __init__(self, data_dir, hosts_path, hosts_override=True):
+    def __init__(self, data_dir, hosts_path, hosts_override=True, extra_env=None):
         env = dict(os.environ)
         env["WS_ENVHOSTS_TEST_SUBKEY"] = SUBKEY
         if hosts_override:
@@ -97,6 +97,8 @@ class Driver:
             # %SystemRoot%\System32\drivers\etc\hosts (read-only for a
             # normal user), which is what the denial tests need.
             env.pop("WS_ENVHOSTS_TEST_HOSTS", None)
+        if extra_env:
+            env.update(extra_env)
         self.proc = subprocess.Popen(
             [EXE], stdin=subprocess.PIPE, stdout=subprocess.PIPE,
             stderr=subprocess.PIPE, env=env, text=True, bufsize=1,
@@ -501,6 +503,45 @@ def main():
     check("进入交互式编辑界面" in pinned_title(zh),
           "uiLanguage=zh-CN pins Chinese even when the host is English")
     zh.shutdown()
+
+    print("== SSH manager query uses the scratch OpenSSH config ==")
+    ssh_dir = os.path.join(tmp, "ssh")
+    os.makedirs(ssh_dir, exist_ok=True)
+    ssh_config = os.path.join(ssh_dir, "config")
+    with open(ssh_config, "w", encoding="utf-8", newline="") as f:
+        f.write("# keep\r\nHost bastion\r\n    HostName bastion.example.com\r\n"
+                "    User ops\r\n    Port 2222\r\n\r\nHost *\r\n"
+                "    ServerAliveInterval 60\r\n")
+    with open(os.path.join(ssh_dir, "id.pub"), "w", encoding="utf-8") as f:
+        f.write("ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIAABAgMEBQYHCAkKCwwNDg8QERITFBUWFxgZGhscHR4f me@host\n")
+    ssh_driver = Driver(data_dir, hosts_path, extra_env={"WS_ENVHOSTS_TEST_SSH": ssh_dir})
+    ssh_driver.initialize(data_dir, dict(settings, sshDir=""))
+    sshq = parse(ssh_driver.query("sshm", "", "sshm"))
+    ssh_items = sshq["result"]["items"]
+    ssh_conn = ssh_driver.find_item(ssh_items, kind="sshConn")
+    ssh_locked = next((item for item in ssh_items if item.get("data", {}).get("kind") == "sshConn"
+                       and item.get("data", {}).get("locked") is True), None)
+    check(ssh_items and ssh_items[0]["data"]["kind"] == "openSshEditor", "sshm opens the SSH manager")
+    check(ssh_conn is not None and ssh_conn["title"] == "bastion", "sshm lists the SSH alias")
+    check(ssh_locked is not None, "sshm marks wildcard blocks read-only")
+    ssh_alias = parse(ssh_driver.query("ssh", "", "ssh"))
+    check(any(item.get("data", {}).get("kind") == "sshConn" for item in ssh_alias["result"]["items"]),
+          "ssh remains a short alias for sshm")
+    ssh_keys = parse(ssh_driver.query("sshm:keys", "", "sshm:keys"))
+    check(ssh_driver.find_item(ssh_keys["result"]["items"], kind="sshKey") is not None,
+          "sshm:keys lists public keys")
+    before_ssh = hashlib.sha256(open(ssh_config, "rb").read()).hexdigest()
+    if ssh_conn is not None:
+        copied = parse(ssh_driver.action("sshm", "copySshCommand", ssh_conn))
+        copied_text = [effect.get("text", "") for effect in copied["result"]["effects"] if effect.get("type") == "copy"]
+        check(copied_text and copied_text[0].endswith('"bastion"'), "SSH command action uses the alias", str(copied_text))
+    if ssh_locked is not None:
+        refused = parse(ssh_driver.action("sshm", "openTerminal", ssh_locked))
+        check(any(effect.get("type") == "notify" for effect in refused["result"]["effects"]),
+              "external actions refuse wildcard blocks")
+    check(before_ssh == hashlib.sha256(open(ssh_config, "rb").read()).hexdigest(),
+          "SSH query actions do not write config")
+    ssh_driver.shutdown()
 
     d.shutdown()
     time.sleep(0.3)

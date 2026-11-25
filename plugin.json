@@ -3,8 +3,8 @@
   "manifest": 1,
   "id": "ra9fael.envhosts",
   "name": {
-    "zh": "环境变量 / hosts 编辑",
-    "en": "Env & hosts editor"
+    "zh": "环境变量 / hosts / SSH 编辑",
+    "en": "Env, hosts & SSH editor"
   },
   "version": "0.10.0",
   "description": {
@@ -31,11 +31,18 @@
     "elevated",
     "ui",
     "clipboard:write",
+    "processes",
     {
       "files:read": ["%SystemRoot%\\System32\\drivers\\etc\\hosts"]
     },
     {
       "files:write": ["%SystemRoot%\\System32\\drivers\\etc\\hosts"]
+    },
+    {
+      "files:read": ["%USERPROFILE%\\.ssh"]
+    },
+    {
+      "files:write": ["%USERPROFILE%\\.ssh"]
     }
   ],
   "ai": {
@@ -86,6 +93,21 @@
         { "id": "openFile", "title": { "zh": "打开 hosts 文件", "en": "Open hosts file" }, "key": "Shift+Enter" },
         { "id": "delete", "title": { "zh": "删除该行", "en": "Delete line" }, "key": "" }
       ]
+    },
+    {
+      "id": "sshm",
+      "keyword": ["sshm", "ssh", "sshm:keys"],
+      "title": { "zh": "SSH 连接与密钥", "en": "SSH connections & keys" },
+      "hint": { "zh": "如 sshm work；sshm:keys 列出密钥", "en": "e.g. sshm work; sshm:keys lists keys" },
+      "icon": "ph:terminal-window",
+      "actions": [
+        { "id": "edit", "title": { "zh": "编辑", "en": "Edit" }, "key": "Enter" },
+        { "id": "copySshCommand", "title": { "zh": "复制 SSH 命令", "en": "Copy SSH command" }, "key": "" },
+        { "id": "openTerminal", "title": { "zh": "用 Windows Terminal 打开", "en": "Open in Windows Terminal" }, "key": "" },
+        { "id": "motty", "title": { "zh": "用 Motty 连接", "en": "Connect with Motty" }, "key": "" },
+        { "id": "mottyAlias", "title": { "zh": "用 Motty 按 alias 连接", "en": "Connect with Motty by alias" }, "key": "" },
+        { "id": "delete", "title": { "zh": "删除", "en": "Delete" }, "key": "" }
+      ]
     }
   ],
   "settings": [
@@ -95,6 +117,13 @@
       "title": { "zh": "hosts 路径", "en": "hosts path" },
       "hint": { "zh": "支持 %VAR% 展开", "en": "%VAR% expanded" },
       "default": "%SystemRoot%\\System32\\drivers\\etc\\hosts"
+    },
+    {
+      "key": "sshDir",
+      "type": "text",
+      "title": { "zh": "SSH 目录", "en": "SSH folder" },
+      "hint": { "zh": "留空使用 %USERPROFILE%\\.ssh；支持 %VAR% 展开", "en": "Leave empty for %USERPROFILE%\\.ssh; %VAR% is expanded" },
+      "default": ""
     },
     {
       "key": "backupCount",

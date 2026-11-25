@@ -30,7 +30,7 @@ QtObject {
     readonly property int inputHeight: 28
     readonly property int headerHeight: 28
     readonly property int checkSize: 14
-    readonly property int selectionWidth: 32
+    readonly property int selectionWidth: 24
     readonly property int focusWidth: 2
     readonly property int controlRadius: 3
     readonly property int listMinHeight: 160

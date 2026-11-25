@@ -1,4 +1,5 @@
 #include "qt/qt_editor.h"
+#include "qt/qt_ssh.h"
 #include <QtTest>
 #include <QGuiApplication>
 #include <QQmlEngine>
@@ -470,6 +471,79 @@ private slots:
         bridge.selectAll();bridge.enableSelected(false);QCOMPARE(bridge.session().undoCount(),1);QVERIFY(!bridge.requestClose());bridge.respond("save");QTRY_COMPARE(bridge.state()["dialog"].toString(),QString("review"));
         QSignalSpy closed(&bridge,&EditorBridge::closeAccepted);bridge.respond("confirm");QTRY_VERIFY(!bridge.session().dirty());QTRY_COMPARE(closed.count(),1);
         QVERIFY2(warnings.isEmpty(),qPrintable(warnings.join('\n')));
+    }
+    void realQmlSshWindowCreates() {
+        const auto testRoot = QDir::current().filePath("ssh-window-test");
+        QDir(testRoot).removeRecursively();
+        QVERIFY(QDir().mkpath(testRoot + "/ssh"));
+        const auto sshDir = testRoot + "/ssh";
+        QFile config(sshDir + "/config");
+        QVERIFY(config.open(QIODevice::WriteOnly | QIODevice::Text));
+        config.write("Host demo\n    HostName demo.example.com\n    User ops\n\nHost staging\n    HostName staging.example.com\n");
+        config.close();
+
+        OpenArgs args;
+        args.kind = "ssh";
+        args.sshDir = sshDir.toStdWString();
+        args.dataDir = testRoot.toStdString();
+        args.setLang(envh::i18n::Lang::EnUS);
+        SshBridge bridge(args);
+        QStringList warnings;
+        QQmlEngine engine;
+        connect(&engine, &QQmlEngine::warnings, this, [&warnings](const QList<QQmlError>& list) {
+            for (const auto& error : list)
+                warnings << error.toString();
+        });
+        QQmlComponent component(&engine, QUrl::fromLocalFile(QStringLiteral(ENVHOSTS_SOURCE_DIR "/qt/qml/SshMain.qml")));
+        QVERIFY2(!component.isError(), qPrintable(component.errorString()));
+        std::unique_ptr<QObject> object(component.createWithInitialProperties({
+            {"bridge", QVariant::fromValue(static_cast<QObject*>(&bridge))}
+        }));
+        QVERIFY2(object, qPrintable(component.errorString()));
+        auto* window = qobject_cast<QQuickWindow*>(object.get());
+        QVERIFY(window);
+        window->show();
+        QString loadError;
+        QVERIFY2(bridge.load(loadError), qPrintable(loadError));
+        bridge.selectConn(0);
+        bridge.setConnSelection({0});
+        QMetaObject::invokeMethod(object.get(), "updateSelection", Q_ARG(QVariant, QStringLiteral("conn")),
+                                  Q_ARG(QVariant, 0), Q_ARG(QVariant, int(Qt::NoModifier)));
+        QCoreApplication::processEvents();
+        QVERIFY(QTest::qWaitForWindowExposed(window));
+        const auto panel = object->findChild<QObject*>("connectionDetailPanel");
+        QVERIFY(panel);
+        QVERIFY(panel->property("visible").toBool());
+        auto* detailSplit = object->findChild<QObject*>("detailHorizontalSplit");
+        QVERIFY(detailSplit);
+        QVERIFY(detailSplit->property("visible").toBool());
+        QVERIFY(!object->findChild<QObject*>("dockTabs"));
+        QVERIFY(!object->findChild<QObject*>("dockSplitView"));
+        const auto preview = bridge.previewLines();
+        QVERIFY(!preview.isEmpty());
+        bool hasConnection = false;
+        for (const auto& line : preview) {
+            const auto map = line.toMap();
+            hasConnection = hasConnection || map.value("connection").toInt() == 0;
+        }
+        QVERIFY(hasConnection);
+        bridge.setConnSelection({0, 1});
+        bool selectedDemo = false;
+        bool selectedStaging = false;
+        for (const auto& line : bridge.previewLines()) {
+            const auto map = line.toMap();
+            if (map.value("connection").toInt() == 0) {
+                QVERIFY(map.value("selected").toBool());
+                selectedDemo = true;
+            } else if (map.value("connection").toInt() == 1) {
+                QVERIFY(map.value("selected").toBool());
+                selectedStaging = true;
+            }
+        }
+        QVERIFY(selectedDemo);
+        QVERIFY(selectedStaging);
+        QVERIFY2(warnings.isEmpty(), qPrintable(warnings.join('\n')));
+        QDir(testRoot).removeRecursively();
     }
 };
 int main(int argc,char** argv) {QGuiApplication app(argc,argv);QQuickStyle::setStyle("Basic");QmlEditorTests tests;return QTest::qExec(&tests,argc,argv);}
