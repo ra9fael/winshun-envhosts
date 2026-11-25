@@ -18,6 +18,7 @@
 #include <QProcess>
 #include <QStringList>
 #include <QVariantList>
+#include <QHash>
 #include <QVariantMap>
 #include <QVector>
 
@@ -134,6 +135,8 @@ class SshBridge : public QObject {
     Q_PROPERTY(QString knownHostsError READ knownHostsError NOTIFY knownHostsChanged)
     Q_PROPERTY(QVariantList agentKeys READ agentKeys NOTIFY agentChanged)
     Q_PROPERTY(QString agentError READ agentError NOTIFY agentChanged)
+    Q_PROPERTY(QString agentSource READ agentSource CONSTANT)
+    Q_PROPERTY(QString agentSourceLabel READ agentSourceLabel CONSTANT)
     Q_PROPERTY(QStringList privateKeyNames READ privateKeyNames NOTIFY metaChanged)
     Q_PROPERTY(int connSel READ connSel NOTIFY selectionChanged)
     Q_PROPERTY(int keySel READ keySel NOTIFY selectionChanged)
@@ -187,6 +190,8 @@ public:
     QString knownHostsError() const { return m_knownHostsError; }
     QVariantList agentKeys() const { return m_agentKeys; }
     QString agentError() const { return m_agentError; }
+    QString agentSource() const { return m_args.sshAgent.empty() ? QStringLiteral("auto") : QString::fromStdString(m_args.sshAgent); }
+    QString agentSourceLabel() const;
     QStringList privateKeyNames() const;
     QVariantList conflictDiff() const { return m_conflictDiff; }
     bool conflictVisible() const { return m_conflictVisible; }
@@ -207,6 +212,7 @@ public:
     Q_INVOKABLE QVariantMap deleteKnownHosts(const QVariantList& rows);
     Q_INVOKABLE QVariantMap refreshAgent();
     Q_INVOKABLE QVariantMap addAgentKey(const QString& name);
+    Q_INVOKABLE QVariantMap addAgentKeyPath(const QString& path);
     Q_INVOKABLE QVariantMap removeAgentKeys(const QVariantList& fingerprints);
     Q_INVOKABLE QVariantMap clearAgent();
     Q_INVOKABLE void reloadKnownHosts() { refreshKnownHosts(); }
@@ -277,6 +283,8 @@ private:
     QVariantList m_selectedConns;
     QVariantList m_selectedKeys;
     QVariantList m_agentKeys;
+    QHash<QString, QString> m_agentExternalPaths;
+    QString m_pendingAgentPath;
     QVariantList m_conflictDiff;
     QVariantMap m_connectionTest {{QStringLiteral("state"), QStringLiteral("idle")}};
     QProcess* m_testProcess = nullptr;

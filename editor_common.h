@@ -19,10 +19,12 @@
 namespace editorwin {
 
 struct OpenArgs {
-    std::string kind; // "env" | "hosts"
+    std::string kind; // "env" | "hosts" | "ssh"
     std::wstring userSubkey = L"Environment"; // HKCU subkey (test override allowed)
     std::wstring sysSubkey = envh::native::systemEnvSubkey(); // HKLM subkey (test override allowed)
     std::wstring hostsPath; // full path to hosts
+    std::wstring sshDir; // %USERPROFILE%\.ssh or configured SSH folder
+    std::string sshAgent = "auto"; // auto | env | custom SSH_AUTH_SOCK value
     std::string dataDir; // WS_DATA_DIR (backups/ and drafts/<kind>.json live here)
     int backupCount = 10;
     bool showSystem = true;

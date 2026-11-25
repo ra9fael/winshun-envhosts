@@ -9,6 +9,7 @@ pragma ComponentBehavior: Bound
 
 import QtQuick
 import QtQuick.Controls.Basic
+import QtQuick.Dialogs
 import QtQuick.Layouts
 import "controls"
 
@@ -170,8 +171,8 @@ ApplicationWindow {
         statusAgent: n => "Agent 中有 " + n + " 个密钥",
         agentEmpty: "当前 agent 没有已加载的密钥。",
         agentAdd: "加载密钥", agentRemove: "移除选中", agentClear: "清空 Agent", agentRefresh: "刷新",
-        agentPick: "选择要加载的私钥", filterAgent: "筛选 Agent 密钥（指纹 / 注释 / 类型）", agentFingerprint: "指纹", agentComment: "注释", agentSource: "来源",
-        agentHint: "只操作当前用户的 OpenSSH agent；私钥正文和 passphrase 不会进入插件。",
+        agentPick: "选择要加载的私钥", agentBrowse: "浏览…", filterAgent: "筛选 Agent 密钥（指纹 / 注释 / 类型）", agentFingerprint: "指纹", agentComment: "注释", agentSource: "来源",
+        agentHint: "Agent 来源：" + (bridge ? bridge.agentSourceLabel : "auto") + "。只操作当前用户的 agent；私钥正文和 passphrase 不会进入插件。",
         bannerKeygen: "未检测到 ssh-keygen：生成密钥不可用。浏览、复制与编辑配置不受影响。",
         bannerLocked: "检测到 Include / Match / 通配符块：这些块只读，保存时原样保留。",
         bannerCreated: "已新建配置文件，保存后写入磁盘。",
@@ -282,8 +283,8 @@ ApplicationWindow {
         statusAgent: n => n + " key(s) in agent",
         agentEmpty: "No keys are loaded in the current agent.",
         agentAdd: "Load key", agentRemove: "Remove selected", agentClear: "Clear agent", agentRefresh: "Refresh",
-        agentPick: "Choose a private key", filterAgent: "Filter agent keys (fingerprint / comment / type)", agentFingerprint: "Fingerprint", agentComment: "Comment", agentSource: "Source",
-        agentHint: "Only the current user's OpenSSH agent is affected; private-key text and passphrases never enter the plugin.",
+        agentPick: "Choose a private key", agentBrowse: "Browse…", filterAgent: "Filter agent keys (fingerprint / comment / type)", agentFingerprint: "Fingerprint", agentComment: "Comment", agentSource: "Source",
+        agentHint: "Agent source: " + (bridge ? bridge.agentSourceLabel : "auto") + ". Only the selected agent is affected; private-key text and passphrases never enter the plugin.",
         bannerKeygen: "ssh-keygen was not found: key generation is unavailable. Browsing, copying and editing the config are unaffected.",
         bannerLocked: "Include / Match / wildcard blocks found: they are read-only and written back verbatim.",
         bannerCreated: "Config created in memory; it is written on the next save.",
@@ -606,6 +607,14 @@ ApplicationWindow {
             showToast(result.detail || result.code, true);
     }
 
+    function addExternalAgentKey(path) {
+        if (!bridge || !path)
+            return;
+        const result = bridge.addAgentKeyPath(path);
+        if (result.code !== "")
+            showToast(result.detail || result.code, true);
+    }
+
     function removeAgent() {
         const rows = agentRows();
         const fingerprints = [];
@@ -887,12 +896,39 @@ ApplicationWindow {
         MenuItem { text: root.str.btnDelete; onTriggered: root.askDelete() }
     }
 
+    FileDialog {
+        id: agentFileDialog
+        objectName: "agentFileDialog"
+        title: root.str.agentBrowse
+        fileMode: FileDialog.OpenFile
+        nameFilters: ["SSH private keys (*)", "All files (*)"]
+        onAccepted: root.addExternalAgentKey(selectedFile.toLocalFile())
+    }
+
     Dialog {
         id: agentPicker
         modal: true
         title: root.str.agentPick
-        standardButtons: Dialog.Ok | Dialog.Cancel
         width: Math.min(420, root.width - 48)
+        footer: DialogButtonBox {
+            alignment: Qt.AlignLeft
+            Button {
+                text: root.str.agentBrowse
+                onClicked: {
+                    agentPicker.close();
+                    agentFileDialog.open();
+                }
+            }
+            Button {
+                text: root.str.btnCancel
+                DialogButtonBox.buttonRole: DialogButtonBox.RejectRole
+            }
+            Button {
+                text: root.str.btnSave
+                DialogButtonBox.buttonRole: DialogButtonBox.AcceptRole
+                enabled: root.agentAddName !== ""
+            }
+        }
         height: Math.min(420, root.height - 48)
         onAccepted: root.addAgentKey()
         onRejected: root.agentAddName = ""
@@ -1941,6 +1977,7 @@ ApplicationWindow {
                                         Text {
                                             Layout.fillWidth: true
                                             text: modelData.fingerprint + (modelData.comment ? " · " + modelData.comment : "")
+                                                   + (modelData.source ? " · " + modelData.source : "")
                                             color: root.dimColor
                                             font.family: root.monoFont
                                             font.pixelSize: 11

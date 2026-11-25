@@ -1280,6 +1280,15 @@ inline bool keyMatches(const KeyFile& k, const std::string& filter)
 // exercises the same config the terminal will use. BatchMode turns a password
 // prompt into an immediate failure instead of a hang, and the trailing `exit`
 // keeps the server from starting a shell.
+inline std::string agentSocketValue(const std::string& setting, const std::string& inheritedSocket)
+{
+    if (setting == "env")
+        return inheritedSocket;
+    if (setting.empty() || setting == "auto")
+        return R"(\\.\pipe\openssh-ssh-agent)";
+    return setting;
+}
+
 inline std::vector<std::string> connectionTestArgs(const std::string& config, const std::string& alias,
                                                    int timeoutSeconds)
 {

@@ -485,6 +485,7 @@ private slots:
         OpenArgs args;
         args.kind = "ssh";
         args.sshDir = sshDir.toStdWString();
+        args.sshAgent = R"(\\.\pipe\custom-agent)";
         args.dataDir = testRoot.toStdString();
         args.setLang(envh::i18n::Lang::EnUS);
         SshBridge bridge(args);
@@ -522,6 +523,8 @@ private slots:
         QVERIFY(object->findChild<QObject*>("sshTestButton"));
         QVERIFY(object->findChild<QObject*>("sshConnectButton"));
         QVERIFY(object->findChild<QObject*>("sshTestStrip"));
+        QVERIFY(object->findChild<QObject*>("agentFileDialog"));
+        QCOMPARE(bridge.agentSourceLabel(), QStringLiteral(R"(\\.\pipe\custom-agent)"));
         QCOMPARE(bridge.connectionTest().value("state").toString(), QStringLiteral("idle"));
         QVERIFY(!bridge.testing());
         const auto preview = bridge.previewLines();

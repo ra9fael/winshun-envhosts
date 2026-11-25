@@ -44,6 +44,7 @@ namespace {
 struct Settings {
     std::string hostsPath = "%SystemRoot%\\System32\\drivers\\etc\\hosts";
     std::string sshDir;
+    std::string sshAgent = "auto";
     int backupCount = 10;
     int maxResults = 50;
     bool showSystem = true;
@@ -63,6 +64,7 @@ Settings readSettings(const winshun::Json& s)
     };
     st.hostsPath = text("hostsPath", st.hostsPath);
     st.sshDir = text("sshDir", st.sshDir);
+    st.sshAgent = text("sshAgent", st.sshAgent);
     st.uiLanguage = text("uiLanguage", st.uiLanguage);
     st.backupCount = envh::parseIntOr(text("backupCount", "10"), st.backupCount);
     st.maxResults = envh::parseIntOr(text("maxResults", "50"), st.maxResults);
@@ -378,6 +380,7 @@ struct EnvHosts : winshun::Plugin {
         oa.sysSubkey = testSystemSubkey();
         oa.hostsPath = winshun::wide(testHostsPath(st));
         oa.sshDir = sshDirPath(st);
+        oa.sshAgent = st.sshAgent;
         oa.dataDir = dataDir();
         oa.backupCount = st.backupCount;
         oa.showSystem = st.showSystem;
@@ -456,7 +459,7 @@ struct EnvHosts : winshun::Plugin {
             const bool keysMode = text == "keys" || envh::startsWith(text, "keys ");
             const std::string filter = keysMode ? winshun::trim(text.substr(4)) : text;
             winshun::Items items;
-            editorwin::OpenArgs oa; oa.kind = "ssh"; oa.sshDir = sshDirPath(st); oa.dataDir = dataDir(); oa.backupCount = st.backupCount; oa.filter = filter; oa.select = keysMode ? "key:" : ""; oa.setLang(uiLang()); oa.dark = theme() == "dark";
+            editorwin::OpenArgs oa; oa.kind = "ssh"; oa.sshDir = sshDirPath(st); oa.sshAgent = st.sshAgent; oa.dataDir = dataDir(); oa.backupCount = st.backupCount; oa.filter = filter; oa.select = keysMode ? "key:" : ""; oa.setLang(uiLang()); oa.dark = theme() == "dark";
             winshun::Item open("sshm:editor", tr(zh, "进入 SSH 管理器", "Open SSH manager"), tr(zh, "管理 SSH 客户端配置、密钥与 known_hosts", "Manage SSH config, keys and known_hosts"));
             open.withScore(1000).withData(rowData({{"kind","openSshEditor"},{"filter",filter},{"mode",keysMode?"keys":"conn"},{"primary","SSH"},{"detail",""},{"chain",""},{"expand",false}})).withActions({{"open",tr(zh,"打开","Open"),"Enter"}}); items.push_back(open);
             envh::native::SshStore store(oa.sshDir, oa.sshDir + L"\\config"); const auto read = store.read();

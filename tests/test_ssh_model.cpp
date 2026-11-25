@@ -21,6 +21,9 @@ int main()
         require(envh::ssh::fuzzyScore("bastion", "bas") > envh::ssh::fuzzyScore("backup-bastion", "bas"), "fuzzy score ranks prefix");
         const auto key = envh::ssh::parsePublicKey("ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIAABAgMEBQYHCAkKCwwNDg8QERITFBUWFxgZGhscHR4f me@host");
         require(key.ok && key.type == "ed25519", "public key parses");
+        require(envh::ssh::agentSocketValue("auto", "env-sock") == R"(\\.\pipe\openssh-ssh-agent)", "auto selects the system OpenSSH agent pipe");
+        require(envh::ssh::agentSocketValue("env", "env-sock") == "env-sock", "env selects the inherited agent socket");
+        require(envh::ssh::agentSocketValue(R"(\\.\pipe\custom-agent)", "env-sock") == R"(\\.\pipe\custom-agent)", "custom agent path is preserved");
         const auto testArgs = envh::ssh::connectionTestArgs("C:\\ssh\\config", "bastion", 7);
         require(!testArgs.empty() && testArgs.back() == "exit", "connection test ends with exit");
         require(std::find(testArgs.begin(), testArgs.end(), "bastion") != testArgs.end(), "connection test uses the alias");

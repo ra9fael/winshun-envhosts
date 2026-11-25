@@ -14,6 +14,7 @@
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QProcess>
+#include <QProcessEnvironment>
 #include <QRegularExpression>
 #include <QUrl>
 #include <QStringList>
@@ -100,6 +101,14 @@ QString capped(const std::string& text)
     if (s.size() > 500)
         s = s.left(500) + QStringLiteral("...");
     return s;
+}
+
+std::wstring agentSocket(const std::string& setting)
+{
+    const QByteArray inherited = QProcessEnvironment::systemEnvironment()
+                                     .value(QStringLiteral("SSH_AUTH_SOCK")).toUtf8();
+    const std::string socket = envh::ssh::agentSocketValue(setting, std::string(inherited.constData(), inherited.size()));
+    return QString::fromUtf8(socket.data(), static_cast<int>(socket.size())).toStdWString();
 }
 
 QVariantMap actionResult(const QString& code, const QString& detail = QString(), const QString& value = QString())
@@ -220,6 +229,16 @@ SshBridge::SshBridge(OpenArgs args, QObject* parent) : QObject(parent), m_args(s
 QString SshBridge::title() const
 {
     return m_args.zh ? QStringLiteral("SSH 管理器 — Win顺") : QStringLiteral("SSH manager — WinShun");
+}
+
+QString SshBridge::agentSourceLabel() const
+{
+    const QString setting = agentSource();
+    if (setting == QStringLiteral("auto"))
+        return setting + QStringLiteral(" (\\\\.\\pipe\\openssh-ssh-agent)");
+    if (setting == QStringLiteral("env"))
+        return setting + QStringLiteral(" (SSH_AUTH_SOCK)");
+    return setting;
 }
 
 QStringList SshBridge::privateKeyNames() const
@@ -426,6 +445,9 @@ void SshBridge::refreshKnownHosts()
 
 QVariantMap SshBridge::refreshAgent()
 {
+    QStringList previousFingerprints;
+    for (const QVariant& item : m_agentKeys)
+        previousFingerprints.append(item.toMap().value(QStringLiteral("fingerprint")).toString());
     m_agentKeys.clear();
     m_agentError.clear();
     const std::wstring tool = envh::native::findSshAdd();
@@ -434,7 +456,7 @@ QVariantMap SshBridge::refreshAgent()
         emit agentChanged();
         return actionResult(QStringLiteral("tool"), m_agentError);
     }
-    const envh::native::ProcResult proc = envh::native::runProcessCapture(tool, {L"-l"});
+    const envh::native::ProcResult proc = envh::native::runProcessCapture(tool, {L"-l"}, agentSocket(m_args.sshAgent));
     const QString output = QString::fromUtf8(proc.out.data(), static_cast<int>(proc.out.size()));
     const QStringList lines = output.split(QRegularExpression(QStringLiteral("[\\r\\n]+")), Qt::SkipEmptyParts);
     bool emptyAgent = false;
@@ -453,16 +475,24 @@ QVariantMap SshBridge::refreshAgent()
         row[QStringLiteral("fingerprint")] = match.captured(2);
         row[QStringLiteral("comment")] = match.captured(3).trimmed();
         row[QStringLiteral("type")] = match.captured(4).trimmed();
-        row[QStringLiteral("source")] = QString();
+        row[QStringLiteral("source")] = m_args.zh ? QStringLiteral("外部路径") : QStringLiteral("External path");
+        row[QStringLiteral("sourcePath")] = QString();
         for (const auto& key : m_keys) {
             if (key.pub.ok && QString::fromStdString(key.pub.fingerprint) == match.captured(2)
                 && key.state != envh::ssh::KeyState::PublicOnly) {
-                row[QStringLiteral("source")] = QDir::toNativeSeparators(QDir(m_dirText).filePath(QString::fromStdString(key.name)));
+                row[QStringLiteral("sourcePath")] = QDir::toNativeSeparators(QDir(m_dirText).filePath(QString::fromStdString(key.name)));
+                row[QStringLiteral("source")] = row.value(QStringLiteral("sourcePath"));
                 break;
             }
         }
+        if (!m_pendingAgentPath.isEmpty() && !previousFingerprints.contains(match.captured(2)))
+            m_agentExternalPaths.insert(match.captured(2), m_pendingAgentPath);
+        const QString externalPath = m_agentExternalPaths.value(match.captured(2));
+        if (row.value(QStringLiteral("sourcePath")).toString().isEmpty() && !externalPath.isEmpty())
+            row[QStringLiteral("sourcePath")] = externalPath;
         m_agentKeys.append(row);
     }
+    m_pendingAgentPath.clear();
     if (!proc.launched)
         m_agentError = qs(proc.err);
     else if (!proc.ok && !emptyAgent && m_agentKeys.isEmpty())
@@ -475,21 +505,23 @@ QVariantMap SshBridge::refreshAgent()
 
 QVariantMap SshBridge::addAgentKey(const QString& name)
 {
+    if (name.isEmpty())
+        return actionResult(QStringLiteral("key"));
+    return addAgentKeyPath(QDir::toNativeSeparators(QDir(m_dirText).filePath(name)));
+}
+
+QVariantMap SshBridge::addAgentKeyPath(const QString& path)
+{
     const std::wstring tool = envh::native::findSshAdd();
     if (tool.empty())
         return actionResult(QStringLiteral("tool"), m_args.zh ? QStringLiteral("未找到 ssh-add.exe") : QStringLiteral("ssh-add.exe was not found"));
-    QString file;
-    for (const auto& key : m_keys) {
-        if (QString::fromStdString(key.name) == name && key.state != envh::ssh::KeyState::PublicOnly) {
-            file = QDir::toNativeSeparators(QDir(m_dirText).filePath(name));
-            break;
-        }
-    }
+    const QString file = QDir::toNativeSeparators(path.trimmed());
     if (file.isEmpty())
-        return actionResult(QStringLiteral("key"), m_args.zh ? QStringLiteral("未找到对应私钥文件") : QStringLiteral("The private key file was not found"));
-    const envh::native::ProcResult proc = envh::native::runInteractiveProcess(tool, {L"--", file.toStdWString()});
+        return actionResult(QStringLiteral("key"), m_args.zh ? QStringLiteral("请选择私钥文件") : QStringLiteral("Choose a private key file"));
+    const envh::native::ProcResult proc = envh::native::runInteractiveProcess(tool, {L"--", file.toStdWString()}, agentSocket(m_args.sshAgent));
     if (!proc.launched || !proc.ok)
         return actionResult(QStringLiteral("agent"), proc.err.empty() ? QStringLiteral("ssh-add failed") : qs(proc.err));
+    m_pendingAgentPath = file;
     return refreshAgent();
 }
 
@@ -505,13 +537,13 @@ QVariantMap SshBridge::removeAgentKeys(const QVariantList& fingerprints)
         for (const QVariant& item : m_agentKeys) {
             const QVariantMap row = item.toMap();
             if (row.value(QStringLiteral("fingerprint")).toString() == fingerprint) {
-                source = row.value(QStringLiteral("source")).toString();
+                source = row.value(QStringLiteral("sourcePath")).toString();
                 break;
             }
         }
         if (source.isEmpty())
             return actionResult(QStringLiteral("source"), m_args.zh ? QStringLiteral("选中的 agent 密钥没有对应的本地公钥/私钥文件") : QStringLiteral("The selected agent key has no matching local key file"));
-        const envh::native::ProcResult proc = envh::native::runProcessCapture(tool, {L"-d", source.toStdWString()});
+        const envh::native::ProcResult proc = envh::native::runProcessCapture(tool, {L"-d", source.toStdWString()}, agentSocket(m_args.sshAgent));
         if (!proc.ok)
             return actionResult(QStringLiteral("agent"), proc.out.empty() ? QStringLiteral("ssh-add -d failed") : QString::fromUtf8(proc.out.data(), static_cast<int>(proc.out.size())).trimmed());
         ++removed;
@@ -527,7 +559,7 @@ QVariantMap SshBridge::clearAgent()
     const std::wstring tool = envh::native::findSshAdd();
     if (tool.empty())
         return actionResult(QStringLiteral("tool"), m_args.zh ? QStringLiteral("未找到 ssh-add.exe") : QStringLiteral("ssh-add.exe was not found"));
-    const envh::native::ProcResult proc = envh::native::runProcessCapture(tool, {L"-D"});
+    const envh::native::ProcResult proc = envh::native::runProcessCapture(tool, {L"-D"}, agentSocket(m_args.sshAgent));
     if (!proc.ok)
         return actionResult(QStringLiteral("agent"), proc.out.empty() ? QStringLiteral("ssh-add -D failed") : QString::fromUtf8(proc.out.data(), static_cast<int>(proc.out.size())).trimmed());
     return refreshAgent();

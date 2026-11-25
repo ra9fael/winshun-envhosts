@@ -125,6 +125,13 @@
       "default": ""
     },
     {
+      "key": "sshAgent",
+      "type": "text",
+      "title": { "zh": "SSH Agent", "en": "SSH agent" },
+      "hint": { "zh": "auto 使用系统 OpenSSH 管道；env 使用 SSH_AUTH_SOCK；也可填写自定义管道或 socket 路径", "en": "auto uses the system OpenSSH pipe; env uses SSH_AUTH_SOCK; enter a custom pipe or socket path" },
+      "default": "auto"
+    },
+    {
       "key": "backupCount",
       "type": "number",
       "title": { "zh": "备份数", "en": "Backups kept" },

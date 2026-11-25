@@ -469,15 +469,48 @@ inline std::wstring findSshKeygen() { const auto path = findProgram(L"ssh-keygen
 inline std::wstring findSshAdd() { const auto path = findProgram(L"ssh-add.exe"); if (!path.empty()) return path; const std::wstring bundled = L"C:\\Windows\\System32\\OpenSSH\\ssh-add.exe"; return GetFileAttributesW(bundled.c_str()) == INVALID_FILE_ATTRIBUTES ? std::wstring() : bundled; }
 inline std::wstring quoteLaunchArg(const std::wstring& arg) { if (!arg.empty() && arg.find_first_of(L" \t\"") == std::wstring::npos) return arg; std::wstring out=L"\""; int slashes=0; for(const wchar_t c:arg){if(c==L'\\')++slashes;else if(c==L'\"'){out.append(static_cast<size_t>(slashes*2+1),L'\\');out.push_back(L'\"');slashes=0;}else{out.append(static_cast<size_t>(slashes),L'\\');slashes=0;out.push_back(c);}}out.append(static_cast<size_t>(slashes*2),L'\\');out.push_back(L'\"');return out; }
 inline LaunchResult launchProcess(const std::wstring& program, const std::vector<std::wstring>& args) { LaunchResult result; std::wstring command=quoteLaunchArg(program);for(const auto& arg:args)command+=L" "+quoteLaunchArg(arg);STARTUPINFOW si{};si.cb=sizeof(si);si.lpDesktop=const_cast<wchar_t*>(L"winsta0\\default");PROCESS_INFORMATION pi{};if(!CreateProcessW(program.c_str(),command.data(),nullptr,nullptr,FALSE,CREATE_UNICODE_ENVIRONMENT|CREATE_NEW_CONSOLE,nullptr,nullptr,&si,&pi)){result.err="cannot start process";return result;}CloseHandle(pi.hThread);CloseHandle(pi.hProcess);result.launched=true;return result; }
-inline ProcResult runInteractiveProcess(const std::wstring& program, const std::vector<std::wstring>& args)
+inline std::vector<wchar_t> processEnvironmentWith(const wchar_t* name, const std::wstring& value)
+{
+    std::vector<std::wstring> entries;
+    LPWCH environment = GetEnvironmentStringsW();
+    if (environment) {
+        for (const wchar_t* entry = environment; *entry; entry += std::wcslen(entry) + 1) {
+            const wchar_t* equals = std::wcschr(entry, L'=');
+            if (!equals || _wcsnicmp(entry, name, static_cast<size_t>(equals - entry)) != 0
+                || static_cast<size_t>(equals - entry) != std::wcslen(name))
+                entries.emplace_back(entry);
+        }
+        FreeEnvironmentStringsW(environment);
+    }
+    entries.emplace_back(std::wstring(name) + L"=" + value);
+    std::sort(entries.begin(), entries.end(), [](const std::wstring& a, const std::wstring& b) {
+        return _wcsicmp(a.c_str(), b.c_str()) < 0;
+    });
+    std::vector<wchar_t> block;
+    for (const auto& entry : entries) {
+        block.insert(block.end(), entry.begin(), entry.end());
+        block.push_back(L'\0');
+    }
+    block.push_back(L'\0');
+    return block;
+}
+
+inline ProcResult runInteractiveProcess(const std::wstring& program, const std::vector<std::wstring>& args,
+                                        const std::wstring& sshAuthSock = {})
 {
     ProcResult r;
     std::wstring command = quoteLaunchArg(program);
     for (const auto& arg : args) command += L" " + quoteLaunchArg(arg);
     STARTUPINFOW si{}; si.cb = sizeof(si); si.lpDesktop = const_cast<wchar_t*>(L"winsta0\\default");
     PROCESS_INFORMATION pi{};
+    std::vector<wchar_t> environment;
+    void* environmentBlock = nullptr;
+    if (!sshAuthSock.empty()) {
+        environment = processEnvironmentWith(L"SSH_AUTH_SOCK", sshAuthSock);
+        environmentBlock = environment.data();
+    }
     if (!CreateProcessW(program.c_str(), command.data(), nullptr, nullptr, FALSE,
-                        CREATE_UNICODE_ENVIRONMENT | CREATE_NEW_CONSOLE, nullptr, nullptr, &si, &pi)) {
+                        CREATE_UNICODE_ENVIRONMENT | CREATE_NEW_CONSOLE, environmentBlock, nullptr, &si, &pi)) {
         r.err = "cannot start process"; return r;
     }
     r.launched = true;
@@ -488,7 +521,8 @@ inline ProcResult runInteractiveProcess(const std::wstring& program, const std::
 }
 inline bool openUrl(const std::wstring& url, std::string& error) { const HINSTANCE r=ShellExecuteW(nullptr,L"open",url.c_str(),nullptr,nullptr,SW_SHOWNORMAL);if(reinterpret_cast<INT_PTR>(r)<=32){error="cannot open URL";return false;}return true; }
 inline ProcResult runProcess(const std::wstring& program, const std::vector<std::wstring>& args) { ProcResult r; std::wstring command=quoteLaunchArg(program);for(const auto& arg:args)command+=L" "+quoteLaunchArg(arg);STARTUPINFOW si{};si.cb=sizeof(si);si.dwFlags=STARTF_USESHOWWINDOW;si.wShowWindow=SW_HIDE;PROCESS_INFORMATION pi{};if(!CreateProcessW(program.c_str(),command.data(),nullptr,nullptr,FALSE,CREATE_NO_WINDOW,nullptr,nullptr,&si,&pi)){r.err="cannot start process";return r;}r.launched=true;WaitForSingleObject(pi.hProcess,60000);DWORD code=1;GetExitCodeProcess(pi.hProcess,&code);CloseHandle(pi.hThread);CloseHandle(pi.hProcess);r.exitCode=static_cast<int>(code);r.ok=code==0;return r; }
-inline ProcResult runProcessCapture(const std::wstring& program, const std::vector<std::wstring>& args)
+inline ProcResult runProcessCapture(const std::wstring& program, const std::vector<std::wstring>& args,
+                                     const std::wstring& sshAuthSock = {})
 {
     ProcResult r;
     SECURITY_ATTRIBUTES sa{sizeof(sa), nullptr, TRUE};
@@ -500,7 +534,13 @@ inline ProcResult runProcessCapture(const std::wstring& program, const std::vect
     STARTUPINFOW si{}; si.cb = sizeof(si); si.dwFlags = STARTF_USESHOWWINDOW | STARTF_USESTDHANDLES;
     si.wShowWindow = SW_HIDE; si.hStdOutput = writePipe; si.hStdError = writePipe; si.hStdInput = GetStdHandle(STD_INPUT_HANDLE);
     PROCESS_INFORMATION pi{};
-    if (!CreateProcessW(program.c_str(), command.data(), nullptr, nullptr, TRUE, CREATE_NO_WINDOW, nullptr, nullptr, &si, &pi)) {
+    std::vector<wchar_t> environment;
+    void* environmentBlock = nullptr;
+    if (!sshAuthSock.empty()) {
+        environment = processEnvironmentWith(L"SSH_AUTH_SOCK", sshAuthSock);
+        environmentBlock = environment.data();
+    }
+    if (!CreateProcessW(program.c_str(), command.data(), nullptr, nullptr, TRUE, CREATE_UNICODE_ENVIRONMENT | CREATE_NO_WINDOW, environmentBlock, nullptr, &si, &pi)) {
         CloseHandle(readPipe); CloseHandle(writePipe); r.err = "cannot start process"; return r;
     }
     CloseHandle(writePipe); r.launched = true;

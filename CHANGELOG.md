@@ -7,6 +7,13 @@ single source of truth; release tags are `<gdi|qml>/v<version>`.
 
 ## [Unreleased]
 
+### Added
+
+- SSH agent source setting for the system OpenSSH named pipe, inherited
+  `SSH_AUTH_SOCK`, or a custom pipe/socket path. The agent key picker can also
+  load private keys from any file path; private-key contents remain with
+  `ssh-add`.
+
 ## [0.10.0] - 2026-11-18
 
 ### Added
