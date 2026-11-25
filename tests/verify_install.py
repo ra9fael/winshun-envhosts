@@ -111,7 +111,7 @@ def inspect_archive(package: Path) -> dict:
     check(bool(VERSION_RE.fullmatch(version)), "three-part version", version)
     check(program.lower().endswith(".exe") and program in names,
           "runtime.program is an exe present in the package", program)
-    check(minimum == "0.22.0", "minWinShun is the unreviewed-native floor", minimum)
+    check(minimum == "0.23.0", "minWinShun supports the shared-Qt elevated permission", minimum)
     print(f"   {len(names)} files, {total} bytes unpacked, version {version}", flush=True)
     return manifest
 

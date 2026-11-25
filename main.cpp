@@ -121,7 +121,7 @@ winshun::Item errorRow(const std::string& id, const std::string& code, const std
 {
     winshun::Item item(id, title, subtitle);
     item.invalid()
-        .withIcon("color:#C0392B")
+        .withIcon("ph:warning-circle")
         .withScore(0)
         .withCopy(subtitle)
         .withPreview(detail)
@@ -147,7 +147,7 @@ winshun::Item envVarRow(const envh::EnvVar& v, const std::string& expanded, bool
         subtitle += tr(zh, " · 展开 ", " · expanded ") + std::to_string(expanded.size()) + tr(zh, " 字符", " chars");
 
     const std::string preview = v.value + (expandable ? "\n\n" + expanded : "");
-    const std::string icon = isUser ? "color:#185FA5" : "color:#8A8A8A";
+    const std::string icon = "ph:gear-six";
 
     // Inline edit covers the single-line grammar only: PATH-style separator
     // items, multi-string and any value the launcher grammar cannot round-trip
@@ -196,7 +196,7 @@ winshun::Item hostsEntryRow(const envh::HostsEntry& e, const std::string& id, bo
         // the text itself.
         winshun::Item item(id, e.comment, tr(zh, "分组注释", "section comment"));
         item.invalid()
-            .withIcon("color:#8A8A8A")
+            .withIcon("ph:text-align-left")
             .withScore(10)
             .withCopy(raw)
             .withPreview(raw)
@@ -208,7 +208,7 @@ winshun::Item hostsEntryRow(const envh::HostsEntry& e, const std::string& id, bo
                            + tr(zh, " 行 · ", " · ") + (e.commented ? tr(zh, "已注释", "commented") : tr(zh, "生效", "active"));
     if (!writable)
         subtitle += tr(zh, " · 🔒 需管理员", " · 🔒 needs admin");
-    const std::string icon = e.commented ? "color:#8A8A8A" : "color:#107C10";
+    const std::string icon = e.commented ? "ph:globe-x" : "ph:globe";
     // The default action is named after its outcome: enable a commented line,
     // disable a live one.
     winshun::Item item(id, title, subtitle);
@@ -249,7 +249,7 @@ winshun::Item envEditRow(const std::string& name, const std::string& value, cons
                                     "Enter save · Ctrl+Enter cancel · Shift+Enter copy")
                                  + (valid ? "" : " · " + errMsg);
     winshun::Item item("env:edit:" + (name.empty() ? "new" : envh::toLower(name)), title, subtitle);
-    item.withIcon("color:#185FA5")
+    item.withIcon("ph:sliders")
         .withScore(100)
         .withCopy(value)
         .withPreview(name + " = " + value)
@@ -279,7 +279,7 @@ winshun::Item confirmRow(const std::string& id, const std::string& kind, const s
         data[key] = value;
     winshun::Item item(id, title, subtitle);
     item.invalid()
-        .withIcon("color:#C0392B")
+        .withIcon("ph:warning-circle")
         .withScore(100)
         .withCopy(target)
         .withData(winshun::Json(std::move(data)))
@@ -298,7 +298,7 @@ winshun::Item editorEntryRow(const std::string& kind, const std::string& filter,
                       (isEnv ? tr(zh, "可视化编辑全部环境变量", "Visually edit all environment variables")
                              : tr(zh, "可视化编辑 hosts 文件", "Visually edit the hosts file"))
                           + tr(zh, " · Enter 打开独立窗口", " · Enter opens a standalone window"));
-    item.withIcon(isEnv ? "color:#185FA5" : "color:#107C10")
+    item.withIcon(isEnv ? "ph:sliders" : "ph:globe")
         .withScore(1000)
         .withPreview(isEnv
                          ? tr(zh, "打开独立窗口：纯键盘操作、撤销/重做、冲突检测、草稿自动保存",
@@ -521,7 +521,7 @@ struct EnvHosts : winshun::Plugin {
             for (const auto& b : backups.listEnv()) {
                 winshun::Item item("env:backup:" + b.id, tr(zh, "恢复备份 ", "restore backup ") + b.id,
                                    tr(zh, "Enter 恢复用户变量", "Enter restores user vars"));
-                item.withIcon("color:#8A8A8A")
+                item.withIcon("ph:clock-counter-clockwise")
                     .withScore(80)
                     .withData(rowData({{"kind", "envRestore"}, {"backupId", b.id}, {"primary", b.id}, {"detail", b.id}, {"chain", ""}, {"expand", false}}))
                     .withActions(std::vector<winshun::Action> {{"restore", tr(zh, "恢复", "Restore"), "Enter"}});
@@ -545,7 +545,7 @@ struct EnvHosts : winshun::Plugin {
                                      + tr(zh, " 项 · 输入更具体的名字可过滤", " · type a name to filter");
             winshun::Item h("env:hint", tr(zh, "环境变量", "Environment variables"), hint);
             h.invalid()
-                .withIcon("color:#185FA5")
+                .withIcon("ph:gear-six")
                 .withScore(0)
                 .withData(rowData({{"kind", "hint"}, {"primary", ""}, {"detail", hint}, {"chain", ""}, {"expand", false}}));
             items.push_back(std::move(h));
@@ -598,7 +598,7 @@ struct EnvHosts : winshun::Plugin {
             for (const auto& b : backups.listHosts()) {
                 winshun::Item item("hosts:backup:" + b.id, tr(zh, "恢复备份 ", "restore backup ") + b.id,
                                    tr(zh, "Enter 恢复 hosts", "Enter restores hosts"));
-                item.withIcon("color:#8A8A8A")
+                item.withIcon("ph:clock-counter-clockwise")
                     .withScore(80)
                     .withData(rowData({{"kind", "hostsRestore"}, {"backupId", b.id}, {"primary", b.id}, {"detail", b.id}, {"chain", ""}, {"expand", false}}))
                     .withActions(std::vector<winshun::Action> {{"restore", tr(zh, "恢复", "Restore"), "Enter"}});
@@ -621,7 +621,7 @@ struct EnvHosts : winshun::Plugin {
                                 + tr(zh, " 条 · 输入可过滤 IP / 主机名 / 注释", " entries · type to filter")
                                 + (!writable ? tr(zh, " · 🔒 只读（需管理员写入）", " · 🔒 read-only (admin to write)") : ""));
             h.invalid()
-                .withIcon("color:#107C10")
+                .withIcon("ph:globe")
                 .withScore(0)
                 .withData(rowData({{"kind", "hint"}, {"primary", ""}, {"detail", ""}, {"chain", ""}, {"expand", false}}));
             items.push_back(std::move(h));
